@@ -1,10 +1,11 @@
 import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
-import { useEffect } from "react";
-import { ActivityIndicator, Platform, Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { ActivityIndicator, Platform, Text, View, Pressable } from "react-native";
 
 export default function StepsCard() {
   const { steps, isLoading, isAuthorized, isAvailable, initialize, fetchTodayData } = useHealthStore();
+  const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
     if (Platform.OS === "ios") {
@@ -39,6 +40,27 @@ export default function StepsCard() {
             <Text className="text-sm text-gray-500 mt-1">Connect Apple Health to track steps</Text>
           </View>
         </View>
+        <Pressable
+          accessibilityRole="button"
+          onPress={async () => {
+            try {
+              setConnecting(true);
+              const ok = await initialize();
+              if (ok) {
+                await fetchTodayData();
+              }
+            } finally {
+              setConnecting(false);
+            }
+          }}
+          className="mt-3 self-start bg-blue-600 rounded-xl px-4 py-2"
+        >
+          {connecting ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text className="text-white font-semibold">Connect Apple Health</Text>
+          )}
+        </Pressable>
       </View>
     );
   }
