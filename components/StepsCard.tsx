@@ -4,14 +4,15 @@ import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
 
 export default function StepsCard() {
-  const { steps, isLoading, isAuthorized, isAvailable, initialize, fetchTodayData } = useHealthStore();
+  const { steps, isLoading, isAuthorized, isAvailable, isNativeModuleAvailable, error, initialize, fetchTodayData } = useHealthStore();
   const [connecting, setConnecting] = useState(false);
 
   useEffect(() => {
-    if (Platform.OS === "ios") {
+    // Only auto-initialize if native module is available
+    if (Platform.OS === "ios" && isNativeModuleAvailable) {
       initialize();
     }
-  }, []);
+  }, [isNativeModuleAvailable]);
 
   useEffect(() => {
     if (isAuthorized && Platform.OS === "ios") {
@@ -24,8 +25,28 @@ export default function StepsCard() {
     }
   }, [isAuthorized]);
 
-  if (Platform.OS !== "ios" || !isAvailable) {
+  // Hide on non-iOS
+  if (Platform.OS !== "ios") {
     return null;
+  }
+
+  // Show message if native module isn't available (Expo Go)
+  if (!isNativeModuleAvailable) {
+    return (
+      <View className="bg-yellow-50 rounded-2xl p-6 mb-4 border border-yellow-200">
+        <View className="flex-row items-center">
+          <View className="h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
+            <Feather name="alert-circle" size={24} color="#CA8A04" />
+          </View>
+          <View className="ml-4 flex-1">
+            <Text className="text-lg font-bold text-yellow-800">Apple Health</Text>
+            <Text className="text-sm text-yellow-700 mt-1">
+              Requires TestFlight or development build
+            </Text>
+          </View>
+        </View>
+      </View>
+    );
   }
 
   if (!isAuthorized) {
@@ -40,8 +61,12 @@ export default function StepsCard() {
             <Text className="text-sm text-gray-500 mt-1">Connect Apple Health to track steps</Text>
           </View>
         </View>
+        {error && (
+          <Text className="text-sm text-red-500 mb-2">{error}</Text>
+        )}
         <Pressable
           accessibilityRole="button"
+          disabled={connecting}
           onPress={async () => {
             try {
               setConnecting(true);

@@ -1,20 +1,40 @@
 import { Platform } from "react-native";
-import AppleHealthKit, {
-    HealthInputOptions,
-    HealthKitPermissions
-} from "react-native-health";
 
-// Permissions we need
-const permissions: HealthKitPermissions = {
-  permissions: {
-    read: [
-      AppleHealthKit.Constants.Permissions.StepCount,
-      AppleHealthKit.Constants.Permissions.Workout,
-      AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
-      AppleHealthKit.Constants.Permissions.DistanceWalkingRunning,
-    ],
-    write: [],
-  },
+// Lazy-load react-native-health to handle cases where native module isn't available
+let AppleHealthKit: any = null;
+let isNativeModuleAvailable = false;
+
+try {
+  // This will throw if the native module isn't linked (e.g., in Expo Go)
+  const HealthKitModule = require("react-native-health");
+  AppleHealthKit = HealthKitModule.default || HealthKitModule;
+  
+  // Check if the native module is actually available
+  if (AppleHealthKit && typeof AppleHealthKit.initHealthKit === "function") {
+    isNativeModuleAvailable = true;
+  }
+} catch (error) {
+  console.warn("react-native-health native module not available:", error);
+  isNativeModuleAvailable = false;
+}
+
+// Build permissions object only if module is available
+const getPermissions = () => {
+  if (!isNativeModuleAvailable || !AppleHealthKit?.Constants?.Permissions) {
+    return { permissions: { read: [], write: [] } };
+  }
+  
+  return {
+    permissions: {
+      read: [
+        AppleHealthKit.Constants.Permissions.StepCount,
+        AppleHealthKit.Constants.Permissions.Workout,
+        AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
+        AppleHealthKit.Constants.Permissions.DistanceWalkingRunning,
+      ],
+      write: [],
+    },
+  };
 };
 
 export type HealthData = {
@@ -52,7 +72,7 @@ const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
   63: { name: "Yoga", isOutdoor: false },
   45: { name: "Swimming (Pool)", isOutdoor: false },
   19: { name: "Elliptical", isOutdoor: false },
-  37: { name: "Indoor Running", isOutdoor: false },
+  83: { name: "Indoor Running", isOutdoor: false },
   // Default
   0: { name: "Other Workout", isOutdoor: false },
 };
@@ -72,9 +92,21 @@ class HealthService {
     if (Platform.OS !== "ios") {
       return false;
     }
-    return AppleHealthKit.isAvailable((err, available) => {
-      return !err && available;
-    });
+    
+    // Native module must be available
+    if (!isNativeModuleAvailable) {
+      return false;
+    }
+    
+    // Synchronously return cached state, async check happens in initialize
+    return true;
+  }
+
+  /**
+   * Check if native module is linked (for UI to show appropriate messaging)
+   */
+  isNativeModuleLinked(): boolean {
+    return isNativeModuleAvailable;
   }
 
   /**
@@ -86,8 +118,15 @@ class HealthService {
       return false;
     }
 
+    if (!isNativeModuleAvailable) {
+      console.warn("HealthKit native module not available. Use a development build instead of Expo Go.");
+      return false;
+    }
+
+    const permissions = getPermissions();
+
     return new Promise((resolve) => {
-      AppleHealthKit.initHealthKit(permissions, (error) => {
+      AppleHealthKit.initHealthKit(permissions, (error: any) => {
         if (error) {
           console.error("Error initializing HealthKit:", error);
           this.isInitialized = false;
@@ -108,6 +147,8 @@ class HealthService {
    * Get step count for a specific date
    */
   async getStepsForDate(date: Date): Promise<number> {
+    if (!isNativeModuleAvailable) return 0;
+    
     if (!this.isAuthorized) {
       const initialized = await this.initialize();
       if (!initialized) return 0;
@@ -119,13 +160,13 @@ class HealthService {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const options: HealthInputOptions = {
+    const options = {
       startDate: startOfDay.toISOString(),
       endDate: endOfDay.toISOString(),
     };
 
     return new Promise((resolve) => {
-      AppleHealthKit.getStepCount(options, (error, results) => {
+      AppleHealthKit.getStepCount(options, (error: any, results: any) => {
         if (error) {
           console.error("Error getting steps:", error);
           resolve(0);
@@ -140,6 +181,8 @@ class HealthService {
    * Get workouts for a specific date
    */
   async getWorkoutsForDate(date: Date): Promise<WorkoutData[]> {
+    if (!isNativeModuleAvailable) return [];
+    
     if (!this.isAuthorized) {
       const initialized = await this.initialize();
       if (!initialized) return [];
@@ -151,14 +194,14 @@ class HealthService {
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const options: HealthInputOptions = {
+    const options = {
       startDate: startOfDay.toISOString(),
       endDate: endOfDay.toISOString(),
       type: "Workout",
     };
 
     return new Promise((resolve) => {
-      AppleHealthKit.getSamples(options, (error, results) => {
+      AppleHealthKit.getSamples(options, (error: any, results: any) => {
         if (error) {
           console.error("Error getting workouts:", error);
           resolve([]);

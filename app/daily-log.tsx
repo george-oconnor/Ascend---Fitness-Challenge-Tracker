@@ -26,7 +26,9 @@ export default function DailyLogScreen() {
   const { 
     steps, 
     workouts, 
-    isAuthorized, 
+    isAuthorized,
+    isNativeModuleAvailable,
+    error: healthError,
     isLoading: healthLoading,
     initialize: initHealth,
     fetchTodayData,
@@ -34,12 +36,12 @@ export default function DailyLogScreen() {
     getTotalWorkoutMinutes,
   } = useHealthStore();
 
-  // Initialize health and fetch data
+  // Initialize health and fetch data (only if native module is available)
   useEffect(() => {
-    if (Platform.OS === "ios") {
+    if (Platform.OS === "ios" && isNativeModuleAvailable) {
       initHealth();
     }
-  }, []);
+  }, [isNativeModuleAvailable]);
 
   // Refresh health data periodically
   useEffect(() => {
@@ -224,8 +226,22 @@ export default function DailyLogScreen() {
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="p-4">
-          {/* Apple Health Card */}
-          {Platform.OS === "ios" && !isAuthorized && (
+          {/* Apple Health Card - Show different states */}
+          {Platform.OS === "ios" && !isNativeModuleAvailable && (
+            <View className="bg-yellow-50 rounded-2xl p-4 mb-4 border border-yellow-200">
+              <View className="flex-row items-center">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-yellow-100">
+                  <Feather name="alert-circle" size={20} color="#CA8A04" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-semibold text-yellow-800">Apple Health</Text>
+                  <Text className="text-xs text-yellow-700">Requires TestFlight or development build</Text>
+                </View>
+              </View>
+            </View>
+          )}
+          
+          {Platform.OS === "ios" && isNativeModuleAvailable && !isAuthorized && (
             <Pressable
               onPress={handleConnectHealth}
               disabled={connectingHealth}
@@ -238,6 +254,9 @@ export default function DailyLogScreen() {
                 <View className="ml-3 flex-1">
                   <Text className="text-base font-semibold text-gray-900">Connect Apple Health</Text>
                   <Text className="text-xs text-gray-500">Auto-track steps & workouts</Text>
+                  {healthError && (
+                    <Text className="text-xs text-red-500 mt-1">{healthError}</Text>
+                  )}
                 </View>
                 {connectingHealth ? (
                   <ActivityIndicator size="small" color="#EF4444" />

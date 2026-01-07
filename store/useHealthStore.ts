@@ -3,6 +3,7 @@ import { captureException } from "@/lib/sentry";
 import { create } from "zustand";
 
 type HealthState = {
+  isNativeModuleAvailable: boolean;
   isAvailable: boolean;
   isAuthorized: boolean;
   isLoading: boolean;
@@ -19,6 +20,7 @@ type HealthState = {
 };
 
 export const useHealthStore = create<HealthState>((set, get) => ({
+  isNativeModuleAvailable: healthService.isNativeModuleLinked(),
   isAvailable: false,
   isAuthorized: false,
   isLoading: false,
@@ -27,6 +29,16 @@ export const useHealthStore = create<HealthState>((set, get) => ({
   error: null,
 
   initialize: async () => {
+    // Check if native module is available first
+    if (!healthService.isNativeModuleLinked()) {
+      set({ 
+        error: "Apple Health requires a development build. Expo Go is not supported.",
+        isLoading: false,
+        isNativeModuleAvailable: false,
+      });
+      return false;
+    }
+    
     set({ isLoading: true, error: null });
     try {
       const authorized = await healthService.initialize();
