@@ -1,11 +1,11 @@
 import {
-  createChallenge,
-  createDailyLog,
-  getChallenge,
-  getDailyLog,
-  getDailyLogsForChallenge,
-  updateChallenge,
-  updateDailyLog,
+    createChallenge,
+    createDailyLog,
+    getChallenge,
+    getDailyLog,
+    getDailyLogsForChallenge,
+    updateChallenge,
+    updateDailyLog,
 } from "@/lib/appwrite";
 import { captureException } from "@/lib/sentry";
 import type { Challenge, DailyLog } from "@/types/type";

@@ -1,5 +1,5 @@
-import { Account, Client, Databases, Query } from "appwrite";
 import type { Challenge, DailyLog, UserProfile } from "@/types/type";
+import { Account, Client, Databases, Query } from "appwrite";
 
 const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT;
 const projectId = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID;
