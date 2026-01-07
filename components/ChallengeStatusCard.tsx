@@ -93,7 +93,7 @@ export default function ChallengeStatusCard() {
             <Text className="text-xs text-gray-500 uppercase tracking-wide">
               Starts in {daysUntilStart} day{daysUntilStart !== 1 ? "s" : ""}
             </Text>
-            <Text className="text-xl font-bold text-gray-900">75 Hard Challenge</Text>
+            <Text className="text-xl font-bold text-gray-900">{challenge.totalDays} Hard Challenge</Text>
           </View>
           <Pressable
             onPress={(e) => {
@@ -139,7 +139,7 @@ export default function ChallengeStatusCard() {
       <View className="flex-row items-center justify-between mb-4">
         <View>
           <Text className="text-xs text-gray-500 uppercase tracking-wide">Day {currentDay} of {challenge.totalDays}</Text>
-          <Text className="text-xl font-bold text-gray-900">75 Hard Challenge</Text>
+          <Text className="text-xl font-bold text-gray-900">{challenge.totalDays} Hard Challenge</Text>
         </View>
         <Pressable
           onPress={(e) => {

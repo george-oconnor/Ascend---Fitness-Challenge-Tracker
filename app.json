@@ -13,11 +13,17 @@
       "buildNumber": "1",
       "supportsTablet": true,
       "bundleIdentifier": "com.georgeoc.75hardapp",
+      "entitlements": {
+        "com.apple.developer.healthkit": true,
+        "com.apple.developer.healthkit.background-delivery": true
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSFaceIDUsageDescription": "Use Face ID to securely access your data.",
         "NSCameraUsageDescription": "Camera access may be used for future features.",
-        "NSPhotoLibraryUsageDescription": "Photo library access may be used for future features."
+        "NSPhotoLibraryUsageDescription": "Photo library access may be used for future features.",
+        "NSHealthShareUsageDescription": "This app needs access to your health data to track your steps and workouts for the 75 Hard challenge.",
+        "NSHealthUpdateUsageDescription": "This app needs access to update your health data to log workouts for the 75 Hard challenge."
       }
     },
     "android": {
@@ -50,7 +56,8 @@
         }
       ],
       "expo-notifications",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "react-native-health"
     ],
     "experiments": {
       "typedRoutes": true,
