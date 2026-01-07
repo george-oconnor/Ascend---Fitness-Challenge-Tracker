@@ -20,18 +20,30 @@
     "development": {
       "ios": {
         "resourceClass": "medium",
-        "developmentClient": true
+        "developmentClient": true,
+        "env": {
+          "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+          "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728"
+        }
       }
     },
     "production": {
       "ios": {
-        "resourceClass": "medium"
+        "resourceClass": "medium",
+        "env": {
+          "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+          "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728"
+        }
       }
     },
     "testflight": {
       "ios": {
         "resourceClass": "medium",
-        "developmentClient": false
+        "developmentClient": false,
+        "env": {
+          "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+          "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728"
+        }
       }
     }
   },
