@@ -1,5 +1,4 @@
 import { getCategories } from "@/lib/appwrite";
-import { queueTransactionsForSync } from "@/lib/syncQueue";
 import { useSessionStore } from "@/store/useSessionStore";
 import { router } from "expo-router";
 import { useEffect, useState } from "react";
@@ -85,19 +84,14 @@ export default function AddTransactionScreen() {
       const amountInCents = Math.round(amountNum * 100);
       const dateISO = new Date(`${date}T${time}:00Z`).toISOString();
 
-      await queueTransactionsForSync(user.id, [
-        {
-          title: title.trim(),
-          subtitle: "Manual Entry",
-          amount: amountInCents,
-          kind,
-          categoryId: selectedCategoryId,
-          date: dateISO,
-          currency: "EUR",
-          source: "manual",
-          displayName: title.trim(),
-        },
-      ]);
+      // TODO: Add transaction to database
+      console.log("Adding transaction:", {
+        title: title.trim(),
+        amount: amountInCents,
+        kind,
+        categoryId: selectedCategoryId,
+        date: dateISO,
+      });
 
       Alert.alert("Success", "Transaction added successfully", [
         {

@@ -1,13 +1,9 @@
-import { useAutoSync } from "@/hooks/useAutoSync";
-import { detectCSVProvider } from "@/lib/csvDetector";
 import { initSentry } from "@/lib/sentry";
 import { useSessionStore } from "@/store/useSessionStore";
-import * as FileSystem from 'expo-file-system';
 import { useFonts } from "expo-font";
 import * as Linking from 'expo-linking';
 import { SplashScreen, Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef } from "react";
-import { Alert } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import './globals.css';
 
@@ -28,10 +24,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const navigationAttempted = useRef(false);
 
-  // Enable auto-sync
-  useAutoSync();
-
-  // Handle deep links for password reset and CSV file imports
+  // Handle deep links for password reset
   useEffect(() => {
     const handleDeepLink = async (event: { url: string }) => {
       const { hostname, path, queryParams } = Linking.parse(event.url);
@@ -48,70 +41,6 @@ export default function RootLayout() {
           } as any);
         }
         return;
-      }
-
-      // Handle file:// URLs (CSV files shared to the app)
-      if (event.url.startsWith('file://')) {
-        try {
-          // Read the file content
-          const fileContent = await FileSystem.readAsStringAsync(event.url);
-          
-          if (!fileContent || fileContent.trim().length === 0) {
-            Alert.alert('Error', 'The file appears to be empty');
-            return;
-          }
-
-          // Detect the CSV provider (AIB or Revolut)
-          const provider = detectCSVProvider(fileContent);
-
-          if (provider === 'unknown') {
-            Alert.alert(
-              'Unrecognized Format',
-              'Could not determine if this is an AIB or Revolut CSV file. Please select the provider manually.',
-              [
-                {
-                  text: 'AIB',
-                  onPress: () => {
-                    router.push({
-                      pathname: '/import/aib/paste',
-                      params: { csvContent: fileContent }
-                    } as any);
-                  }
-                },
-                {
-                  text: 'Revolut',
-                  onPress: () => {
-                    router.push({
-                      pathname: '/import/revolut/paste',
-                      params: { csvContent: fileContent }
-                    } as any);
-                  }
-                },
-                { text: 'Cancel', style: 'cancel' }
-              ]
-            );
-            return;
-          }
-
-          // Route to the appropriate import screen
-          const pathname = provider === 'aib' ? '/import/aib/paste' : '/import/revolut/paste';
-          router.push({
-            pathname,
-            params: { csvContent: fileContent }
-          } as any);
-
-          Alert.alert(
-            'CSV Detected',
-            `Detected ${provider.toUpperCase()} format. Loading import screen...`
-          );
-
-        } catch (error) {
-          console.error('Error reading CSV file:', error);
-          Alert.alert(
-            'Error',
-            'Failed to read the CSV file. Please try again.'
-          );
-        }
       }
     };
 

@@ -1,43 +1,46 @@
-export type Category = {
-  id: string;
-  name: string;
-  color?: string;
-  icon?: string;
+// 75 Hard Challenge Types
+export type Challenge = {
+  $id?: string;
+  userId: string;
+  startDate: string;
+  totalDays: number;
+  trackSteps: boolean;
+  stepsGoal: number;
+  trackWater: boolean;
+  waterLiters: number;
+  trackDiet: boolean;
+  trackWorkout1: boolean;
+  trackWorkout2: boolean;
+  workoutMinutes: number;
+  trackReading: boolean;
+  readingPages: number;
+  trackProgressPhoto: boolean;
+  trackNoAlcohol: boolean;
 };
 
-export type Transaction = {
-  id: string;
-  title: string;
-  subtitle: string;
-  amount: number;
-  categoryId: string;
-  kind: "income" | "expense";
+export type DailyLog = {
+  $id?: string;
+  userId: string;
+  challengeId: string;
   date: string;
-  currency?: string; // e.g., 'EUR', 'GBP', 'USD'
-  excludeFromAnalytics?: boolean;
-  isAnalyticsProtected?: boolean; // When true, excludeFromAnalytics cannot be toggled by user
-  source?: "revolut_import" | "aib_import" | "manual" | "other_import"; // Where the transaction came from
-  displayName?: string; // How the transaction appears to the user; defaults to title for deduplication
-  account?: string; // Which account this transaction relates to (e.g., "Current Account", "Savings")
-  matchedTransferId?: string; // Linked transaction for internal transfers
-  hideMerchantIcon?: boolean; // When true, use category icon instead of merchant icon
-  importBatchId?: string; // Unique identifier for the import batch this transaction came from
+  stepsCompleted?: boolean;
+  waterCompleted?: boolean;
+  dietCompleted?: boolean;
+  workout1Completed?: boolean;
+  workout2Completed?: boolean;
+  readingCompleted?: boolean;
+  progressPhotoCompleted?: boolean;
+  noAlcoholCompleted?: boolean;
+  notes?: string;
 };
 
-export type Summary = {
-  balance: number;
-  income: number;
-  expenses: number;
-  currency: string;
-  monthlyBudget: number;
-  budgetSource?: "manual" | "lastMonth";
-  lastMonthReference?: string;
-};
-
-export type QuickAction = {
-  id: string;
-  label: string;
-  icon: string; // icon name from Feather glyphMap
+export type UserProfile = {
+  $id?: string;
+  authId: string;
+  email: string;
+  firstName?: string;
+  lastName?: string;
+  createdAt: string;
 };
 
 export type SessionStatus = "idle" | "loading" | "authenticated" | "unauthenticated" | "error";

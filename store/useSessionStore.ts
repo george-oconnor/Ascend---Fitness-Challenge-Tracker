@@ -54,16 +54,16 @@ export const useSessionStore = create<SessionState>((set) => ({
     set({ status: "loading", error: null });
     try {
       const fullName = `${firstName} ${lastName}`.trim();
-      const authUser = await createAccount(email, password, fullName);
+      await createAccount(email, password, fullName);
       await signIn(email, password);
-      
-      // Create user profile in users table
-      await createUserProfile(authUser.$id, email, firstName, lastName);
       
       const user = await getCurrentUser();
       if (user) {
+        // Create user profile in users collection
+        await createUserProfile(user.$id, email, firstName, lastName);
+        
         setSentryUser({ id: user.$id, email: user.email, username: fullName });
-        set({ user: { id: user.$id, email: user.email, name: fullName, firstName, lastName }, token: user.$id, status: "authenticated", error: null });
+        set({ user: { id: user.$id, email: user.email, name: fullName }, token: user.$id, status: "authenticated", error: null });
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Signup failed";
