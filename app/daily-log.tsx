@@ -3,7 +3,7 @@ import { useHealthStore } from "@/store/useHealthStore";
 import type { DailyLog } from "@/types/type";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -21,6 +21,7 @@ type TaskItem = {
 };
 
 export default function DailyLogScreen() {
+  const [connectingHealth, setConnectingHealth] = useState(false);
   const { challenge, todayLog, toggleTask } = useChallengeStore();
   const { 
     steps, 
@@ -194,7 +195,15 @@ export default function DailyLogScreen() {
   };
 
   const handleConnectHealth = async () => {
-    await initHealth();
+    try {
+      setConnectingHealth(true);
+      const ok = await initHealth();
+      if (ok) {
+        await fetchTodayData();
+      }
+    } finally {
+      setConnectingHealth(false);
+    }
   };
 
   return (
@@ -219,6 +228,7 @@ export default function DailyLogScreen() {
           {Platform.OS === "ios" && !isAuthorized && (
             <Pressable
               onPress={handleConnectHealth}
+              disabled={connectingHealth}
               className="bg-red-50 rounded-2xl p-4 mb-4 border border-red-100"
             >
               <View className="flex-row items-center">
@@ -229,7 +239,11 @@ export default function DailyLogScreen() {
                   <Text className="text-base font-semibold text-gray-900">Connect Apple Health</Text>
                   <Text className="text-xs text-gray-500">Auto-track steps & workouts</Text>
                 </View>
-                <Feather name="chevron-right" size={20} color="#9CA3AF" />
+                {connectingHealth ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <Feather name="chevron-right" size={20} color="#9CA3AF" />
+                )}
               </View>
             </Pressable>
           )}

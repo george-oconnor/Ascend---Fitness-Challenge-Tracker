@@ -1,7 +1,7 @@
 import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
 import { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Text, View, Pressable } from "react-native";
+import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native";
 
 export default function StepsCard() {
   const { steps, isLoading, isAuthorized, isAvailable, initialize, fetchTodayData } = useHealthStore();
