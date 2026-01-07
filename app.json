@@ -56,15 +56,17 @@
         }
       ],
       "expo-notifications",
-      "@react-native-community/datetimepicker",
-      "react-native-health"
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "eas": {
+        "projectId": "952f241a-2d00-4951-8b7a-b073ec850257"
+      }
     }
   }
 }
