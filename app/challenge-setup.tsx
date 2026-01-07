@@ -215,6 +215,8 @@ export default function ChallengeSetupScreen() {
                   setShowDatePicker(Platform.OS === "ios");
                   if (date) setStartDate(date);
                 }}
+                textColor="#000000"
+                themeVariant="light"
               />
             )}
           </View>

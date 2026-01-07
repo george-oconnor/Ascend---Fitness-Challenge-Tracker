@@ -1,5 +1,6 @@
 import ChallengeStatusCard from "@/components/ChallengeStatusCard";
 import Header from "@/components/Header";
+import StepsCard from "@/components/StepsCard";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { useEffect } from "react";
@@ -22,6 +23,9 @@ export default function HomeScreen() {
       
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="p-4">
+          {/* Steps Card */}
+          <StepsCard />
+          
           {/* Challenge Status Card */}
           <ChallengeStatusCard />
         </View>
