@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "description": "75 Hard - Fitness Challenge - Built with Expo and Appwrite",
     "ios": {
-      "buildNumber": "10",
+        "buildNumber": "12",
       "supportsTablet": true,
       "bundleIdentifier": "com.georgeoc.75hardapp",
       "entitlements": {
@@ -56,7 +56,14 @@
         }
       ],
       "expo-notifications",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "react-native-health",
+        {
+          "healthSharePermission": "This app needs access to your health data to track your steps and workouts for the 75 Hard challenge.",
+          "healthUpdatePermission": "This app needs access to update your health data to log workouts for the 75 Hard challenge."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

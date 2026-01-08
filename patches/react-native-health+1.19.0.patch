@@ -1,0 +1,43 @@
+diff --git a/node_modules/react-native-health/index.js b/node_modules/react-native-health/index.js
+index 06e5105..d43564c 100644
+--- a/node_modules/react-native-health/index.js
++++ b/node_modules/react-native-health/index.js
+@@ -1,14 +1,35 @@
+ import { Activities, Observers, Permissions, Units } from './src/constants'
++const { NativeModules } = require('react-native')
+ 
+-const { AppleHealthKit } = require('react-native').NativeModules
+-
+-export const HealthKit = Object.assign({}, AppleHealthKit, {
++// Create a proxy that lazily accesses the native module
++// This fixes compatibility with React Native's New Architecture (bridgeless mode)
++// which lazy-loads native modules
++const HealthKit = new Proxy({
+   Constants: {
+     Activities,
+     Observers,
+     Permissions,
+     Units,
+   },
++}, {
++  get(target, prop) {
++    // Return Constants directly
++    if (prop === 'Constants') {
++      return target.Constants
++    }
++    // For all other properties, lazily access from NativeModules.AppleHealthKit
++    const nativeModule = NativeModules.AppleHealthKit
++    if (nativeModule && prop in nativeModule) {
++      return nativeModule[prop]
++    }
++    return undefined
++  },
++  has(target, prop) {
++    if (prop === 'Constants') return true
++    const nativeModule = NativeModules.AppleHealthKit
++    return nativeModule ? prop in nativeModule : false
++  }
+ })
+ 
++export { HealthKit }
+ module.exports = HealthKit

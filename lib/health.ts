@@ -47,7 +47,7 @@ function getWorkoutInfo(activityType: number): { name: string; isOutdoor: boolea
 class HealthService {
   private isInitialized = false;
   private isAuthorized = false;
-  private AppleHealthKit: any = null;
+  private HealthKit: any = null;
   private moduleLoadAttempted = false;
   private moduleLoadError: string | null = null;
 
@@ -56,7 +56,7 @@ class HealthService {
    */
   private loadModule(): boolean {
     if (this.moduleLoadAttempted) {
-      return this.AppleHealthKit !== null;
+      return this.HealthKit !== null;
     }
 
     this.moduleLoadAttempted = true;
@@ -67,14 +67,25 @@ class HealthService {
     }
 
     try {
-      // Direct require - let it fail naturally if not available
+      // Import the library - with our patch, it uses a Proxy for lazy loading
       const HealthKitModule = require("react-native-health");
-      this.AppleHealthKit = HealthKitModule.default || HealthKitModule;
       
-      // Verify the module has the methods we need
-      if (!this.AppleHealthKit || typeof this.AppleHealthKit.initHealthKit !== "function") {
-        this.moduleLoadError = "HealthKit module loaded but initHealthKit method not found";
-        this.AppleHealthKit = null;
+      // The library exports as module.exports = HealthKit
+      this.HealthKit = HealthKitModule.HealthKit || HealthKitModule.default || HealthKitModule;
+      
+      // With the Proxy patch, initHealthKit won't show up until we access it
+      // So we try to access it to trigger lazy loading
+      const hasInitHealthKit = typeof this.HealthKit?.initHealthKit === "function";
+      
+      console.log("📦 react-native-health module loaded:", {
+        hasModule: !!this.HealthKit,
+        hasInitHealthKit,
+        hasConstants: !!this.HealthKit?.Constants,
+      });
+
+      if (!hasInitHealthKit) {
+        this.moduleLoadError = "HealthKit native module not linked - initHealthKit not available";
+        this.HealthKit = null;
         return false;
       }
 
@@ -91,17 +102,17 @@ class HealthService {
    * Build permissions object
    */
   private getPermissions() {
-    if (!this.AppleHealthKit?.Constants?.Permissions) {
+    if (!this.HealthKit?.Constants?.Permissions) {
       return { permissions: { read: [], write: [] } };
     }
 
     return {
       permissions: {
         read: [
-          this.AppleHealthKit.Constants.Permissions.StepCount,
-          this.AppleHealthKit.Constants.Permissions.Workout,
-          this.AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
-          this.AppleHealthKit.Constants.Permissions.DistanceWalkingRunning,
+          this.HealthKit.Constants.Permissions.StepCount,
+          this.HealthKit.Constants.Permissions.Workout,
+          this.HealthKit.Constants.Permissions.ActiveEnergyBurned,
+          this.HealthKit.Constants.Permissions.DistanceWalkingRunning,
         ],
         write: [],
       },
@@ -117,7 +128,7 @@ class HealthService {
     if (!this.moduleLoadAttempted) {
       this.loadModule();
     }
-    return this.AppleHealthKit !== null;
+    return this.HealthKit !== null;
   }
 
   /**
@@ -153,7 +164,7 @@ class HealthService {
 
     return new Promise((resolve) => {
       try {
-        this.AppleHealthKit.initHealthKit(permissions, (error: any) => {
+        this.HealthKit.initHealthKit(permissions, (error: any) => {
           if (error) {
             console.error("Error initializing HealthKit:", error);
             this.isInitialized = false;
@@ -201,7 +212,7 @@ class HealthService {
 
     return new Promise((resolve) => {
       try {
-        this.AppleHealthKit.getStepCount(options, (error: any, results: any) => {
+        this.HealthKit.getStepCount(options, (error: any, results: any) => {
           if (error) {
             console.error("Error getting steps:", error);
             resolve(0);
@@ -241,7 +252,7 @@ class HealthService {
 
     return new Promise((resolve) => {
       try {
-        this.AppleHealthKit.getSamples(options, (error: any, results: any) => {
+        this.HealthKit.getSamples(options, (error: any, results: any) => {
           if (error) {
             console.error("Error getting workouts:", error);
             resolve([]);
