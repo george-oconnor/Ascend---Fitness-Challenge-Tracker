@@ -23,56 +23,43 @@ export default function ProgressSummaryCard() {
 
   if (!challenge || !todayLog) return null;
 
-  const items: JSX.Element[] = [];
+  const exerciseItems: JSX.Element[] = [];
+  const nutritionItems: JSX.Element[] = [];
+  const habitBools: Array<{ key: keyof typeof todayLog; label: string; value?: boolean }> = [];
 
-  // Steps
+  // Exercise group
   if (challenge.trackSteps) {
-    items.push(
+    exerciseItems.push(
       <ProgressRow key="steps" label="Steps" current={todayLog.stepsCount ?? 0} goal={challenge.stepsGoal ?? 0} unit="steps" />
     );
   }
-
-  // Outdoor workout
   if (challenge.trackWorkout1) {
-    items.push(
+    exerciseItems.push(
       <ProgressRow key="w1" label="Outdoor Workout" current={todayLog.workout1Minutes ?? 0} goal={challenge.workoutMinutes ?? 0} unit="min" />
     );
   }
-
-  // Second workout
   if (challenge.trackWorkout2) {
-    items.push(
+    exerciseItems.push(
       <ProgressRow key="w2" label="Second Workout" current={todayLog.workout2Minutes ?? 0} goal={challenge.workoutMinutes ?? 0} unit="min" />
     );
   }
 
-  // Water
+  // Nutrition group
   if (challenge.trackWater) {
-    items.push(
+    nutritionItems.push(
       <ProgressRow key="water" label="Water" current={todayLog.waterLiters ?? 0} goal={challenge.waterLiters ?? 0} unit="L" />
     );
   }
-
-  // Reading
-  if (challenge.trackReading) {
-    items.push(
-      <ProgressRow key="reading" label="Reading" current={todayLog.readingPages ?? 0} goal={challenge.readingPages ?? 0} unit="pages" />
-    );
-  }
-
-  // Calories
-  if (challenge.trackDiet) {
-    items.push(
+  if ((challenge as any).trackCalories) {
+    nutritionItems.push(
       <ProgressRow key="calories" label="Calories" current={todayLog.caloriesConsumed ?? 0} goal={challenge.caloriesGoal ?? 0} unit="kcal" />
     );
   }
-
-  // Weight (show simple current vs goal text)
   if (challenge.trackWeight) {
     const current = todayLog.currentWeight ?? 0;
     const goal = challenge.weightGoal ?? 0;
     const delta = current && goal ? (current - goal) : 0;
-    items.push(
+    nutritionItems.push(
       <View key="weight" className="mb-1 flex-row items-center justify-between">
         <Text className="text-sm text-gray-700">Weight</Text>
         <Text className="text-sm text-gray-700">{current} kg {goal ? `(goal ${goal} kg${delta ? `, ${delta > 0 ? "+" : ""}${delta.toFixed(1)} kg` : ""})` : ""}</Text>
@@ -80,11 +67,12 @@ export default function ProgressSummaryCard() {
     );
   }
 
-  // Booleans summary (diet/photo/no alcohol)
-  const bools: Array<{ key: keyof typeof todayLog; label: string; value?: boolean }> = [];
-  if (challenge.trackDiet) bools.push({ key: "dietCompleted", label: "Diet", value: todayLog.dietCompleted });
-  if (challenge.trackProgressPhoto) bools.push({ key: "progressPhotoCompleted", label: "Photo", value: todayLog.progressPhotoCompleted });
-  if (challenge.trackNoAlcohol) bools.push({ key: "noAlcoholCompleted", label: "No Alcohol", value: todayLog.noAlcoholCompleted });
+  // Habits group (booleans)
+  if (challenge.trackDiet) habitBools.push({ key: "dietCompleted", label: "Diet", value: todayLog.dietCompleted });
+  if (challenge.trackProgressPhoto) habitBools.push({ key: "progressPhotoCompleted", label: "Photo", value: todayLog.progressPhotoCompleted });
+  if (challenge.trackNoAlcohol) habitBools.push({ key: "noAlcoholCompleted", label: "No Alcohol", value: todayLog.noAlcoholCompleted });
+
+  const hasAny = exerciseItems.length + nutritionItems.length + habitBools.length > 0;
 
   return (
     <View className="bg-white rounded-2xl p-6 mt-2 shadow-sm">
@@ -93,19 +81,45 @@ export default function ProgressSummaryCard() {
         <Text className="text-sm font-semibold text-gray-700 ml-2">Today's Progress</Text>
       </View>
 
-      {items.length > 0 ? items : (
+      {!hasAny && (
         <Text className="text-sm text-gray-500">No tracked goals configured.</Text>
       )}
 
-      {bools.length > 0 && (
-        <View className="mt-3 flex-row flex-wrap">
-          {bools.map((b) => (
-            <View key={String(b.key)} className="mr-3 mb-2 px-3 py-1.5 rounded-full" style={{ backgroundColor: b.value ? "#DCFCE7" : "#F3F4F6" }}>
-              <Text style={{ color: b.value ? "#166534" : "#374151" }} className="text-xs font-semibold">
-                {b.label}: {b.value ? "Done" : "Pending"}
-              </Text>
-            </View>
-          ))}
+      {exerciseItems.length > 0 && (
+        <View className="mb-4">
+          <View className="flex-row items-center mb-2">
+            <Feather name="activity" size={14} color="#6B7280" />
+            <Text className="text-xs font-semibold text-gray-600 ml-2">Exercise</Text>
+          </View>
+          {exerciseItems}
+        </View>
+      )}
+
+      {nutritionItems.length > 0 && (
+        <View className="mb-2">
+          <View className="flex-row items-center mb-2">
+            <Feather name="droplet" size={14} color="#6B7280" />
+            <Text className="text-xs font-semibold text-gray-600 ml-2">Nutrition & Weight</Text>
+          </View>
+          {nutritionItems}
+        </View>
+      )}
+
+      {habitBools.length > 0 && (
+        <View className="mt-2">
+          <View className="flex-row items-center mb-2">
+            <Feather name="check-circle" size={14} color="#6B7280" />
+            <Text className="text-xs font-semibold text-gray-600 ml-2">Habits</Text>
+          </View>
+          <View className="flex-row flex-wrap">
+            {habitBools.map((b) => (
+              <View key={String(b.key)} className="mr-3 mb-2 px-3 py-1.5 rounded-full" style={{ backgroundColor: b.value ? "#DCFCE7" : "#F3F4F6" }}>
+                <Text style={{ color: b.value ? "#166534" : "#374151" }} className="text-xs font-semibold">
+                  {b.label}: {b.value ? "Done" : "Pending"}
+                </Text>
+              </View>
+            ))}
+          </View>
         </View>
       )}
     </View>

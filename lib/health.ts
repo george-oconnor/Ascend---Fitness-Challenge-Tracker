@@ -5,12 +5,14 @@ const isNativeModuleAvailable = Platform.OS === "ios" && !!NativeModules.AppleHe
 
 // Only require react-native-health if native module is available
 let AppleHealthKit: any = null;
+let hasInitMethod = false;
 
 if (isNativeModuleAvailable) {
   try {
     const HealthKitModule = require("react-native-health");
     // The module exports HealthKit as module.exports
     AppleHealthKit = HealthKitModule.default || HealthKitModule;
+    hasInitMethod = !!(AppleHealthKit && typeof AppleHealthKit.initHealthKit === "function");
   } catch (error) {
     console.warn("Error loading react-native-health:", error);
   }
@@ -104,7 +106,7 @@ class HealthService {
    * Check if native module is linked (for UI to show appropriate messaging)
    */
   isNativeModuleLinked(): boolean {
-    return isNativeModuleAvailable;
+    return isNativeModuleAvailable && hasInitMethod;
   }
 
   /**
@@ -116,7 +118,7 @@ class HealthService {
       return false;
     }
 
-    if (!isNativeModuleAvailable) {
+    if (!isNativeModuleAvailable || !hasInitMethod) {
       console.warn("HealthKit native module not available. Use a development build instead of Expo Go.");
       return false;
     }
@@ -124,6 +126,14 @@ class HealthService {
     const permissions = getPermissions();
 
     return new Promise((resolve) => {
+      if (!AppleHealthKit || typeof AppleHealthKit.initHealthKit !== "function") {
+        console.warn("HealthKit init function missing. Ensure a dev or production build with react-native-health installed.");
+        this.isInitialized = false;
+        this.isAuthorized = false;
+        resolve(false);
+        return;
+      }
+
       AppleHealthKit.initHealthKit(permissions, (error: any) => {
         if (error) {
           console.error("Error initializing HealthKit:", error);

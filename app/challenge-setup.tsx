@@ -114,6 +114,7 @@ export default function ChallengeSetupScreen() {
     trackWorkout1: challenge?.trackWorkout1 ?? true,
     trackWorkout2: challenge?.trackWorkout2 ?? true,
     trackDiet: challenge?.trackDiet ?? true,
+    trackCalories: (challenge as any)?.trackCalories ?? true,
     trackWater: challenge?.trackWater ?? true,
     trackReading: challenge?.trackReading ?? true,
     trackProgressPhoto: challenge?.trackProgressPhoto ?? true,
@@ -145,6 +146,7 @@ export default function ChallengeSetupScreen() {
       trackWorkout1: tracking.trackWorkout1,
       trackWorkout2: tracking.trackWorkout2,
       trackDiet: tracking.trackDiet,
+      trackCalories: tracking.trackCalories,
       trackWater: tracking.trackWater,
       trackReading: tracking.trackReading,
       trackProgressPhoto: tracking.trackProgressPhoto,
@@ -244,80 +246,208 @@ export default function ChallengeSetupScreen() {
             </View>
           </View>
 
-          {/* Tracking Options */}
+          {/* Exercise */}
           <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <Text className="text-sm font-semibold text-gray-700 mb-4">What to Track</Text>
+            <Text className="text-sm font-semibold text-gray-700 mb-4">Exercise</Text>
 
-            {TRACKING_OPTIONS.map((option, index) => (
-              <View key={option.key}>
-                <View className="flex-row items-center justify-between py-3">
-                  <View className="flex-row items-center flex-1">
-                    <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
-                      <Feather name={option.icon} size={18} color="#6B7280" />
-                    </View>
-                    <View className="ml-3 flex-1">
-                      <Text className="text-base font-medium text-gray-900">{option.label}</Text>
-                      <Text className="text-xs text-gray-500">{option.description}</Text>
-                    </View>
-                  </View>
-                  <Switch
-                    value={tracking[option.key]}
-                    onValueChange={() => toggleTracking(option.key)}
-                    trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
-                    thumbColor="white"
-                  />
+            {/* Outdoor Workout */}
+            <View className="flex-row items-center justify-between py-3">
+              <View className="flex-row items-center flex-1">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Feather name="sun" size={18} color="#6B7280" />
                 </View>
-
-                {/* Goal input if enabled and has goal */}
-                {option.hasGoal && tracking[option.key] && option.goalKey && (
-                  <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
-                    <Text className="text-sm text-gray-600 mr-2">Goal:</Text>
-                    <TextInput
-                      value={goals[option.goalKey]}
-                      onChangeText={(val) =>
-                        setGoals((prev) => ({ ...prev, [option.goalKey!]: val }))
-                      }
-                      keyboardType={option.goalType === "float" ? "decimal-pad" : "number-pad"}
-                      className="flex-1"
-                      style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
-                    />
-                    <Text className="text-sm text-gray-500">{option.goalLabel}</Text>
-                  </View>
-                )}
-
-                {index < TRACKING_OPTIONS.length - 1 && (
-                  <View className="h-px bg-gray-100" />
-                )}
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-medium text-gray-900">Outdoor Workout</Text>
+                  <Text className="text-xs text-gray-500">45+ minutes outdoor exercise</Text>
+                </View>
               </View>
-            ))}
+              <Switch
+                value={tracking.trackWorkout1}
+                onValueChange={() => toggleTracking("trackWorkout1")}
+                trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                thumbColor="white"
+              />
+            </View>
+            {tracking.trackWorkout1 && (
+              <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
+                <Text className="text-sm text-gray-600 mr-2">Minutes:</Text>
+                <TextInput
+                  value={goals.workoutMinutes}
+                  onChangeText={(val) => setGoals((prev) => ({ ...prev, workoutMinutes: val }))}
+                  keyboardType="number-pad"
+                  className="flex-1"
+                  style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+                />
+                <Text className="text-sm text-gray-500">min</Text>
+              </View>
+            )}
+
+            <View className="h-px bg-gray-100 my-2" />
+
+            {/* Second Workout */}
+            <View className="flex-row items-center justify-between py-3">
+              <View className="flex-row items-center flex-1">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Feather name="activity" size={18} color="#6B7280" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-medium text-gray-900">Second Workout</Text>
+                  <Text className="text-xs text-gray-500">Additional 45+ minute workout</Text>
+                </View>
+              </View>
+              <Switch
+                value={tracking.trackWorkout2}
+                onValueChange={() => toggleTracking("trackWorkout2")}
+                trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                thumbColor="white"
+              />
+            </View>
+
+            <View className="h-px bg-gray-100 my-2" />
+
+            {/* Steps */}
+            <View className="flex-row items-center justify-between py-3">
+              <View className="flex-row items-center flex-1">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Feather name="trending-up" size={18} color="#6B7280" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-medium text-gray-900">Daily Steps</Text>
+                  <Text className="text-xs text-gray-500">Hit your step count goal</Text>
+                </View>
+              </View>
+              <Switch
+                value={tracking.trackSteps}
+                onValueChange={() => toggleTracking("trackSteps")}
+                trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                thumbColor="white"
+              />
+            </View>
+            {tracking.trackSteps && (
+              <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
+                <Text className="text-sm text-gray-600 mr-2">Goal:</Text>
+                <TextInput
+                  value={goals.stepsGoal}
+                  onChangeText={(val) => setGoals((prev) => ({ ...prev, stepsGoal: val }))}
+                  keyboardType="number-pad"
+                  className="flex-1"
+                  style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+                />
+                <Text className="text-sm text-gray-500">steps</Text>
+              </View>
+            )}
           </View>
 
           {/* Nutrition & Weight */}
           <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
             <Text className="text-sm font-semibold text-gray-700 mb-4">Nutrition & Weight</Text>
 
-            {/* Calorie Goal */}
+            {/* Track Calories */}
             <View className="flex-row items-center justify-between py-3">
               <View className="flex-row items-center flex-1">
                 <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
                   <Feather name="bar-chart-2" size={18} color="#6B7280" />
                 </View>
                 <View className="ml-3 flex-1">
-                  <Text className="text-base font-medium text-gray-900">Daily Calorie Goal</Text>
-                  <Text className="text-xs text-gray-500">Target calories to consume per day</Text>
+                  <Text className="text-base font-medium text-gray-900">Track Calories</Text>
+                  <Text className="text-xs text-gray-500">Enable daily calorie tracking</Text>
                 </View>
               </View>
-            </View>
-            <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
-              <Text className="text-sm text-gray-600 mr-2">Goal:</Text>
-              <TextInput
-                value={goals.caloriesGoal}
-                onChangeText={(val) => setGoals((prev) => ({ ...prev, caloriesGoal: val }))}
-                keyboardType="number-pad"
-                className="flex-1"
-                style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+              <Switch
+                value={tracking.trackCalories}
+                onValueChange={() => toggleTracking("trackCalories")}
+                trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                thumbColor="white"
               />
-              <Text className="text-sm text-gray-500">kcal</Text>
+            </View>
+            {tracking.trackCalories && (
+              <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
+                <Text className="text-sm text-gray-600 mr-2">Goal:</Text>
+                <TextInput
+                  value={goals.caloriesGoal}
+                  onChangeText={(val) => setGoals((prev) => ({ ...prev, caloriesGoal: val }))}
+                  keyboardType="number-pad"
+                  className="flex-1"
+                  style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+                />
+                <Text className="text-sm text-gray-500">kcal</Text>
+              </View>
+            )}
+
+            <View className="h-px bg-gray-100 my-2" />
+
+            {/* Follow Diet */}
+            <View className="flex-row items-center justify-between py-3">
+              <View className="flex-row items-center flex-1">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Feather name="check-square" size={18} color="#6B7280" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-medium text-gray-900">Follow Diet</Text>
+                  <Text className="text-xs text-gray-500">Stick to your chosen diet plan</Text>
+                </View>
+              </View>
+              <Switch
+                value={tracking.trackDiet}
+                onValueChange={() => toggleTracking("trackDiet")}
+                trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                thumbColor="white"
+              />
+            </View>
+
+            <View className="h-px bg-gray-100 my-2" />
+
+            {/* Water */}
+            <View className="flex-row items-center justify-between py-3">
+              <View className="flex-row items-center flex-1">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Feather name="droplet" size={18} color="#6B7280" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-medium text-gray-900">Drink Water</Text>
+                  <Text className="text-xs text-gray-500">Drink your daily water goal</Text>
+                </View>
+              </View>
+              <Switch
+                value={tracking.trackWater}
+                onValueChange={() => toggleTracking("trackWater")}
+                trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                thumbColor="white"
+              />
+            </View>
+            {tracking.trackWater && (
+              <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
+                <Text className="text-sm text-gray-600 mr-2">Goal:</Text>
+                <TextInput
+                  value={goals.waterLiters}
+                  onChangeText={(val) => setGoals((prev) => ({ ...prev, waterLiters: val }))}
+                  keyboardType="decimal-pad"
+                  className="flex-1"
+                  style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+                />
+                <Text className="text-sm text-gray-500">L</Text>
+              </View>
+            )}
+
+            <View className="h-px bg-gray-100 my-2" />
+
+            {/* No Alcohol */}
+            <View className="flex-row items-center justify-between py-3">
+              <View className="flex-row items-center flex-1">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Feather name="slash" size={18} color="#6B7280" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-medium text-gray-900">No Alcohol</Text>
+                  <Text className="text-xs text-gray-500">Zero alcohol consumption</Text>
+                </View>
+              </View>
+              <Switch
+                value={tracking.trackNoAlcohol}
+                onValueChange={() => toggleTracking("trackNoAlcohol")}
+                trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                thumbColor="white"
+              />
             </View>
 
             <View className="h-px bg-gray-100 my-2" />
@@ -354,6 +484,59 @@ export default function ChallengeSetupScreen() {
                 <Text className="text-sm text-gray-500">kg</Text>
               </View>
             )}
+          </View>
+
+          {/* Removed separate Nutrition card; merged above */}
+
+          {/* Habits */}
+          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+            <Text className="text-sm font-semibold text-gray-700 mb-4">Habits</Text>
+
+            {["trackReading", "trackProgressPhoto"].map((key, index) => {
+              const option = TRACKING_OPTIONS.find((o) => o.key === key)!;
+              return (
+                <View key={option.key}>
+                  <View className="flex-row items-center justify-between py-3">
+                    <View className="flex-row items-center flex-1">
+                      <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                        <Feather name={option.icon} size={18} color="#6B7280" />
+                      </View>
+                      <View className="ml-3 flex-1">
+                        <Text className="text-base font-medium text-gray-900">{option.label}</Text>
+                        <Text className="text-xs text-gray-500">{option.description}</Text>
+                      </View>
+                    </View>
+                    <Switch
+                      value={tracking[option.key]}
+                      onValueChange={() => toggleTracking(option.key)}
+                      trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                      thumbColor="white"
+                    />
+                  </View>
+
+                  {/* Goal input if enabled and has goal */}
+                  {option.hasGoal && tracking[option.key] && option.goalKey && (
+                    <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
+                      <Text className="text-sm text-gray-600 mr-2">Goal:</Text>
+                      <TextInput
+                        value={goals[option.goalKey]}
+                        onChangeText={(val) =>
+                          setGoals((prev) => ({ ...prev, [option.goalKey!]: val }))
+                        }
+                        keyboardType={option.goalType === "float" ? "decimal-pad" : "number-pad"}
+                        className="flex-1"
+                        style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+                      />
+                      <Text className="text-sm text-gray-500">{option.goalLabel}</Text>
+                    </View>
+                  )}
+
+                  {index < 1 && (
+                    <View className="h-px bg-gray-100" />
+                  )}
+                </View>
+              );
+            })}
           </View>
         </View>
       </ScrollView>

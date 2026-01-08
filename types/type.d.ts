@@ -9,6 +9,7 @@ export type Challenge = {
   trackWater: boolean;
   waterLiters: number;
   trackDiet: boolean;
+  trackCalories: boolean;
   caloriesGoal: number;
   trackWeight: boolean;
   weightGoal: number;
