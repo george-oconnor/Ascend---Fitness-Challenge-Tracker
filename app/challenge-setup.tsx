@@ -119,6 +119,7 @@ export default function ChallengeSetupScreen() {
     trackProgressPhoto: challenge?.trackProgressPhoto ?? true,
     trackNoAlcohol: challenge?.trackNoAlcohol ?? true,
     trackSteps: challenge?.trackSteps ?? false,
+    trackWeight: challenge?.trackWeight ?? false,
   });
 
   // Goals
@@ -127,6 +128,8 @@ export default function ChallengeSetupScreen() {
     waterLiters: String(challenge?.waterLiters ?? 3.0),
     readingPages: String(challenge?.readingPages ?? 10),
     stepsGoal: String(challenge?.stepsGoal ?? 10000),
+    caloriesGoal: String(challenge?.caloriesGoal ?? 2000),
+    weightGoal: String(challenge?.weightGoal ?? 0),
   });
 
   const handleSave = async () => {
@@ -147,10 +150,13 @@ export default function ChallengeSetupScreen() {
       trackProgressPhoto: tracking.trackProgressPhoto,
       trackNoAlcohol: tracking.trackNoAlcohol,
       trackSteps: tracking.trackSteps,
+      trackWeight: tracking.trackWeight,
       workoutMinutes: parseInt(goals.workoutMinutes, 10) || 45,
       waterLiters: parseFloat(goals.waterLiters) || 3.0,
       readingPages: parseInt(goals.readingPages, 10) || 10,
       stepsGoal: parseInt(goals.stepsGoal, 10) || 10000,
+      caloriesGoal: parseInt(goals.caloriesGoal, 10) || 2000,
+      weightGoal: parseFloat(goals.weightGoal) || 0,
     };
 
     try {
@@ -284,6 +290,70 @@ export default function ChallengeSetupScreen() {
                 )}
               </View>
             ))}
+          </View>
+
+          {/* Nutrition & Weight */}
+          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+            <Text className="text-sm font-semibold text-gray-700 mb-4">Nutrition & Weight</Text>
+
+            {/* Calorie Goal */}
+            <View className="flex-row items-center justify-between py-3">
+              <View className="flex-row items-center flex-1">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Feather name="bar-chart-2" size={18} color="#6B7280" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-medium text-gray-900">Daily Calorie Goal</Text>
+                  <Text className="text-xs text-gray-500">Target calories to consume per day</Text>
+                </View>
+              </View>
+            </View>
+            <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
+              <Text className="text-sm text-gray-600 mr-2">Goal:</Text>
+              <TextInput
+                value={goals.caloriesGoal}
+                onChangeText={(val) => setGoals((prev) => ({ ...prev, caloriesGoal: val }))}
+                keyboardType="number-pad"
+                className="flex-1"
+                style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+              />
+              <Text className="text-sm text-gray-500">kcal</Text>
+            </View>
+
+            <View className="h-px bg-gray-100 my-2" />
+
+            {/* Track Weight */}
+            <View className="flex-row items-center justify-between py-3">
+              <View className="flex-row items-center flex-1">
+                <View className="h-10 w-10 items-center justify-center rounded-full bg-gray-100">
+                  <Feather name="trending-down" size={18} color="#6B7280" />
+                </View>
+                <View className="ml-3 flex-1">
+                  <Text className="text-base font-medium text-gray-900">Track Weight</Text>
+                  <Text className="text-xs text-gray-500">Enable daily weight tracking and target</Text>
+                </View>
+              </View>
+              <Switch
+                value={tracking.trackWeight}
+                onValueChange={() => toggleTracking("trackWeight")}
+                trackColor={{ false: "#E5E7EB", true: "#8B5CF6" }}
+                thumbColor="white"
+              />
+            </View>
+
+            {tracking.trackWeight && (
+              <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
+                <Text className="text-sm text-gray-600 mr-2">Target:</Text>
+                <TextInput
+                  value={goals.weightGoal}
+                  onChangeText={(val) => setGoals((prev) => ({ ...prev, weightGoal: val }))}
+                  keyboardType="decimal-pad"
+                  className="flex-1"
+                  style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+                />
+                <Text className="text-sm text-gray-500">kg</Text>
+              </View>
+            )}
           </View>
         </View>
       </ScrollView>

@@ -1,5 +1,6 @@
 import ChallengeStatusCard from "@/components/ChallengeStatusCard";
 import Header from "@/components/Header";
+import ProgressSummaryCard from "@/components/ProgressSummaryCard";
 import StepsCard from "@/components/StepsCard";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useSessionStore } from "@/store/useSessionStore";
@@ -28,6 +29,9 @@ export default function HomeScreen() {
           
           {/* Challenge Status Card */}
           <ChallengeStatusCard />
+
+          {/* Progress Summary Card */}
+          <ProgressSummaryCard />
         </View>
       </ScrollView>
     </SafeAreaView>
