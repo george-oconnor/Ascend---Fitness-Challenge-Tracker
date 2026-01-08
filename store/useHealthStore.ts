@@ -20,7 +20,8 @@ type HealthState = {
 };
 
 export const useHealthStore = create<HealthState>((set, get) => ({
-  isNativeModuleAvailable: healthService.isNativeModuleLinked(),
+  // Don't call isNativeModuleLinked at store creation - it's called lazily now
+  isNativeModuleAvailable: false,
   isAvailable: false,
   isAuthorized: false,
   isLoading: false,
@@ -29,17 +30,23 @@ export const useHealthStore = create<HealthState>((set, get) => ({
   error: null,
 
   initialize: async () => {
-    // Check if native module is available first
-    if (!healthService.isNativeModuleLinked()) {
+    set({ isLoading: true, error: null });
+    
+    // Check if native module is available (this triggers lazy loading)
+    const isLinked = healthService.isNativeModuleLinked();
+    set({ isNativeModuleAvailable: isLinked });
+    
+    if (!isLinked) {
+      const loadError = healthService.getModuleLoadError();
       set({ 
-        error: "Apple Health requires a development build. Expo Go is not supported.",
+        error: loadError || "Apple Health requires a development or TestFlight build.",
         isLoading: false,
         isNativeModuleAvailable: false,
       });
+      console.log("HealthKit module not linked. Error:", loadError);
       return false;
     }
     
-    set({ isLoading: true, error: null });
     try {
       const authorized = await healthService.initialize();
       set({ 

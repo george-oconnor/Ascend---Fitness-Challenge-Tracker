@@ -1,44 +1,4 @@
-import { NativeModules, Platform } from "react-native";
-
-// The native module for react-native-health is registered as "RNAppleHealthKit"
-const isNativeModuleAvailable = Platform.OS === "ios" && !!NativeModules.RNAppleHealthKit;
-
-// Only require react-native-health if native module is available
-let AppleHealthKit: any = null;
-let hasInitMethod = false;
-
-if (isNativeModuleAvailable) {
-  try {
-    const HealthKitModule = require("react-native-health");
-    // The module exports the HealthKit API directly
-    AppleHealthKit = HealthKitModule.default || HealthKitModule;
-    hasInitMethod = !!(AppleHealthKit && typeof AppleHealthKit.initHealthKit === "function");
-    console.log("HealthKit module loaded successfully, initHealthKit available:", hasInitMethod);
-  } catch (error) {
-    console.warn("Error loading react-native-health:", error);
-  }
-} else if (Platform.OS === "ios") {
-  console.log("RNAppleHealthKit native module not found. Available modules:", Object.keys(NativeModules).filter(k => k.toLowerCase().includes("health") || k.toLowerCase().includes("apple")));
-}
-
-// Build permissions object only if module is available
-const getPermissions = () => {
-  if (!isNativeModuleAvailable || !AppleHealthKit?.Constants?.Permissions) {
-    return { permissions: { read: [], write: [] } };
-  }
-  
-  return {
-    permissions: {
-      read: [
-        AppleHealthKit.Constants.Permissions.StepCount,
-        AppleHealthKit.Constants.Permissions.Workout,
-        AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
-        AppleHealthKit.Constants.Permissions.DistanceWalkingRunning,
-      ],
-      write: [],
-    },
-  };
-};
+import { Platform } from "react-native";
 
 export type HealthData = {
   steps: number;
@@ -87,29 +47,91 @@ function getWorkoutInfo(activityType: number): { name: string; isOutdoor: boolea
 class HealthService {
   private isInitialized = false;
   private isAuthorized = false;
+  private AppleHealthKit: any = null;
+  private moduleLoadAttempted = false;
+  private moduleLoadError: string | null = null;
+
+  /**
+   * Lazy-load the HealthKit module when first needed
+   */
+  private loadModule(): boolean {
+    if (this.moduleLoadAttempted) {
+      return this.AppleHealthKit !== null;
+    }
+
+    this.moduleLoadAttempted = true;
+
+    if (Platform.OS !== "ios") {
+      this.moduleLoadError = "HealthKit is only available on iOS";
+      return false;
+    }
+
+    try {
+      // Direct require - let it fail naturally if not available
+      const HealthKitModule = require("react-native-health");
+      this.AppleHealthKit = HealthKitModule.default || HealthKitModule;
+      
+      // Verify the module has the methods we need
+      if (!this.AppleHealthKit || typeof this.AppleHealthKit.initHealthKit !== "function") {
+        this.moduleLoadError = "HealthKit module loaded but initHealthKit method not found";
+        this.AppleHealthKit = null;
+        return false;
+      }
+
+      console.log("✅ react-native-health module loaded successfully");
+      return true;
+    } catch (error: any) {
+      this.moduleLoadError = error?.message || "Failed to load react-native-health";
+      console.log("❌ Failed to load react-native-health:", this.moduleLoadError);
+      return false;
+    }
+  }
+
+  /**
+   * Build permissions object
+   */
+  private getPermissions() {
+    if (!this.AppleHealthKit?.Constants?.Permissions) {
+      return { permissions: { read: [], write: [] } };
+    }
+
+    return {
+      permissions: {
+        read: [
+          this.AppleHealthKit.Constants.Permissions.StepCount,
+          this.AppleHealthKit.Constants.Permissions.Workout,
+          this.AppleHealthKit.Constants.Permissions.ActiveEnergyBurned,
+          this.AppleHealthKit.Constants.Permissions.DistanceWalkingRunning,
+        ],
+        write: [],
+      },
+    };
+  }
+
+  /**
+   * Check if HealthKit native module is linked and available
+   * This is the key method for UI to determine whether to show "requires dev build" message
+   */
+  isNativeModuleLinked(): boolean {
+    // Try to load the module if we haven't yet
+    if (!this.moduleLoadAttempted) {
+      this.loadModule();
+    }
+    return this.AppleHealthKit !== null;
+  }
+
+  /**
+   * Get the error message if module failed to load
+   */
+  getModuleLoadError(): string | null {
+    return this.moduleLoadError;
+  }
 
   /**
    * Check if HealthKit is available on this device
    */
   isAvailable(): boolean {
-    if (Platform.OS !== "ios") {
-      return false;
-    }
-    
-    // Native module must be available
-    if (!isNativeModuleAvailable) {
-      return false;
-    }
-    
-    // Synchronously return cached state, async check happens in initialize
-    return true;
-  }
-
-  /**
-   * Check if native module is linked (for UI to show appropriate messaging)
-   */
-  isNativeModuleLinked(): boolean {
-    return isNativeModuleAvailable && hasInitMethod;
+    return Platform.OS === "ios" && this.isNativeModuleLinked();
   }
 
   /**
@@ -121,36 +143,37 @@ class HealthService {
       return false;
     }
 
-    if (!isNativeModuleAvailable || !hasInitMethod) {
-      console.warn("HealthKit native module not available. Use a development build instead of Expo Go.");
+    // Try to load module
+    if (!this.loadModule()) {
+      console.warn("HealthKit native module not available:", this.moduleLoadError);
       return false;
     }
 
-    const permissions = getPermissions();
+    const permissions = this.getPermissions();
 
     return new Promise((resolve) => {
-      if (!AppleHealthKit || typeof AppleHealthKit.initHealthKit !== "function") {
-        console.warn("HealthKit init function missing. Ensure a dev or production build with react-native-health installed.");
+      try {
+        this.AppleHealthKit.initHealthKit(permissions, (error: any) => {
+          if (error) {
+            console.error("Error initializing HealthKit:", error);
+            this.isInitialized = false;
+            this.isAuthorized = false;
+            resolve(false);
+            return;
+          }
+
+          console.log("✅ HealthKit initialized successfully");
+          this.isInitialized = true;
+          this.isAuthorized = true;
+          resolve(true);
+        });
+      } catch (error: any) {
+        console.error("Exception calling initHealthKit:", error);
+        this.moduleLoadError = error?.message || "Exception during HealthKit init";
         this.isInitialized = false;
         this.isAuthorized = false;
         resolve(false);
-        return;
       }
-
-      AppleHealthKit.initHealthKit(permissions, (error: any) => {
-        if (error) {
-          console.error("Error initializing HealthKit:", error);
-          this.isInitialized = false;
-          this.isAuthorized = false;
-          resolve(false);
-          return;
-        }
-
-        console.log("HealthKit initialized successfully");
-        this.isInitialized = true;
-        this.isAuthorized = true;
-        resolve(true);
-      });
     });
   }
 
@@ -158,8 +181,8 @@ class HealthService {
    * Get step count for a specific date
    */
   async getStepsForDate(date: Date): Promise<number> {
-    if (!isNativeModuleAvailable) return 0;
-    
+    if (!this.isNativeModuleLinked()) return 0;
+
     if (!this.isAuthorized) {
       const initialized = await this.initialize();
       if (!initialized) return 0;
@@ -177,14 +200,19 @@ class HealthService {
     };
 
     return new Promise((resolve) => {
-      AppleHealthKit.getStepCount(options, (error: any, results: any) => {
-        if (error) {
-          console.error("Error getting steps:", error);
-          resolve(0);
-          return;
-        }
-        resolve(results?.value || 0);
-      });
+      try {
+        this.AppleHealthKit.getStepCount(options, (error: any, results: any) => {
+          if (error) {
+            console.error("Error getting steps:", error);
+            resolve(0);
+            return;
+          }
+          resolve(results?.value || 0);
+        });
+      } catch (error) {
+        console.error("Exception getting steps:", error);
+        resolve(0);
+      }
     });
   }
 
@@ -192,8 +220,8 @@ class HealthService {
    * Get workouts for a specific date
    */
   async getWorkoutsForDate(date: Date): Promise<WorkoutData[]> {
-    if (!isNativeModuleAvailable) return [];
-    
+    if (!this.isNativeModuleLinked()) return [];
+
     if (!this.isAuthorized) {
       const initialized = await this.initialize();
       if (!initialized) return [];
@@ -212,41 +240,46 @@ class HealthService {
     };
 
     return new Promise((resolve) => {
-      AppleHealthKit.getSamples(options, (error: any, results: any) => {
-        if (error) {
-          console.error("Error getting workouts:", error);
-          resolve([]);
-          return;
-        }
+      try {
+        this.AppleHealthKit.getSamples(options, (error: any, results: any) => {
+          if (error) {
+            console.error("Error getting workouts:", error);
+            resolve([]);
+            return;
+          }
 
-        if (!results || results.length === 0) {
-          resolve([]);
-          return;
-        }
+          if (!results || results.length === 0) {
+            resolve([]);
+            return;
+          }
 
-        const workouts: WorkoutData[] = results.map((workout: any) => {
-          const activityType = workout.activityId || 0;
-          const workoutInfo = getWorkoutInfo(activityType);
-          
-          const startDate = new Date(workout.start || workout.startDate);
-          const endDate = new Date(workout.end || workout.endDate);
-          const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60); // minutes
+          const workouts: WorkoutData[] = results.map((workout: any) => {
+            const activityType = workout.activityId || 0;
+            const workoutInfo = getWorkoutInfo(activityType);
 
-          return {
-            id: workout.id || `${startDate.getTime()}`,
-            activityType: String(activityType),
-            activityName: workoutInfo.name,
-            duration: Math.round(duration),
-            calories: workout.calories || 0,
-            distance: workout.distance || undefined,
-            startDate: startDate.toISOString(),
-            endDate: endDate.toISOString(),
-            isOutdoor: workoutInfo.isOutdoor,
-          };
+            const startDate = new Date(workout.start || workout.startDate);
+            const endDate = new Date(workout.end || workout.endDate);
+            const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+
+            return {
+              id: workout.id || `${startDate.getTime()}`,
+              activityType: String(activityType),
+              activityName: workoutInfo.name,
+              duration: Math.round(duration),
+              calories: workout.calories || 0,
+              distance: workout.distance || undefined,
+              startDate: startDate.toISOString(),
+              endDate: endDate.toISOString(),
+              isOutdoor: workoutInfo.isOutdoor,
+            };
+          });
+
+          resolve(workouts);
         });
-
-        resolve(workouts);
-      });
+      } catch (error) {
+        console.error("Exception getting workouts:", error);
+        resolve([]);
+      }
     });
   }
 
@@ -255,7 +288,7 @@ class HealthService {
    */
   async getTodayHealthData(): Promise<HealthData> {
     const today = new Date();
-    
+
     const [steps, workouts] = await Promise.all([
       this.getStepsForDate(today),
       this.getWorkoutsForDate(today),
@@ -264,7 +297,7 @@ class HealthService {
     return {
       steps,
       workouts,
-      isAvailable: Platform.OS === "ios",
+      isAvailable: this.isAvailable(),
       isAuthorized: this.isAuthorized,
     };
   }
@@ -282,9 +315,9 @@ class HealthService {
    */
   async getWorkoutMinutes(date: Date, outdoorOnly: boolean = false): Promise<number> {
     const workouts = await this.getWorkoutsForDate(date);
-    
-    const filteredWorkouts = outdoorOnly 
-      ? workouts.filter(w => w.isOutdoor) 
+
+    const filteredWorkouts = outdoorOnly
+      ? workouts.filter((w) => w.isOutdoor)
       : workouts;
 
     return filteredWorkouts.reduce((total, w) => total + w.duration, 0);

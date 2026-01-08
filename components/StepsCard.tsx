@@ -6,13 +6,16 @@ import { ActivityIndicator, Platform, Pressable, Text, View } from "react-native
 export default function StepsCard() {
   const { steps, isLoading, isAuthorized, isAvailable, isNativeModuleAvailable, error, initialize, fetchTodayData } = useHealthStore();
   const [connecting, setConnecting] = useState(false);
+  const [checkAttempted, setCheckAttempted] = useState(false);
 
   useEffect(() => {
-    // Only auto-initialize if native module is available
-    if (Platform.OS === "ios" && isNativeModuleAvailable) {
+    // On mount, attempt to initialize which will trigger the module availability check
+    if (Platform.OS === "ios" && !checkAttempted) {
+      setCheckAttempted(true);
+      // This will set isNativeModuleAvailable in the store
       initialize();
     }
-  }, [isNativeModuleAvailable]);
+  }, []);
 
   useEffect(() => {
     if (isAuthorized && Platform.OS === "ios") {
@@ -30,7 +33,19 @@ export default function StepsCard() {
     return null;
   }
 
-  // Show message if native module isn't available (Expo Go)
+  // Show loading state while we check module availability
+  if (!checkAttempted || (isLoading && !isNativeModuleAvailable && !error)) {
+    return (
+      <View className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
+        <View className="flex-row items-center">
+          <ActivityIndicator size="small" color="#3B82F6" />
+          <Text className="ml-3 text-gray-500">Checking Apple Health...</Text>
+        </View>
+      </View>
+    );
+  }
+
+  // Show message if native module isn't available (Expo Go or module not linked)
   if (!isNativeModuleAvailable) {
     return (
       <View className="bg-yellow-50 rounded-2xl p-6 mb-4 border border-yellow-200">
@@ -41,7 +56,7 @@ export default function StepsCard() {
           <View className="ml-4 flex-1">
             <Text className="text-lg font-bold text-yellow-800">Apple Health</Text>
             <Text className="text-sm text-yellow-700 mt-1">
-              Requires TestFlight or development build
+              {error || "Requires TestFlight or development build"}
             </Text>
           </View>
         </View>
