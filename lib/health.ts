@@ -1,4 +1,4 @@
-import { Platform, NativeModules } from "react-native";
+import { NativeModules, Platform } from "react-native";
 
 // Check if the native module is available by checking NativeModules directly
 const isNativeModuleAvailable = Platform.OS === "ios" && !!NativeModules.AppleHealthKit;

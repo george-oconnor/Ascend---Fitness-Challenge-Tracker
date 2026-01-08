@@ -22,7 +22,7 @@ type TaskItem = {
 
 export default function DailyLogScreen() {
   const [connectingHealth, setConnectingHealth] = useState(false);
-  const { challenge, todayLog, toggleTask } = useChallengeStore();
+  const { challenge, todayLog, toggleTask, updateProgress } = useChallengeStore();
   const { 
     steps, 
     workouts, 
@@ -52,6 +52,42 @@ export default function DailyLogScreen() {
       return () => clearInterval(interval);
     }
   }, [isAuthorized]);
+
+  // Sync health data to daily log when it changes
+  useEffect(() => {
+    if (isAuthorized && todayLog && challenge) {
+      const outdoorMinutes = getOutdoorWorkoutMinutes();
+      const totalMinutes = getTotalWorkoutMinutes();
+
+      const progressUpdate: Partial<DailyLog> = {};
+
+      // Update steps
+      if (challenge.trackSteps && steps !== todayLog.stepsCount) {
+        progressUpdate.stepsCount = steps;
+        progressUpdate.stepsCompleted = steps >= challenge.stepsGoal;
+      }
+
+      // Update workout 1 (outdoor)
+      if (challenge.trackWorkout1 && outdoorMinutes !== todayLog.workout1Minutes) {
+        progressUpdate.workout1Minutes = outdoorMinutes;
+        progressUpdate.workout1Completed = outdoorMinutes >= challenge.workoutMinutes;
+      }
+
+      // Update workout 2 (total - outdoor)
+      if (challenge.trackWorkout2) {
+        const secondWorkoutMinutes = Math.max(0, totalMinutes - challenge.workoutMinutes);
+        if (secondWorkoutMinutes !== todayLog.workout2Minutes) {
+          progressUpdate.workout2Minutes = secondWorkoutMinutes;
+          progressUpdate.workout2Completed = totalMinutes >= challenge.workoutMinutes * 2;
+        }
+      }
+
+      // Only update if there are changes
+      if (Object.keys(progressUpdate).length > 0) {
+        updateProgress(progressUpdate);
+      }
+    }
+  }, [steps, workouts, isAuthorized, todayLog, challenge]);
 
   if (!challenge || !todayLog) {
     return (

@@ -24,11 +24,16 @@ export type DailyLog = {
   challengeId: string;
   date: string;
   stepsCompleted?: boolean;
+  stepsCount?: number;
   waterCompleted?: boolean;
+  waterLiters?: number;
   dietCompleted?: boolean;
   workout1Completed?: boolean;
+  workout1Minutes?: number;
   workout2Completed?: boolean;
+  workout2Minutes?: number;
   readingCompleted?: boolean;
+  readingPages?: number;
   progressPhotoCompleted?: boolean;
   noAlcoholCompleted?: boolean;
   notes?: string;

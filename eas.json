@@ -21,9 +21,11 @@
       "ios": {
         "resourceClass": "medium",
         "developmentClient": true,
+        "simulator": true,
         "env": {
           "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
-          "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728"
+          "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728",
+          "EXPO_PUBLIC_SENTRY_DSN": "https://427b038e9826c76a4003063a3ff7d179@o4509054949195776.ingest.de.sentry.io/4510664307441744"
         }
       }
     },

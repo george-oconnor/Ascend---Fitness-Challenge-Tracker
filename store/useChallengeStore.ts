@@ -24,6 +24,7 @@ type ChallengeState = {
   editChallenge: (challengeId: string, data: Partial<Challenge>) => Promise<void>;
   fetchTodayLog: (challengeId: string) => Promise<void>;
   toggleTask: (taskKey: keyof DailyLog, value: boolean) => Promise<void>;
+  updateProgress: (progressData: Partial<DailyLog>) => Promise<void>;
   fetchAllLogs: (challengeId: string) => Promise<void>;
   clearChallenge: () => void;
 };
@@ -98,11 +99,16 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             challengeId,
             date: today,
             stepsCompleted: false,
+            stepsCount: 0,
             waterCompleted: false,
+            waterLiters: 0,
             dietCompleted: false,
             workout1Completed: false,
+            workout1Minutes: 0,
             workout2Completed: false,
+            workout2Minutes: 0,
             readingCompleted: false,
+            readingPages: 0,
             progressPhotoCompleted: false,
             noAlcoholCompleted: false,
           });
@@ -132,6 +138,26 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       // Rollback on error
       set({ todayLog });
       const errorMsg = err instanceof Error ? err.message : "Failed to update task";
+      captureException(err instanceof Error ? err : new Error(errorMsg));
+      throw err;
+    }
+  },
+
+  updateProgress: async (progressData: Partial<DailyLog>) => {
+    const { todayLog, challenge } = get();
+
+    if (!todayLog?.$id || !challenge) return;
+
+    // Optimistic update
+    set({ todayLog: { ...todayLog, ...progressData } });
+
+    try {
+      const updated = await updateDailyLog(todayLog.$id, progressData);
+      set({ todayLog: updated });
+    } catch (err) {
+      // Rollback on error
+      set({ todayLog });
+      const errorMsg = err instanceof Error ? err.message : "Failed to update progress";
       captureException(err instanceof Error ? err : new Error(errorMsg));
       throw err;
     }
