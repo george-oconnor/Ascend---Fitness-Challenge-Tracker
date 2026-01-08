@@ -36,6 +36,7 @@ export type DailyLog = {
   readingPages?: number;
   progressPhotoCompleted?: boolean;
   noAlcoholCompleted?: boolean;
+  meals?: string;
   notes?: string;
 };
 
