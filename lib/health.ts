@@ -1,7 +1,7 @@
 import { NativeModules, Platform } from "react-native";
 
-// Check if the native module is available by checking NativeModules directly
-const isNativeModuleAvailable = Platform.OS === "ios" && !!NativeModules.AppleHealthKit;
+// The native module for react-native-health is registered as "RNAppleHealthKit"
+const isNativeModuleAvailable = Platform.OS === "ios" && !!NativeModules.RNAppleHealthKit;
 
 // Only require react-native-health if native module is available
 let AppleHealthKit: any = null;
@@ -10,12 +10,15 @@ let hasInitMethod = false;
 if (isNativeModuleAvailable) {
   try {
     const HealthKitModule = require("react-native-health");
-    // The module exports HealthKit as module.exports
+    // The module exports the HealthKit API directly
     AppleHealthKit = HealthKitModule.default || HealthKitModule;
     hasInitMethod = !!(AppleHealthKit && typeof AppleHealthKit.initHealthKit === "function");
+    console.log("HealthKit module loaded successfully, initHealthKit available:", hasInitMethod);
   } catch (error) {
     console.warn("Error loading react-native-health:", error);
   }
+} else if (Platform.OS === "ios") {
+  console.log("RNAppleHealthKit native module not found. Available modules:", Object.keys(NativeModules).filter(k => k.toLowerCase().includes("health") || k.toLowerCase().includes("apple")));
 }
 
 // Build permissions object only if module is available
