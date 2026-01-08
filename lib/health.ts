@@ -1,21 +1,19 @@
-import { Platform } from "react-native";
+import { Platform, NativeModules } from "react-native";
 
-// Lazy-load react-native-health to handle cases where native module isn't available
+// Check if the native module is available by checking NativeModules directly
+const isNativeModuleAvailable = Platform.OS === "ios" && !!NativeModules.AppleHealthKit;
+
+// Only require react-native-health if native module is available
 let AppleHealthKit: any = null;
-let isNativeModuleAvailable = false;
 
-try {
-  // This will throw if the native module isn't linked (e.g., in Expo Go)
-  const HealthKitModule = require("react-native-health");
-  AppleHealthKit = HealthKitModule.default || HealthKitModule;
-  
-  // Check if the native module is actually available
-  if (AppleHealthKit && typeof AppleHealthKit.initHealthKit === "function") {
-    isNativeModuleAvailable = true;
+if (isNativeModuleAvailable) {
+  try {
+    const HealthKitModule = require("react-native-health");
+    // The module exports HealthKit as module.exports
+    AppleHealthKit = HealthKitModule.default || HealthKitModule;
+  } catch (error) {
+    console.warn("Error loading react-native-health:", error);
   }
-} catch (error) {
-  console.warn("react-native-health native module not available:", error);
-  isNativeModuleAvailable = false;
 }
 
 // Build permissions object only if module is available
