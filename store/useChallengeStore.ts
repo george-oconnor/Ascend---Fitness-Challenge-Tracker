@@ -103,6 +103,8 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             waterCompleted: false,
             waterLiters: 0,
             dietCompleted: false,
+            caloriesConsumed: 0,
+            currentWeight: 0,
             workout1Completed: false,
             workout1Minutes: 0,
             workout2Completed: false,

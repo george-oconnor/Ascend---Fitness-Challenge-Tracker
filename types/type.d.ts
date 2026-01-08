@@ -9,6 +9,9 @@ export type Challenge = {
   trackWater: boolean;
   waterLiters: number;
   trackDiet: boolean;
+  caloriesGoal: number;
+  trackWeight: boolean;
+  weightGoal: number;
   trackWorkout1: boolean;
   trackWorkout2: boolean;
   workoutMinutes: number;
@@ -28,6 +31,8 @@ export type DailyLog = {
   waterCompleted?: boolean;
   waterLiters?: number;
   dietCompleted?: boolean;
+  caloriesConsumed?: number;
+  currentWeight?: number;
   workout1Completed?: boolean;
   workout1Minutes?: number;
   workout2Completed?: boolean;
