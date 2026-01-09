@@ -9,6 +9,7 @@ import {
 } from "@/lib/appwrite";
 import { captureException } from "@/lib/sentry";
 import type { Challenge, DailyLog } from "@/types/type";
+import { Platform } from "react-native";
 import { create } from "zustand";
 
 type ChallengeState = {
@@ -26,6 +27,7 @@ type ChallengeState = {
   toggleTask: (taskKey: keyof DailyLog, value: boolean) => Promise<void>;
   updateProgress: (progressData: Partial<DailyLog>) => Promise<void>;
   fetchAllLogs: (challengeId: string) => Promise<void>;
+  syncHealthData: () => Promise<void>;
   clearChallenge: () => void;
 };
 
@@ -174,6 +176,109 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       const errorMsg = err instanceof Error ? err.message : "Failed to fetch logs";
       captureException(err instanceof Error ? err : new Error(errorMsg));
       console.error("fetchAllLogs error:", err);
+    }
+  },
+
+  syncHealthData: async () => {
+    const { todayLog, challenge } = get();
+
+    if (!todayLog?.$id || !challenge) {
+      console.log("syncHealthData: No todayLog or challenge available");
+      return;
+    }
+
+    // Only sync on iOS where Apple Health is available
+    if (Platform.OS !== "ios") {
+      return;
+    }
+
+    try {
+      // Import health store to get current health data
+      const { useHealthStore } = await import("@/store/useHealthStore");
+      const healthState = useHealthStore.getState();
+
+      if (!healthState.isAuthorized) {
+        console.log("syncHealthData: Apple Health not authorized");
+        return;
+      }
+
+      const updates: Partial<DailyLog> = {};
+
+      // Sync steps if tracking is enabled
+      if (challenge.trackSteps && healthState.steps > 0) {
+        const newStepsCount = Math.round(healthState.steps);
+        const stepsGoalMet = newStepsCount >= (challenge.stepsGoal || 0);
+        
+        // Only update if steps changed
+        if (newStepsCount !== todayLog.stepsCount) {
+          updates.stepsCount = newStepsCount;
+          updates.stepsCompleted = stepsGoalMet;
+        }
+      }
+
+      // Sync workout data if tracking is enabled
+      if (challenge.trackWorkout1 || challenge.trackWorkout2) {
+        const workouts = healthState.workouts;
+        const workoutGoalMinutes = challenge.workoutMinutes || 45;
+
+        if (workouts.length > 0) {
+          // Separate outdoor and indoor workouts
+          const outdoorWorkouts = workouts.filter(w => w.isOutdoor);
+          const indoorWorkouts = workouts.filter(w => !w.isOutdoor);
+
+          // Calculate total minutes for each type
+          const outdoorMinutes = outdoorWorkouts.reduce((sum, w) => sum + w.duration, 0);
+          const indoorMinutes = indoorWorkouts.reduce((sum, w) => sum + w.duration, 0);
+          const totalMinutes = outdoorMinutes + indoorMinutes;
+
+          // For workout1 (outdoor), use outdoor workouts
+          if (challenge.trackWorkout1) {
+            const workout1Minutes = Math.round(outdoorMinutes);
+            if (workout1Minutes !== todayLog.workout1Minutes) {
+              updates.workout1Minutes = workout1Minutes;
+              updates.workout1Completed = workout1Minutes >= workoutGoalMinutes;
+            }
+          }
+
+          // For workout2 (second workout), use indoor or remaining total
+          if (challenge.trackWorkout2) {
+            // If we have both workout types, use indoor for workout2
+            // Otherwise, if only one type and it covers both goals, split it
+            let workout2Minutes = 0;
+            
+            if (challenge.trackWorkout1) {
+              // Use indoor workouts for second workout
+              workout2Minutes = Math.round(indoorMinutes);
+            } else {
+              // If only tracking workout2, use total
+              workout2Minutes = Math.round(totalMinutes);
+            }
+            
+            if (workout2Minutes !== todayLog.workout2Minutes) {
+              updates.workout2Minutes = workout2Minutes;
+              updates.workout2Completed = workout2Minutes >= workoutGoalMinutes;
+            }
+          }
+        }
+      }
+
+      // Only update if there are changes
+      if (Object.keys(updates).length > 0) {
+        console.log("syncHealthData: Updating daily log with:", updates);
+        
+        // Update local state optimistically
+        set({ todayLog: { ...todayLog, ...updates } });
+
+        // Persist to Appwrite
+        const updated = await updateDailyLog(todayLog.$id, updates);
+        set({ todayLog: updated });
+        
+        console.log("syncHealthData: Successfully synced health data to Appwrite");
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to sync health data";
+      captureException(err instanceof Error ? err : new Error(errorMsg));
+      console.error("syncHealthData error:", err);
     }
   },
 

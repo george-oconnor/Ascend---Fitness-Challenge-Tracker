@@ -1,5 +1,7 @@
 import { useChallengeStore } from "@/store/useChallengeStore";
+import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
+import { Platform } from "react-native";
 import { Text, View } from "react-native";
 
 function ProgressRow({ label, current, goal, unit }: { label: string; current: number; goal: number; unit?: string }) {
@@ -20,8 +22,21 @@ function ProgressRow({ label, current, goal, unit }: { label: string; current: n
 
 export default function ProgressSummaryCard() {
   const { challenge, todayLog } = useChallengeStore();
+  const { steps: liveSteps, workouts: liveWorkouts, isAuthorized: healthAuthorized } = useHealthStore();
 
   if (!challenge || !todayLog) return null;
+
+  // Use live Apple Health data if available, otherwise fall back to logged data
+  const useHealthKit = Platform.OS === "ios" && healthAuthorized;
+  const currentSteps = useHealthKit ? Math.round(liveSteps) : (todayLog.stepsCount ?? 0);
+  
+  // Calculate workout minutes from live health data
+  const liveOutdoorMinutes = useHealthKit 
+    ? Math.round(liveWorkouts.filter(w => w.isOutdoor).reduce((sum, w) => sum + w.duration, 0))
+    : (todayLog.workout1Minutes ?? 0);
+  const liveIndoorMinutes = useHealthKit
+    ? Math.round(liveWorkouts.filter(w => !w.isOutdoor).reduce((sum, w) => sum + w.duration, 0))
+    : (todayLog.workout2Minutes ?? 0);
 
   const exerciseItems: JSX.Element[] = [];
   const nutritionItems: JSX.Element[] = [];
@@ -30,17 +45,17 @@ export default function ProgressSummaryCard() {
   // Exercise group
   if (challenge.trackSteps) {
     exerciseItems.push(
-      <ProgressRow key="steps" label="Steps" current={todayLog.stepsCount ?? 0} goal={challenge.stepsGoal ?? 0} unit="steps" />
+      <ProgressRow key="steps" label="Steps" current={currentSteps} goal={challenge.stepsGoal ?? 0} unit="steps" />
     );
   }
   if (challenge.trackWorkout1) {
     exerciseItems.push(
-      <ProgressRow key="w1" label="Outdoor Workout" current={todayLog.workout1Minutes ?? 0} goal={challenge.workoutMinutes ?? 0} unit="min" />
+      <ProgressRow key="w1" label="Outdoor Workout" current={liveOutdoorMinutes} goal={challenge.workoutMinutes ?? 0} unit="min" />
     );
   }
   if (challenge.trackWorkout2) {
     exerciseItems.push(
-      <ProgressRow key="w2" label="Second Workout" current={todayLog.workout2Minutes ?? 0} goal={challenge.workoutMinutes ?? 0} unit="min" />
+      <ProgressRow key="w2" label="Second Workout" current={liveIndoorMinutes} goal={challenge.workoutMinutes ?? 0} unit="min" />
     );
   }
 

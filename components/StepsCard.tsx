@@ -36,7 +36,7 @@ export default function StepsCard() {
   // Show loading state while we check module availability
   if (!checkAttempted || (isLoading && !isNativeModuleAvailable && !error)) {
     return (
-      <View className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
+      <View className="bg-white rounded-2xl p-6 mt-2 shadow-sm">
         <View className="flex-row items-center">
           <ActivityIndicator size="small" color="#3B82F6" />
           <Text className="ml-3 text-gray-500">Checking Apple Health...</Text>
@@ -48,7 +48,7 @@ export default function StepsCard() {
   // Show message if native module isn't available (Expo Go or module not linked)
   if (!isNativeModuleAvailable) {
     return (
-      <View className="bg-yellow-50 rounded-2xl p-6 mb-4 border border-yellow-200">
+      <View className="bg-yellow-50 rounded-2xl p-6 mt-2 border border-yellow-200">
         <View className="flex-row items-center">
           <View className="h-12 w-12 items-center justify-center rounded-full bg-yellow-100">
             <Feather name="alert-circle" size={24} color="#CA8A04" />
@@ -66,14 +66,14 @@ export default function StepsCard() {
 
   if (!isAuthorized) {
     return (
-      <View className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
+      <View className="bg-white rounded-2xl p-6 mt-2 shadow-sm">
         <View className="flex-row items-center mb-2">
           <View className="h-12 w-12 items-center justify-center rounded-full bg-blue-100">
             <Feather name="activity" size={24} color="#3B82F6" />
           </View>
           <View className="ml-4 flex-1">
-            <Text className="text-lg font-bold text-gray-900">Steps Today</Text>
-            <Text className="text-sm text-gray-500 mt-1">Connect Apple Health to track steps</Text>
+            <Text className="text-lg font-bold text-gray-900">Apple Health</Text>
+            <Text className="text-sm text-gray-500 mt-1">Connect to track steps & workouts</Text>
           </View>
         </View>
         {error && (
@@ -106,14 +106,14 @@ export default function StepsCard() {
   }
 
   return (
-    <View className="bg-white rounded-2xl p-6 mb-4 shadow-sm">
+    <View className="bg-white rounded-2xl p-6 mt-2 shadow-sm">
       <View className="flex-row items-center justify-between">
         <View className="flex-row items-center flex-1">
           <View className="h-12 w-12 items-center justify-center rounded-full bg-blue-100">
             <Feather name="activity" size={24} color="#3B82F6" />
           </View>
           <View className="ml-4 flex-1">
-            <Text className="text-sm text-gray-500">Steps Today</Text>
+            <Text className="text-sm text-gray-500">Apple Health Steps</Text>
             {isLoading ? (
               <ActivityIndicator size="small" color="#3B82F6" />
             ) : (
@@ -124,8 +124,9 @@ export default function StepsCard() {
           </View>
         </View>
         <View className="items-end">
-          <View className="bg-blue-50 px-3 py-1.5 rounded-full">
-            <Text className="text-xs font-semibold text-blue-600">LIVE</Text>
+          <View className="bg-green-50 px-3 py-1.5 rounded-full flex-row items-center">
+            <Feather name="heart" size={12} color="#16A34A" />
+            <Text className="text-xs font-semibold text-green-600 ml-1">LIVE</Text>
           </View>
         </View>
       </View>
