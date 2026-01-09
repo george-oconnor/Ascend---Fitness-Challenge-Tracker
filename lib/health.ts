@@ -113,8 +113,14 @@ class HealthService {
           this.HealthKit.Constants.Permissions.Workout,
           this.HealthKit.Constants.Permissions.ActiveEnergyBurned,
           this.HealthKit.Constants.Permissions.DistanceWalkingRunning,
+          this.HealthKit.Constants.Permissions.BodyMass,
+          this.HealthKit.Constants.Permissions.EnergyConsumed,
         ],
-        write: [],
+        write: [
+          this.HealthKit.Constants.Permissions.BodyMass,
+          this.HealthKit.Constants.Permissions.Workout,
+          this.HealthKit.Constants.Permissions.EnergyConsumed,
+        ],
       },
     };
   }
@@ -342,6 +348,241 @@ class HealthService {
       isInitialized: this.isInitialized,
       isAuthorized: this.isAuthorized,
     };
+  }
+
+  /**
+   * Get the most recent weight from Apple Health
+   */
+  async getLatestWeight(): Promise<number | null> {
+    if (!this.isNativeModuleLinked()) return null;
+
+    if (!this.isAuthorized) {
+      const initialized = await this.initialize();
+      if (!initialized) return null;
+    }
+
+    const options = {
+      unit: "kg",
+      limit: 1,
+    };
+
+    return new Promise((resolve) => {
+      try {
+        this.HealthKit.getLatestWeight(options, (error: any, results: any) => {
+          if (error) {
+            console.error("Error getting weight:", error);
+            resolve(null);
+            return;
+          }
+          console.log("📊 Weight from Apple Health:", results);
+          resolve(results?.value || null);
+        });
+      } catch (error) {
+        console.error("Exception getting weight:", error);
+        resolve(null);
+      }
+    });
+  }
+
+  /**
+   * Save weight to Apple Health
+   */
+  async saveWeight(weightKg: number): Promise<boolean> {
+    if (!this.isNativeModuleLinked()) return false;
+
+    if (!this.isAuthorized) {
+      const initialized = await this.initialize();
+      if (!initialized) return false;
+    }
+
+    const options = {
+      value: weightKg,
+      unit: "kg",
+      date: new Date().toISOString(),
+    };
+
+    return new Promise((resolve) => {
+      try {
+        this.HealthKit.saveWeight(options, (error: any, result: any) => {
+          if (error) {
+            console.error("Error saving weight to Apple Health:", error);
+            resolve(false);
+            return;
+          }
+          console.log("✅ Weight saved to Apple Health:", result);
+          resolve(true);
+        });
+      } catch (error) {
+        console.error("Exception saving weight:", error);
+        resolve(false);
+      }
+    });
+  }
+
+  /**
+   * Save a workout to Apple Health
+   */
+  async saveWorkout(options: {
+    type: string;
+    startDate: Date;
+    endDate: Date;
+    calories?: number;
+    distance?: number;
+  }): Promise<boolean> {
+    if (!this.isNativeModuleLinked()) return false;
+
+    if (!this.isAuthorized) {
+      const initialized = await this.initialize();
+      if (!initialized) return false;
+    }
+
+    // Map our workout types to Apple's activity types
+    const WORKOUT_TYPE_TO_APPLE: Record<string, string> = {
+      running: "Running",
+      walking: "Walking",
+      cycling: "Cycling",
+      hiking: "Hiking",
+      swimming: "Swimming",
+      strength: "TraditionalStrengthTraining",
+      hiit: "HighIntensityIntervalTraining",
+      yoga: "Yoga",
+      pilates: "Pilates",
+      crossfit: "CrossTraining",
+      boxing: "Boxing",
+      dance: "Dance",
+      rowing: "Rowing",
+      "indoor-rowing": "Rowing",
+      other: "Other",
+    };
+
+    const activityType = WORKOUT_TYPE_TO_APPLE[options.type] || "Other";
+
+    const workoutOptions: any = {
+      type: activityType,
+      startDate: options.startDate.toISOString(),
+      endDate: options.endDate.toISOString(),
+    };
+
+    if (options.calories && options.calories > 0) {
+      workoutOptions.energyBurned = options.calories;
+    }
+
+    if (options.distance && options.distance > 0) {
+      workoutOptions.distance = options.distance;
+    }
+
+    return new Promise((resolve) => {
+      try {
+        this.HealthKit.saveWorkout(workoutOptions, (error: any, result: any) => {
+          if (error) {
+            console.error("Error saving workout to Apple Health:", error);
+            resolve(false);
+            return;
+          }
+          console.log("✅ Workout saved to Apple Health:", result);
+          resolve(true);
+        });
+      } catch (error) {
+        console.error("Exception saving workout:", error);
+        resolve(false);
+      }
+    });
+  }
+
+  /**
+   * Save food/calories to Apple Health
+   */
+  async saveFood(options: {
+    foodName: string;
+    mealType: "Breakfast" | "Lunch" | "Dinner" | "Snacks";
+    calories: number;
+    date?: Date;
+  }): Promise<boolean> {
+    if (!this.isAuthorized) {
+      console.log("HealthKit not authorized, skipping saveFood");
+      return false;
+    }
+
+    if (!this.HealthKit?.saveFood) {
+      console.log("saveFood not available");
+      return false;
+    }
+
+    const foodOptions: any = {
+      foodName: options.foodName,
+      mealType: options.mealType,
+      energy: options.calories,
+      date: (options.date || new Date()).toISOString(),
+    };
+
+    return new Promise((resolve) => {
+      try {
+        this.HealthKit.saveFood(foodOptions, (error: any, result: any) => {
+          if (error) {
+            console.error("Error saving food to Apple Health:", error);
+            resolve(false);
+            return;
+          }
+          console.log("✅ Food saved to Apple Health:", result);
+          resolve(true);
+        });
+      } catch (error) {
+        console.error("Exception saving food:", error);
+        resolve(false);
+      }
+    });
+  }
+
+  /**
+   * Save all meals' calories to Apple Health
+   */
+  async saveMealCalories(meals: {
+    breakfast?: number;
+    lunch?: number;
+    dinner?: number;
+    snacks?: number;
+  }): Promise<boolean> {
+    const results: boolean[] = [];
+    const now = new Date();
+
+    if (meals.breakfast && meals.breakfast > 0) {
+      results.push(await this.saveFood({
+        foodName: "Breakfast",
+        mealType: "Breakfast",
+        calories: meals.breakfast,
+        date: now,
+      }));
+    }
+
+    if (meals.lunch && meals.lunch > 0) {
+      results.push(await this.saveFood({
+        foodName: "Lunch",
+        mealType: "Lunch",
+        calories: meals.lunch,
+        date: now,
+      }));
+    }
+
+    if (meals.dinner && meals.dinner > 0) {
+      results.push(await this.saveFood({
+        foodName: "Dinner",
+        mealType: "Dinner",
+        calories: meals.dinner,
+        date: now,
+      }));
+    }
+
+    if (meals.snacks && meals.snacks > 0) {
+      results.push(await this.saveFood({
+        foodName: "Snacks",
+        mealType: "Snacks",
+        calories: meals.snacks,
+        date: now,
+      }));
+    }
+
+    // Return true if at least one save succeeded
+    return results.some((r) => r === true);
   }
 }
 

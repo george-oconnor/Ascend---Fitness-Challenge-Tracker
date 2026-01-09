@@ -12,6 +12,8 @@ type TaskItem = {
   label: string;
   description: string;
   icon: keyof typeof Feather.glyphMap;
+  isHealthTracked?: boolean; // True for tasks that sync from Apple Health on iOS
+  route?: string; // Route to navigate to when tapped
   healthData?: {
     current: number;
     goal: number;
@@ -22,6 +24,7 @@ type TaskItem = {
 
 export default function DailyLogScreen() {
   const [connectingHealth, setConnectingHealth] = useState(false);
+  const [cycleLoggedToday, setCycleLoggedToday] = useState(false);
   const { challenge, todayLog, toggleTask, updateProgress } = useChallengeStore();
   const { 
     steps, 
@@ -35,6 +38,26 @@ export default function DailyLogScreen() {
     getOutdoorWorkoutMinutes,
     getTotalWorkoutMinutes,
   } = useHealthStore();
+
+  // Check if cycle was logged today
+  useEffect(() => {
+    const checkCycleLog = async () => {
+      if ((challenge as any)?.trackCycle && todayLog) {
+        try {
+          const { getCycleLog } = await import("@/lib/appwrite");
+          const { user } = await import("@/store/useSessionStore").then(m => m.useSessionStore.getState());
+          if (user?.id) {
+            const today = new Date().toISOString().split("T")[0];
+            const cycleLog = await getCycleLog(user.id, today);
+            setCycleLoggedToday(!!cycleLog);
+          }
+        } catch (error) {
+          console.log("Failed to check cycle log:", error);
+        }
+      }
+    };
+    checkCycleLog();
+  }, [challenge, todayLog]);
 
   // Initialize health and fetch data (only if native module is available)
   useEffect(() => {
@@ -122,9 +145,11 @@ export default function DailyLogScreen() {
     const meetsGoal = outdoorMinutes >= challenge.workoutMinutes;
     tasks.push({
       key: "workout1Completed",
-      label: "Outdoor Workout",
-      description: `${challenge.workoutMinutes}+ minutes outdoor exercise`,
+      label: "Workout 1",
+      description: `${challenge.workoutMinutes}+ minutes exercise`,
       icon: "sun",
+      route: "/log-workout?workout=1",
+      isHealthTracked: Platform.OS === "ios",
       healthData: isAuthorized ? {
         current: outdoorMinutes,
         goal: challenge.workoutMinutes,
@@ -135,13 +160,15 @@ export default function DailyLogScreen() {
   }
   
   if (challenge.trackWorkout2) {
-    // Second workout can be any workout (indoor or outdoor) but needs total of 2x goal
+    // Workout 2
     const meetsGoal = totalMinutes >= challenge.workoutMinutes * 2;
     tasks.push({
       key: "workout2Completed",
-      label: "Second Workout",
-      description: `${challenge.workoutMinutes}+ minutes additional workout`,
+      label: "Workout 2",
+      description: `${challenge.workoutMinutes}+ minutes exercise`,
       icon: "activity",
+      route: "/log-workout?workout=2",
+      isHealthTracked: Platform.OS === "ios",
       healthData: isAuthorized ? {
         current: Math.max(0, totalMinutes - challenge.workoutMinutes),
         goal: challenge.workoutMinutes,
@@ -157,6 +184,7 @@ export default function DailyLogScreen() {
       label: "Follow Diet",
       description: "Stuck to your diet plan today",
       icon: "check-square",
+      route: "/log-diet",
     });
   }
 
@@ -166,6 +194,8 @@ export default function DailyLogScreen() {
       label: "Drink Water",
       description: `Drank ${challenge.waterLiters}L of water`,
       icon: "droplet",
+      route: "/log-water",
+      isHealthTracked: Platform.OS === "ios",
     });
   }
 
@@ -175,6 +205,7 @@ export default function DailyLogScreen() {
       label: "Read",
       description: `Read ${challenge.readingPages}+ pages of non-fiction`,
       icon: "book-open",
+      route: "/log-reading",
     });
   }
 
@@ -184,6 +215,7 @@ export default function DailyLogScreen() {
       label: "Progress Photo",
       description: "Took today's progress photo",
       icon: "camera",
+      route: "/log-photo",
     });
   }
 
@@ -193,6 +225,84 @@ export default function DailyLogScreen() {
       label: "No Alcohol",
       description: "No alcohol consumed today",
       icon: "slash",
+      route: "/log-alcohol",
+    });
+  }
+
+  if (challenge.trackWeight) {
+    tasks.push({
+      key: "weightLogged",
+      label: "Log Weight",
+      description: todayLog.weightLogged ? `${todayLog.currentWeight} kg logged` : "Log today's weight",
+      icon: "trending-down",
+      route: "/log-weight",
+      isHealthTracked: Platform.OS === "ios",
+    });
+  }
+
+  if (challenge.trackCalories) {
+    const direction = (challenge as any).caloriesGoalDirection ?? "below";
+    const meetsGoal = direction === "below" 
+      ? (todayLog.caloriesConsumed ?? 0) <= challenge.caloriesGoal && (todayLog.caloriesConsumed ?? 0) > 0
+      : (todayLog.caloriesConsumed ?? 0) >= challenge.caloriesGoal;
+    tasks.push({
+      key: "caloriesConsumed" as keyof DailyLog,
+      label: "Track Calories",
+      description: direction === "below" 
+        ? `Stay under ${challenge.caloriesGoal} kcal` 
+        : `Eat at least ${challenge.caloriesGoal} kcal`,
+      icon: "bar-chart-2",
+      route: "/log-calories",
+      isHealthTracked: Platform.OS === "ios",
+      healthData: (todayLog.caloriesConsumed ?? 0) > 0 ? {
+        current: todayLog.caloriesConsumed ?? 0,
+        goal: challenge.caloriesGoal,
+        unit: "kcal",
+        autoComplete: meetsGoal,
+      } : undefined,
+    });
+  }
+
+  if ((challenge as any).trackMood) {
+    tasks.push({
+      key: "moodScore" as keyof DailyLog,
+      label: "Track Mood",
+      description: todayLog.moodScore ? `Mood: ${todayLog.moodScore}/5` : "Log how you're feeling",
+      icon: "smile",
+      route: "/log-mood",
+      isHealthTracked: Platform.OS === "ios",
+    });
+  }
+
+  if ((challenge as any).trackSleep) {
+    const sleepGoalMinutes = ((challenge as any).sleepGoalHours ?? 8) * 60;
+    const meetsGoal = (todayLog.sleepMinutes ?? 0) >= sleepGoalMinutes;
+    tasks.push({
+      key: "sleepLogged",
+      label: "Sleep Tracking",
+      description: todayLog.sleepLogged 
+        ? `${Math.floor((todayLog.sleepMinutes ?? 0) / 60)}h ${(todayLog.sleepMinutes ?? 0) % 60}m logged`
+        : `Goal: ${(challenge as any).sleepGoalHours ?? 8}h`,
+      icon: "moon",
+      route: "/log-sleep",
+      isHealthTracked: Platform.OS === "ios",
+      healthData: todayLog.sleepLogged ? {
+        current: Math.round((todayLog.sleepMinutes ?? 0) / 60 * 10) / 10,
+        goal: (challenge as any).sleepGoalHours ?? 8,
+        unit: "h",
+        autoComplete: meetsGoal,
+      } : undefined,
+    });
+  }
+
+  if ((challenge as any).trackCycle) {
+    tasks.push({
+      key: "cycleLogged" as keyof DailyLog,
+      label: "Cycle Tracking",
+      description: cycleLoggedToday ? "Logged today" : "Log cycle data",
+      icon: "heart",
+      route: "/log-cycle",
+      isHealthTracked: Platform.OS === "ios",
     });
   }
 
@@ -203,6 +313,8 @@ export default function DailyLogScreen() {
       label: "Daily Steps",
       description: `Hit ${challenge.stepsGoal.toLocaleString()} steps`,
       icon: "trending-up",
+      route: "/log-steps",
+      isHealthTracked: Platform.OS === "ios",
       healthData: isAuthorized ? {
         current: steps,
         goal: challenge.stepsGoal,
@@ -217,18 +329,36 @@ export default function DailyLogScreen() {
     if (task.healthData?.autoComplete) {
       return true;
     }
+    // Special cases for non-boolean fields
+    if (task.key === "moodScore") {
+      return (todayLog.moodScore ?? 0) > 0;
+    }
+    if (task.key === "caloriesConsumed") {
+      const calories = todayLog.caloriesConsumed ?? 0;
+      if (calories === 0) return false;
+      const direction = (challenge as any).caloriesGoalDirection ?? "below";
+      const goal = challenge.caloriesGoal;
+      return direction === "below" ? calories <= goal : calories >= goal;
+    }
+    if (task.key === "cycleLogged") {
+      // Check if cycle was logged today from separate collection
+      return cycleLoggedToday;
+    }
+    if (task.key === "weightLogged") {
+      return todayLog.weightLogged === true || (todayLog.currentWeight ?? 0) > 0;
+    }
+    if (task.key === "sleepLogged") {
+      return todayLog.sleepLogged === true;
+    }
     return todayLog[task.key] as boolean;
   };
 
   const completedCount = tasks.filter((t) => getTaskCompleted(t)).length;
   const allComplete = tasks.length > 0 && completedCount === tasks.length;
 
-  const handleToggle = async (key: keyof DailyLog) => {
-    const currentValue = todayLog[key] as boolean;
-    try {
-      await toggleTask(key, !currentValue);
-    } catch (err) {
-      // Error is handled in store
+  const handleTaskPress = (task: TaskItem) => {
+    if (task.route) {
+      router.push(task.route as any);
     }
   };
 
@@ -303,33 +433,6 @@ export default function DailyLogScreen() {
             </Pressable>
           )}
 
-          {/* Health Stats Summary */}
-          {isAuthorized && (
-            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-              <View className="flex-row items-center mb-3">
-                <Feather name="heart" size={16} color="#EF4444" />
-                <Text className="text-sm font-semibold text-gray-700 ml-2">Apple Health</Text>
-                {healthLoading && <ActivityIndicator size="small" color="#8B5CF6" className="ml-2" />}
-              </View>
-              <View className="flex-row">
-                <View className="flex-1 items-center">
-                  <Text className="text-2xl font-bold text-gray-900">{steps.toLocaleString()}</Text>
-                  <Text className="text-xs text-gray-500">Steps</Text>
-                </View>
-                <View className="w-px bg-gray-200" />
-                <View className="flex-1 items-center">
-                  <Text className="text-2xl font-bold text-gray-900">{totalMinutes}</Text>
-                  <Text className="text-xs text-gray-500">Workout Mins</Text>
-                </View>
-                <View className="w-px bg-gray-200" />
-                <View className="flex-1 items-center">
-                  <Text className="text-2xl font-bold text-gray-900">{workouts.length}</Text>
-                  <Text className="text-xs text-gray-500">Workouts</Text>
-                </View>
-              </View>
-            </View>
-          )}
-
           {/* Status Banner */}
           <View
             className={`rounded-2xl p-4 mb-4 ${
@@ -354,7 +457,7 @@ export default function DailyLogScreen() {
                     allComplete ? "text-green-800" : "text-gray-700"
                   }`}
                 >
-                  {allComplete ? "Day Complete! 🎉" : `${completedCount}/${tasks.length} Tasks Done`}
+                  {allComplete ? "Day Complete!" : `${completedCount}/${tasks.length} Tasks Done`}
                 </Text>
                 <Text
                   className={`text-sm ${
@@ -375,11 +478,12 @@ export default function DailyLogScreen() {
               const isCompleted = getTaskCompleted(task);
               const hasHealthData = !!task.healthData;
               const isAutoCompleted = task.healthData?.autoComplete;
+              const isHealthSynced = task.isHealthTracked === true;
 
               return (
                 <Pressable
                   key={task.key}
-                  onPress={() => !isAutoCompleted && handleToggle(task.key)}
+                  onPress={() => handleTaskPress(task)}
                   className={`flex-row items-center p-4 ${
                     index < tasks.length - 1 ? "border-b border-gray-100" : ""
                   }`}
@@ -388,9 +492,7 @@ export default function DailyLogScreen() {
                   <View
                     className={`h-8 w-8 items-center justify-center rounded-full border-2 ${
                       isCompleted
-                        ? isAutoCompleted
-                          ? "bg-purple-500 border-purple-500"
-                          : "bg-green-500 border-green-500"
+                        ? "bg-green-500 border-green-500"
                         : "border-gray-300"
                     }`}
                   >
@@ -402,15 +504,13 @@ export default function DailyLogScreen() {
                   {/* Icon */}
                   <View
                     className={`h-10 w-10 items-center justify-center rounded-full ml-3 ${
-                      isCompleted 
-                        ? isAutoCompleted ? "bg-purple-100" : "bg-green-100" 
-                        : "bg-gray-100"
+                      isCompleted ? "bg-green-100" : "bg-gray-100"
                     }`}
                   >
                     <Feather
                       name={task.icon}
                       size={18}
-                      color={isCompleted ? (isAutoCompleted ? "#8B5CF6" : "#22C55E") : "#6B7280"}
+                      color={isCompleted ? "#22C55E" : "#6B7280"}
                     />
                   </View>
 
@@ -419,27 +519,26 @@ export default function DailyLogScreen() {
                     <View className="flex-row items-center">
                       <Text
                         className={`text-base font-medium ${
-                          isCompleted 
-                            ? isAutoCompleted ? "text-purple-700" : "text-green-700 line-through" 
-                            : "text-gray-900"
+                          isCompleted ? "text-green-700" : "text-gray-900"
                         }`}
                       >
                         {task.label}
                       </Text>
-                      {isAutoCompleted && (
-                        <View className="ml-2 bg-purple-100 px-2 py-0.5 rounded">
-                          <Text className="text-xs text-purple-600 font-medium">Auto</Text>
+                      {isHealthSynced && (
+                        <View className="ml-2 bg-purple-100 px-2 py-0.5 rounded flex-row items-center">
+                          <Feather name="heart" size={10} color="#8B5CF6" />
+                          <Text className="text-xs text-purple-600 font-medium ml-1">Health</Text>
                         </View>
                       )}
                     </View>
                     
-                    {/* Health progress bar */}
+                    {/* Health progress bar - show when authorized */}
                     {hasHealthData && task.healthData && (
                       <View className="mt-1">
                         <View className="flex-row items-center">
                           <View className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                             <View
-                              className={`h-full rounded-full ${isAutoCompleted ? "bg-purple-500" : "bg-gray-400"}`}
+                              className={`h-full rounded-full ${isCompleted ? "bg-green-500" : "bg-green-300"}`}
                               style={{ 
                                 width: `${Math.min(100, (task.healthData.current / task.healthData.goal) * 100)}%` 
                               }}
@@ -452,6 +551,14 @@ export default function DailyLogScreen() {
                       </View>
                     )}
                     
+                    {/* Show connect prompt only for steps when not authorized */}
+                    {isHealthSynced && !hasHealthData && task.key === "stepsCompleted" && (
+                      <Text className="text-xs text-purple-500">
+                        Connect Apple Health above to track
+                      </Text>
+                    )}
+                    
+                    {/* Show description for non-health tasks */}
                     {!hasHealthData && (
                       <Text
                         className={`text-xs ${
@@ -462,6 +569,9 @@ export default function DailyLogScreen() {
                       </Text>
                     )}
                   </View>
+
+                  {/* Chevron icon for navigation */}
+                  <Feather name="chevron-right" size={20} color="#9CA3AF" />
                 </Pressable>
               );
             })}
@@ -508,10 +618,7 @@ export default function DailyLogScreen() {
           {!allComplete && (
             <View className="mt-6 items-center">
               <Text className="text-gray-400 text-sm text-center">
-                {isAuthorized 
-                  ? "Steps & workouts sync automatically from Apple Health 💪"
-                  : "Tap a task to mark it complete. You've got this! 💪"
-                }
+                Tap any task to log your progress
               </Text>
             </View>
           )}

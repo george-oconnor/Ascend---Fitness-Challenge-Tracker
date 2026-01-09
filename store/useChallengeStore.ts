@@ -216,6 +216,46 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         }
       }
 
+      // Sync water if tracking is enabled
+      if (challenge.trackWater) {
+        try {
+          const { healthSyncService } = await import("@/lib/healthSync");
+          const waterData = await healthSyncService.getWaterIntakeForDate(new Date());
+          if (waterData.totalLiters > 0) {
+            const waterGoalMet = waterData.totalLiters >= (challenge.waterLiters || 0);
+            if (waterData.totalLiters !== todayLog.waterLiters) {
+              updates.waterLiters = waterData.totalLiters;
+              updates.waterCompleted = waterGoalMet;
+            }
+          }
+        } catch (error) {
+          console.log("Water sync skipped:", error);
+        }
+      }
+
+      // Sync sleep if tracking is enabled
+      if ((challenge as any).trackSleep) {
+        try {
+          const { healthSyncService } = await import("@/lib/healthSync");
+          const sleepData = await healthSyncService.getSleepForDate(new Date());
+          if (sleepData.asleepMinutes > 0) {
+            const sleepGoalMinutes = ((challenge as any).sleepGoalHours || 8) * 60;
+            const sleepGoalMet = sleepData.asleepMinutes >= sleepGoalMinutes;
+            if (sleepData.asleepMinutes !== todayLog.sleepMinutes) {
+              updates.sleepMinutes = sleepData.asleepMinutes;
+              updates.sleepLogged = sleepGoalMet;
+              // Also sync the times if available
+              if (sleepData.sleepStart && sleepData.wakeTime) {
+                updates.sleepStartTime = sleepData.sleepStart.toISOString();
+                updates.sleepEndTime = sleepData.wakeTime.toISOString();
+              }
+            }
+          }
+        } catch (error) {
+          console.log("Sleep sync skipped:", error);
+        }
+      }
+
       // Sync workout data if tracking is enabled
       if (challenge.trackWorkout1 || challenge.trackWorkout2) {
         const workouts = healthState.workouts;
@@ -231,7 +271,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           const indoorMinutes = indoorWorkouts.reduce((sum, w) => sum + w.duration, 0);
           const totalMinutes = outdoorMinutes + indoorMinutes;
 
-          // For workout1 (outdoor), use outdoor workouts
+          // For workout 1, use outdoor workouts
           if (challenge.trackWorkout1) {
             const workout1Minutes = Math.round(outdoorMinutes);
             if (workout1Minutes !== todayLog.workout1Minutes) {
@@ -240,14 +280,14 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             }
           }
 
-          // For workout2 (second workout), use indoor or remaining total
+          // For workout 2, use indoor or remaining total
           if (challenge.trackWorkout2) {
-            // If we have both workout types, use indoor for workout2
+            // If we have both workout types, use indoor for workout 2
             // Otherwise, if only one type and it covers both goals, split it
             let workout2Minutes = 0;
             
             if (challenge.trackWorkout1) {
-              // Use indoor workouts for second workout
+              // Use indoor workouts for workout 2
               workout2Minutes = Math.round(indoorMinutes);
             } else {
               // If only tracking workout2, use total

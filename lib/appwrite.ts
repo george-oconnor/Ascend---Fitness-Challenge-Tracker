@@ -1,4 +1,4 @@
-import type { Challenge, DailyLog, UserProfile } from "@/types/type";
+import type { Challenge, CycleLog, DailyLog, UserProfile } from "@/types/type";
 import { Account, Client, Databases, Query } from "appwrite";
 
 const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT;
@@ -10,6 +10,7 @@ const COLLECTIONS = {
   USERS: "users",
   CHALLENGES: "challenges",
   DAILY_LOGS: "dailyLogs",
+  CYCLE_LOGS: "cycleLog",
 };
 
 export const appwriteClient = new Client();
@@ -183,6 +184,80 @@ export async function getDailyLogsForChallenge(challengeId: string): Promise<Dai
   } catch (err) {
     console.error("getDailyLogsForChallenge error:", err);
     return [];
+  }
+}
+
+// Cycle Log functions
+export async function createCycleLog(log: Omit<CycleLog, "$id">): Promise<CycleLog> {
+  const doc = await databases.createDocument(
+    DATABASE_ID,
+    COLLECTIONS.CYCLE_LOGS,
+    "unique()",
+    log
+  );
+  return doc as unknown as CycleLog;
+}
+
+export async function getCycleLog(userId: string, date: string): Promise<CycleLog | null> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.CYCLE_LOGS,
+      [Query.equal("userId", userId), Query.equal("date", date)]
+    );
+    if (response.documents.length > 0) {
+      return response.documents[0] as unknown as CycleLog;
+    }
+    return null;
+  } catch (err) {
+    console.error("getCycleLog error:", err);
+    return null;
+  }
+}
+
+export async function updateCycleLog(logId: string, data: Partial<CycleLog>): Promise<CycleLog> {
+  const doc = await databases.updateDocument(
+    DATABASE_ID,
+    COLLECTIONS.CYCLE_LOGS,
+    logId,
+    data
+  );
+  return doc as unknown as CycleLog;
+}
+
+export async function getCycleLogsForUser(userId: string, limit: number = 90): Promise<CycleLog[]> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.CYCLE_LOGS,
+      [Query.equal("userId", userId), Query.orderDesc("date"), Query.limit(limit)]
+    );
+    return response.documents as unknown as CycleLog[];
+  } catch (err) {
+    console.error("getCycleLogsForUser error:", err);
+    return [];
+  }
+}
+
+export async function getLastPeriodStart(userId: string): Promise<CycleLog | null> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.CYCLE_LOGS,
+      [
+        Query.equal("userId", userId),
+        Query.equal("isPeriodStart", true),
+        Query.orderDesc("date"),
+        Query.limit(1)
+      ]
+    );
+    if (response.documents.length > 0) {
+      return response.documents[0] as unknown as CycleLog;
+    }
+    return null;
+  } catch (err) {
+    console.error("getLastPeriodStart error:", err);
+    return null;
   }
 }
 

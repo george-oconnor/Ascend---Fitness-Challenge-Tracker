@@ -1,4 +1,5 @@
 import { completePasswordReset } from "@/lib/appwrite";
+import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
@@ -54,7 +55,7 @@ export default function ResetPasswordScreen() {
         <View className="flex-1 px-5 pt-10 justify-center">
           <View className="items-center mb-8">
             <View className="w-16 h-16 rounded-full bg-green-100 items-center justify-center mb-4">
-              <Text className="text-3xl">✓</Text>
+              <Feather name="check" size={32} color="#22C55E" />
             </View>
             <Text className="text-2xl font-bold text-dark-100 mb-2 text-center">Password Reset Successful</Text>
             <Text className="text-base text-gray-500 text-center">

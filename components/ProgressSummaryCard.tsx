@@ -1,8 +1,7 @@
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
-import { Platform } from "react-native";
-import { Text, View } from "react-native";
+import { Platform, Text, View } from "react-native";
 
 function ProgressRow({ label, current, goal, unit }: { label: string; current: number; goal: number; unit?: string }) {
   const safeGoal = goal > 0 ? goal : 0;
@@ -50,12 +49,12 @@ export default function ProgressSummaryCard() {
   }
   if (challenge.trackWorkout1) {
     exerciseItems.push(
-      <ProgressRow key="w1" label="Outdoor Workout" current={liveOutdoorMinutes} goal={challenge.workoutMinutes ?? 0} unit="min" />
+      <ProgressRow key="w1" label="Workout 1" current={liveOutdoorMinutes} goal={challenge.workoutMinutes ?? 0} unit="min" />
     );
   }
   if (challenge.trackWorkout2) {
     exerciseItems.push(
-      <ProgressRow key="w2" label="Second Workout" current={liveIndoorMinutes} goal={challenge.workoutMinutes ?? 0} unit="min" />
+      <ProgressRow key="w2" label="Workout 2" current={liveIndoorMinutes} goal={challenge.workoutMinutes ?? 0} unit="min" />
     );
   }
 

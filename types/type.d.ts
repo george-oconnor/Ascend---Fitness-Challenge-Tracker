@@ -11,6 +11,7 @@ export type Challenge = {
   trackDiet: boolean;
   trackCalories: boolean;
   caloriesGoal: number;
+  caloriesGoalDirection?: "above" | "below"; // Whether to stay above or below the calorie goal
   trackWeight: boolean;
   weightGoal: number;
   trackWorkout1: boolean;
@@ -20,6 +21,13 @@ export type Challenge = {
   readingPages: number;
   trackProgressPhoto: boolean;
   trackNoAlcohol: boolean;
+  trackMood: boolean;
+  trackSleep: boolean;
+  sleepGoalHours?: number;
+  trackCycle: boolean;
+  averageCycleLength?: number;
+  averagePeriodLength?: number;
+  lastPeriodStart?: string;
 };
 
 export type DailyLog = {
@@ -33,17 +41,30 @@ export type DailyLog = {
   waterLiters?: number;
   dietCompleted?: boolean;
   caloriesConsumed?: number;
+  calorieDetails?: string;
   currentWeight?: number;
+  weightLogged?: boolean;
   workout1Completed?: boolean;
   workout1Minutes?: number;
   workout2Completed?: boolean;
   workout2Minutes?: number;
+  workoutDetails?: string;
   readingCompleted?: boolean;
   readingPages?: number;
+  finishedBook?: boolean;
   progressPhotoCompleted?: boolean;
   noAlcoholCompleted?: boolean;
+  alcoholDetails?: string;
+  moodScore?: number;
+  moodNotes?: string;
   meals?: string;
   notes?: string;
+  // Sleep tracking
+  sleepLogged?: boolean;
+  sleepMinutes?: number;
+  sleepStartTime?: string;
+  sleepEndTime?: string;
+  sleepQuality?: number; // 1-5 rating
 };
 
 export type UserProfile = {
@@ -78,4 +99,46 @@ export type SessionState = {
   setStatus: (status: SessionStatus) => void;
   setError: (message: string | null) => void;
   clearSession: () => void;
+};
+
+// Cycle Tracking Types (Beta)
+export type PeriodFlow = "none" | "spotting" | "light" | "medium" | "heavy";
+
+export type CycleSymptom = 
+  // Physical
+  | "cramps" | "bloating" | "breast_tenderness" | "headache" | "migraine"
+  | "fatigue" | "backache" | "acne" | "nausea" | "dizziness"
+  | "hot_flashes" | "chills" | "appetite_increase" | "appetite_decrease"
+  | "cravings" | "insomnia" | "joint_pain" | "muscle_aches"
+  // Digestive
+  | "constipation" | "diarrhea" | "gas"
+  // Emotional/Mental (integrated with mood tracking)
+  | "mood_swings" | "anxiety" | "irritability" | "depression" 
+  | "crying" | "stress" | "brain_fog" | "low_energy" | "high_energy"
+  | "tired" | "energetic" | "calm" | "excited" | "grateful" 
+  | "motivated" | "frustrated" | "hopeful" | "lonely" | "focused"
+  | "sensitive" | "overwhelmed" | "content" | "restless";
+
+export type CervicalMucus = "dry" | "sticky" | "creamy" | "watery" | "egg_white";
+
+export type SexualActivityType = {
+  hadActivity: boolean;
+  protected?: boolean;
+  notes?: string;
+};
+
+export type CycleLog = {
+  $id?: string;
+  userId: string;
+  date: string;
+  periodFlow?: PeriodFlow;
+  isPeriodStart?: boolean;
+  isPeriodEnd?: boolean;
+  symptoms?: string; // JSON array of CycleSymptom
+  cervicalMucus?: CervicalMucus;
+  sexualActivity?: string; // JSON of SexualActivityType
+  basalTemp?: number;
+  ovulationTest?: "positive" | "negative" | "not_taken";
+  notes?: string;
+  cycleDay?: number;
 };

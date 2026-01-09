@@ -60,8 +60,16 @@
       [
         "react-native-health",
         {
-          "healthSharePermission": "This app needs access to your health data to track your steps and workouts for the 75 Hard challenge.",
-          "healthUpdatePermission": "This app needs access to update your health data to log workouts for the 75 Hard challenge."
+          "healthSharePermission": "This app needs access to your health data to track your steps, workouts, water intake, weight, sleep, and mood for the 75 Hard challenge.",
+          "healthUpdatePermission": "This app needs access to update your health data to log workouts, water intake, weight, calories, sleep, and mood for the 75 Hard challenge."
+        }
+      ],
+      [
+        "@kingstinct/react-native-healthkit",
+        {
+          "NSHealthShareUsageDescription": "This app needs access to your health data to track your cycle, water intake, weight, calories, sleep, and mood for the 75 Hard challenge.",
+          "NSHealthUpdateUsageDescription": "This app needs access to update your health data to log your cycle tracking, water intake, weight, calories, sleep, and mood.",
+          "background": false
         }
       ]
     ],

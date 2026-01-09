@@ -1,10 +1,14 @@
+import { useTodayCycleLog } from "@/hooks/useCycleLog";
 import { useChallengeStore } from "@/store/useChallengeStore";
+import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { Pressable, Text, View } from "react-native";
 
 export default function ChallengeStatusCard() {
   const { challenge, todayLog, isLoading } = useChallengeStore();
+  const { steps, workouts, isAuthorized: healthAuthorized } = useHealthStore();
+  const { hasLoggedToday: cycleLoggedToday } = useTodayCycleLog();
 
   if (isLoading) {
     return (
@@ -23,9 +27,12 @@ export default function ChallengeStatusCard() {
       >
         <View className="flex-row items-center justify-between">
           <View className="flex-1">
-            <Text className="text-white text-lg font-bold mb-1">
-              Start Your 75 Hard Challenge 💪
-            </Text>
+            <View className="flex-row items-center">
+              <Text className="text-white text-lg font-bold mb-1">
+                Start Your 75 Hard Challenge
+              </Text>
+              <Feather name="target" size={18} color="white" style={{ marginLeft: 8 }} />
+            </View>
             <Text className="text-white/80 text-sm">
               Set up your challenge parameters and start tracking your progress
             </Text>
@@ -42,43 +49,120 @@ export default function ChallengeStatusCard() {
   startDate.setHours(0, 0, 0, 0);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
-  
-  const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+
+  const daysPassed =
+    Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   const hasStarted = daysPassed >= 1;
   const currentDay = hasStarted ? Math.min(daysPassed, challenge.totalDays) : 0;
   const progressPercent = hasStarted ? (currentDay / challenge.totalDays) * 100 : 0;
   const daysUntilStart = hasStarted ? 0 : Math.abs(daysPassed - 1);
 
-  // Calculate today's tasks
-  const trackedTasks: { key: string; label: string; completed: boolean }[] = [];
+  // Calculate today's completed activities
+  let completedToday = 0;
+  let totalTracked = 0;
 
-  if (challenge.trackSteps) {
-    trackedTasks.push({ key: "steps", label: "Steps", completed: todayLog?.stepsCompleted ?? false });
-  }
-  if (challenge.trackWater) {
-    trackedTasks.push({ key: "water", label: "Water", completed: todayLog?.waterCompleted ?? false });
-  }
-  if (challenge.trackDiet) {
-    trackedTasks.push({ key: "diet", label: "Diet", completed: todayLog?.dietCompleted ?? false });
-  }
-  if (challenge.trackWorkout1) {
-    trackedTasks.push({ key: "workout1", label: "Workout 1", completed: todayLog?.workout1Completed ?? false });
-  }
-  if (challenge.trackWorkout2) {
-    trackedTasks.push({ key: "workout2", label: "Workout 2", completed: todayLog?.workout2Completed ?? false });
-  }
-  if (challenge.trackReading) {
-    trackedTasks.push({ key: "reading", label: "Reading", completed: todayLog?.readingCompleted ?? false });
-  }
-  if (challenge.trackProgressPhoto) {
-    trackedTasks.push({ key: "photo", label: "Photo", completed: todayLog?.progressPhotoCompleted ?? false });
-  }
-  if (challenge.trackNoAlcohol) {
-    trackedTasks.push({ key: "alcohol", label: "No Alcohol", completed: todayLog?.noAlcoholCompleted ?? false });
+  if (hasStarted && todayLog) {
+    // Steps
+    if (challenge.trackSteps) {
+      totalTracked++;
+      const stepsCount = healthAuthorized ? steps : (todayLog.stepsCount ?? 0);
+      if (stepsCount >= challenge.stepsGoal) completedToday++;
+    }
+
+    // Workout 1
+    if (challenge.trackWorkout1) {
+      totalTracked++;
+      const outdoorMinutes = healthAuthorized
+        ? workouts.filter(w => w.isOutdoor).reduce((sum, w) => sum + w.duration, 0)
+        : (todayLog.workout1Minutes ?? 0);
+      if (outdoorMinutes >= challenge.workoutMinutes) completedToday++;
+    }
+
+    // Workout 2
+    if (challenge.trackWorkout2) {
+      totalTracked++;
+      const totalMinutes = healthAuthorized
+        ? workouts.reduce((sum, w) => sum + w.duration, 0)
+        : ((todayLog.workout1Minutes ?? 0) + (todayLog.workout2Minutes ?? 0));
+      if (totalMinutes >= challenge.workoutMinutes * 2) completedToday++;
+    }
+
+    // Diet
+    if (challenge.trackDiet) {
+      totalTracked++;
+      if (todayLog.dietCompleted) completedToday++;
+    }
+
+    // Water
+    if (challenge.trackWater) {
+      totalTracked++;
+      if ((todayLog.waterLiters ?? 0) >= challenge.waterLiters) completedToday++;
+    }
+
+    // Reading
+    if (challenge.trackReading) {
+      totalTracked++;
+      if ((todayLog.readingPages ?? 0) >= challenge.readingPages || todayLog.readingCompleted) completedToday++;
+    }
+
+    // Progress Photo
+    if (challenge.trackProgressPhoto) {
+      totalTracked++;
+      if (todayLog.progressPhotoCompleted) completedToday++;
+    }
+
+    // No Alcohol
+    if (challenge.trackNoAlcohol) {
+      totalTracked++;
+      if (todayLog.noAlcoholCompleted) completedToday++;
+    }
+
+    // Weight
+    if (challenge.trackWeight) {
+      totalTracked++;
+      if (todayLog.weightLogged) completedToday++;
+    }
+
+    // Calories
+    if (challenge.trackCalories) {
+      totalTracked++;
+      const calories = todayLog.caloriesConsumed ?? 0;
+      const direction = (challenge as any).caloriesGoalDirection ?? "below";
+      const meetsGoal = calories > 0 && (direction === "below" ? calories <= challenge.caloriesGoal : calories >= challenge.caloriesGoal);
+      if (meetsGoal) completedToday++;
+    }
+
+    // Mood
+    if ((challenge as any).trackMood) {
+      totalTracked++;
+      if ((todayLog.moodScore ?? 0) > 0) completedToday++;
+    }
+
+    // Sleep
+    if ((challenge as any).trackSleep) {
+      totalTracked++;
+      if (todayLog.sleepLogged) completedToday++;
+    }
+
+    // Cycle
+    if ((challenge as any).trackCycle) {
+      totalTracked++;
+      if (cycleLoggedToday) completedToday++;
+    }
   }
 
-  const completedCount = trackedTasks.filter((t) => t.completed).length;
-  const allComplete = trackedTasks.length > 0 && completedCount === trackedTasks.length;
+  // Count tracked tasks for the "not started" state display
+  const trackedTasksCount = [
+    challenge.trackSteps,
+    challenge.trackWater,
+    challenge.trackDiet,
+    challenge.trackWorkout1,
+    challenge.trackWorkout2,
+    challenge.trackReading,
+    challenge.trackProgressPhoto,
+    challenge.trackNoAlcohol,
+    challenge.trackMood,
+  ].filter(Boolean).length;
 
   // Challenge hasn't started yet
   if (!hasStarted) {
@@ -117,7 +201,7 @@ export default function ChallengeStatusCard() {
                 Starting {startDate.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" })}
               </Text>
               <Text className="text-sm text-gray-500">
-                {challenge.totalDays} day challenge • {trackedTasks.length} daily tasks
+                {challenge.totalDays} day challenge • {trackedTasksCount} daily tasks
               </Text>
             </View>
           </View>
@@ -138,8 +222,8 @@ export default function ChallengeStatusCard() {
       {/* Header */}
       <View className="flex-row items-center justify-between mb-4">
         <View>
-          <Text className="text-xs text-gray-500 uppercase tracking-wide">Day {currentDay} of {challenge.totalDays}</Text>
-          <Text className="text-xl font-bold text-gray-900">{challenge.totalDays} Hard Challenge</Text>
+          <Text className="text-xs text-gray-500 uppercase tracking-wide">{challenge.totalDays} Hard Challenge</Text>
+          <Text className="text-xl font-bold text-gray-900">Day {currentDay} of {challenge.totalDays}</Text>
         </View>
         <Pressable
           onPress={(e) => {
@@ -153,7 +237,7 @@ export default function ChallengeStatusCard() {
       </View>
 
       {/* Progress bar */}
-      <View className="mb-4">
+      <View className="mb-2">
         <View className="h-3 bg-gray-100 rounded-full overflow-hidden">
           <View
             className="h-full bg-primary rounded-full"
@@ -165,52 +249,22 @@ export default function ChallengeStatusCard() {
         </Text>
       </View>
 
-      {/* Today's status */}
-      <View className="bg-gray-50 rounded-xl p-4">
-        <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-sm font-semibold text-gray-700">Today's Progress</Text>
-          {allComplete ? (
-            <View className="flex-row items-center bg-green-100 px-2 py-1 rounded-full">
-              <Feather name="check-circle" size={14} color="#22C55E" />
-              <Text className="text-xs text-green-600 ml-1 font-medium">All Done!</Text>
-            </View>
-          ) : (
-            <Text className="text-xs text-gray-500">
-              {completedCount}/{trackedTasks.length} tasks
-            </Text>
-          )}
+      {/* Today's activities */}
+      <View className="flex-row items-center justify-between mt-3 bg-gray-50 rounded-xl p-3">
+        <View className="flex-row items-center">
+          <View className={`h-8 w-8 rounded-full items-center justify-center ${
+            completedToday === totalTracked ? "bg-green-500" : "bg-purple-500"
+          }`}>
+            <Feather name={completedToday === totalTracked ? "check" : "clock"} size={16} color="white" />
+          </View>
+          <Text className="text-sm font-semibold text-gray-700 ml-2">Today's Activities</Text>
         </View>
-
-        {/* Task pills */}
-        <View className="flex-row flex-wrap gap-2">
-          {trackedTasks.map((task) => (
-            <View
-              key={task.key}
-              className={`flex-row items-center px-3 py-1.5 rounded-full ${
-                task.completed ? "bg-green-100" : "bg-gray-200"
-              }`}
-            >
-              <Feather
-                name={task.completed ? "check" : "circle"}
-                size={12}
-                color={task.completed ? "#22C55E" : "#9CA3AF"}
-              />
-              <Text
-                className={`text-xs ml-1.5 ${
-                  task.completed ? "text-green-700" : "text-gray-600"
-                }`}
-              >
-                {task.label}
-              </Text>
-            </View>
-          ))}
-        </View>
+        <Text className={`text-base font-bold ${
+          completedToday === totalTracked ? "text-green-600" : "text-purple-600"
+        }`}>
+          {completedToday} / {totalTracked}
+        </Text>
       </View>
-
-      {/* Tap hint */}
-      <Text className="text-xs text-gray-400 text-center mt-3">
-        Tap to log today's progress
-      </Text>
     </Pressable>
   );
 }
