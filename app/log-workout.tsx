@@ -1,5 +1,5 @@
 import { healthService } from "@/lib/health";
-import { captureException, captureMessage } from "@/lib/sentry";
+import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
@@ -160,7 +160,6 @@ export default function LogWorkoutScreen() {
             startDate,
             endDate,
           });
-          captureMessage(`Workout synced to Apple Health: ${selectedType} - ${minutes}min`, "info");
         } catch (healthError: any) {
           console.error("Error saving workout to HealthKit:", healthError);
           captureException(new Error(`Apple Health workout sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {

@@ -3,6 +3,7 @@
  * Uses @kingstinct/react-native-healthkit for reproductive health data
  */
 
+import { logger } from "@/lib/sentry";
 import { CervicalMucus, PeriodFlow, SexualActivityType } from "@/types/type.d";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
@@ -291,7 +292,7 @@ class CycleHealthService {
         },
       });
 
-      console.log("✅ Menstrual flow saved to Apple Health:", flow);
+      logger.info("Apple Health sync: menstrual flow saved", { type: "menstrualFlow", flow, date: date.toISOString() });
       return true;
     } catch (error: any) {
       console.error("❌ Failed to save menstrual flow:", error);
@@ -320,7 +321,7 @@ class CycleHealthService {
         endDate: date,
       });
 
-      console.log("✅ Cervical mucus saved to Apple Health:", mucus);
+      logger.info("Apple Health sync: cervical mucus saved", { type: "cervicalMucus", mucus, date: date.toISOString() });
       return true;
     } catch (error: any) {
       console.error("❌ Failed to save cervical mucus:", error);
@@ -353,7 +354,7 @@ class CycleHealthService {
         endDate: date,
       });
 
-      console.log("✅ Ovulation test saved to Apple Health:", result);
+      logger.info("Apple Health sync: ovulation test saved", { type: "ovulationTest", result, date: date.toISOString() });
       return true;
     } catch (error: any) {
       console.error("❌ Failed to save ovulation test:", error);
@@ -384,7 +385,7 @@ class CycleHealthService {
         } : undefined,
       });
 
-      console.log("✅ Sexual activity saved to Apple Health");
+      logger.info("Apple Health sync: sexual activity saved", { type: "sexualActivity", protected: activity.protected, date: date.toISOString() });
       return true;
     } catch (error: any) {
       console.error("❌ Failed to save sexual activity:", error);

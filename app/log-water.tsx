@@ -1,5 +1,5 @@
 import { healthSyncService } from "@/lib/healthSync";
-import { captureException, captureMessage } from "@/lib/sentry";
+import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
@@ -155,7 +155,6 @@ export default function LogWaterScreen() {
         const amountToSync = healthKitWater !== null ? water - healthKitWater : water;
         if (amountToSync > 0) {
           await healthSyncService.saveWaterIntake(amountToSync);
-          captureMessage(`Water synced to Apple Health: ${amountToSync}L`, "info");
         }
       } catch (healthError: any) {
         console.error("Error saving water to HealthKit:", healthError);

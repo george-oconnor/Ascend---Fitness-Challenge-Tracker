@@ -1,6 +1,6 @@
 import { createCycleLog, getCycleLog, getLastPeriodStart, updateCycleLog } from "@/lib/appwrite";
 import { cycleHealthService } from "@/lib/cycleHealth";
-import { captureException, captureMessage } from "@/lib/sentry";
+import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { CervicalMucus, CycleLog, CycleSymptom, PeriodFlow, SexualActivityType } from "@/types/type.d";
@@ -396,8 +396,6 @@ export default function LogCycleScreen() {
           ovulationTest: ovulationTest !== "not_taken" ? ovulationTest : undefined,
           sexualActivity: sexualActivity.hadActivity ? sexualActivity : undefined,
         });
-        const flowStr = periodFlow !== "none" ? periodFlow : "none";
-        captureMessage(`Cycle synced to Apple Health: ${flowStr} flow`, "info");
       } catch (healthError: any) {
         console.log("HealthKit sync skipped or failed:", healthError);
         const flowStr = periodFlow !== "none" ? periodFlow : "none";

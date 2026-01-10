@@ -7,7 +7,7 @@ import {
     updateChallenge,
     updateDailyLog,
 } from "@/lib/appwrite";
-import { captureException } from "@/lib/sentry";
+import { captureException, logger } from "@/lib/sentry";
 import type { Challenge, DailyLog } from "@/types/type";
 import { Platform } from "react-native";
 import { create } from "zustand";
@@ -66,6 +66,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     set({ isLoading: true, error: null });
     try {
       const challenge = await createChallenge(challengeData);
+      logger.info("Challenge created", { challengeId: challenge.$id, userId: challengeData.userId });
       set({ challenge, isLoading: false });
       return challenge;
     } catch (err) {
@@ -264,33 +265,36 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         const workoutGoalMinutes = challenge.workoutMinutes || 45;
 
         if (workouts.length > 0) {
-          // Separate outdoor and indoor workouts
-          const outdoorWorkouts = workouts.filter(w => w.isOutdoor);
-          const indoorWorkouts = workouts.filter(w => !w.isOutdoor);
+          // Sort workouts by start time (earliest first)
+          const sortedWorkouts = [...workouts].sort(
+            (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+          );
 
-          // Calculate total minutes for each type
-          const outdoorMinutes = outdoorWorkouts.reduce((sum, w) => sum + w.duration, 0);
-          const indoorMinutes = indoorWorkouts.reduce((sum, w) => sum + w.duration, 0);
-          const totalMinutes = outdoorMinutes + indoorMinutes;
+          // Calculate total minutes
+          const totalMinutes = sortedWorkouts.reduce((sum, w) => sum + w.duration, 0);
 
-          // For workout 1, use outdoor workouts
+          // Fill workout1 first, then workout2 with remaining time
           if (challenge.trackWorkout1) {
-            const workout1Minutes = Math.round(outdoorMinutes);
+            // Use all workout time for workout1 up to what's needed
+            const workout1Minutes = Math.round(
+              challenge.trackWorkout2 
+                ? Math.min(totalMinutes, workoutGoalMinutes) // Cap at goal if tracking both
+                : totalMinutes // Use all time if only tracking workout1
+            );
+            
             if (workout1Minutes !== todayLog.workout1Minutes) {
               updates.workout1Minutes = workout1Minutes;
               updates.workout1Completed = workout1Minutes >= workoutGoalMinutes;
             }
           }
 
-          // For workout 2, use indoor or remaining total
+          // For workout 2, use remaining time after workout1
           if (challenge.trackWorkout2) {
-            // If we have both workout types, use indoor for workout 2
-            // Otherwise, if only one type and it covers both goals, split it
             let workout2Minutes = 0;
             
             if (challenge.trackWorkout1) {
-              // Use indoor workouts for workout 2
-              workout2Minutes = Math.round(indoorMinutes);
+              // Use time beyond workout1's goal for workout2
+              workout2Minutes = Math.round(Math.max(0, totalMinutes - workoutGoalMinutes));
             } else {
               // If only tracking workout2, use total
               workout2Minutes = Math.round(totalMinutes);

@@ -164,12 +164,9 @@ export default function LogWeightScreen() {
       // Save to Apple Health using new healthSyncService
       if (Platform.OS === "ios" && weight > 0) {
         try {
-          console.log("Attempting to save weight to Apple Health:", weight);
           const result = await healthSyncService.saveWeight(weight);
-          console.log("Weight save result:", result);
-          if (result) {
-            captureMessage(`Weight synced to Apple Health: ${weight}kg`, "info");
-          } else {
+          if (!result) {
+            // Log warning if sync returned false (logged as info in healthSyncService on success)
             captureMessage(`Weight sync to Apple Health returned false for: ${weight}kg`, "warning");
           }
         } catch (healthError: any) {

@@ -1,3 +1,4 @@
+import { logger } from "@/lib/sentry";
 import { Platform } from "react-native";
 
 export type HealthData = {
@@ -409,7 +410,7 @@ class HealthService {
             resolve(false);
             return;
           }
-          console.log("✅ Weight saved to Apple Health:", result);
+          logger.info("Apple Health sync: weight saved (legacy)", { type: "weight", weightKg });
           resolve(true);
         });
       } catch (error) {
@@ -479,7 +480,8 @@ class HealthService {
             resolve(false);
             return;
           }
-          console.log("✅ Workout saved to Apple Health:", result);
+          const durationMinutes = Math.round((options.endDate.getTime() - options.startDate.getTime()) / 60000);
+          logger.info("Apple Health sync: workout saved", { type: "workout", workoutType: options.type, durationMinutes });
           resolve(true);
         });
       } catch (error) {
@@ -523,7 +525,7 @@ class HealthService {
             resolve(false);
             return;
           }
-          console.log("✅ Food saved to Apple Health:", result);
+          logger.info("Apple Health sync: food saved", { type: "food", mealType: options.mealType, calories: options.calories });
           resolve(true);
         });
       } catch (error) {

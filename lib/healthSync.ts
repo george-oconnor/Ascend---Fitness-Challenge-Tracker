@@ -3,6 +3,7 @@
  * Uses @kingstinct/react-native-healthkit for water, weight, calories, sleep, and mood
  */
 
+import { logger } from "@/lib/sentry";
 import Constants from "expo-constants";
 import { Platform } from "react-native";
 
@@ -175,12 +176,9 @@ class HealthSyncService {
         return false;
       }
 
-      await saveQuantitySample(HKQuantityTypes.DietaryWater, HKUnits.Liter, liters, {
-        startDate: date,
-        endDate: date,
-      });
+      await saveQuantitySample(HKQuantityTypes.DietaryWater, HKUnits.Liter, liters, date, date);
 
-      console.log(`✅ HealthSync: Saved ${liters}L water to Apple Health`);
+      logger.info("Apple Health sync: water saved", { type: "water", liters, date: date.toISOString() });
       return true;
     } catch (error: any) {
       console.error("❌ HealthSync: Failed to save water:", error);
@@ -247,12 +245,9 @@ class HealthSyncService {
         return false;
       }
 
-      await saveQuantitySample(HKQuantityTypes.BodyMass, HKUnits.Kilogram, kilograms, {
-        startDate: date,
-        endDate: date,
-      });
+      await saveQuantitySample(HKQuantityTypes.BodyMass, HKUnits.Kilogram, kilograms, date, date);
 
-      console.log(`✅ HealthSync: Saved ${kilograms}kg weight to Apple Health`);
+      logger.info("Apple Health sync: weight saved", { type: "weight", kilograms, date: date.toISOString() });
       return true;
     } catch (error: any) {
       console.error("❌ HealthSync: Failed to save weight:", error);
@@ -361,23 +356,18 @@ class HealthSyncService {
         return false;
       }
 
-      const options: any = {
-        startDate: date,
-        endDate: date,
-      };
-
-      if (mealName) {
-        options.metadata = { HKFoodMeal: mealName };
-      }
+      const metadata = mealName ? { HKFoodMeal: mealName } : undefined;
 
       await saveQuantitySample(
         HKQuantityTypes.DietaryEnergyConsumed,
         HKUnits.Kilocalorie,
         calories,
-        options
+        date,
+        date,
+        metadata
       );
 
-      console.log(`✅ HealthSync: Saved ${calories} kcal to Apple Health`);
+      logger.info("Apple Health sync: calories saved", { type: "calories", calories, mealName: mealName || "unspecified", date: date.toISOString() });
       return true;
     } catch (error: any) {
       console.error("❌ HealthSync: Failed to save calories:", error);
@@ -455,7 +445,7 @@ class HealthSyncService {
       });
 
       const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
-      console.log(`✅ HealthSync: Saved ${durationMinutes} min sleep to Apple Health`);
+      logger.info("Apple Health sync: sleep saved", { type: "sleep", durationMinutes, startTime: startTime.toISOString(), endTime: endTime.toISOString() });
       return true;
     } catch (error: any) {
       console.error("❌ HealthSync: Failed to save sleep:", error);
@@ -674,7 +664,7 @@ class HealthSyncService {
         date,
       });
 
-      console.log(`✅ HealthSync: Saved mood (${score}/5) to Apple Health`);
+      logger.info("Apple Health sync: mood saved", { type: "mood", score, valence, emotionCount: emotions.length, date: date.toISOString() });
       return true;
     } catch (error: any) {
       // Don't log error for unsupported iOS versions

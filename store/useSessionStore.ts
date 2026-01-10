@@ -1,5 +1,5 @@
 import { createAccount, createUserProfile, getCurrentSession, getCurrentUser, signIn, signOut } from "@/lib/appwrite";
-import { captureException, clearUser as clearSentryUser, setUser as setSentryUser } from "@/lib/sentry";
+import { captureException, clearUser as clearSentryUser, logger, setUser as setSentryUser } from "@/lib/sentry";
 import type { SessionState } from "@/types/type";
 import { create } from "zustand";
 
@@ -40,6 +40,7 @@ export const useSessionStore = create<SessionState>((set) => ({
       const user = await getCurrentUser();
       if (user) {
         setSentryUser({ id: user.$id, email: user.email, username: user.name });
+        logger.info("User logged in", { userId: user.$id });
         set({ user: { id: user.$id, email: user.email, name: user.name }, token: user.$id, status: "authenticated", error: null });
       }
     } catch (err) {
@@ -63,6 +64,7 @@ export const useSessionStore = create<SessionState>((set) => ({
         await createUserProfile(user.$id, email, firstName, lastName);
         
         setSentryUser({ id: user.$id, email: user.email, username: fullName });
+        logger.info("User signed up", { userId: user.$id });
         set({ user: { id: user.$id, email: user.email, name: fullName }, token: user.$id, status: "authenticated", error: null });
       }
     } catch (err) {
