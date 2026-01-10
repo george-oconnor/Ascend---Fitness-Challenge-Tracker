@@ -1,5 +1,6 @@
 import { healthService } from "@/lib/health";
 import { healthSyncService } from "@/lib/healthSync";
+import { captureException, captureMessage } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -163,9 +164,20 @@ export default function LogWeightScreen() {
       // Save to Apple Health using new healthSyncService
       if (Platform.OS === "ios" && weight > 0) {
         try {
-          await healthSyncService.saveWeight(weight);
-        } catch (healthError) {
-          console.log("HealthKit weight sync skipped:", healthError);
+          console.log("Attempting to save weight to Apple Health:", weight);
+          const result = await healthSyncService.saveWeight(weight);
+          console.log("Weight save result:", result);
+          if (result) {
+            captureMessage(`Weight synced to Apple Health: ${weight}kg`, "info");
+          } else {
+            captureMessage(`Weight sync to Apple Health returned false for: ${weight}kg`, "warning");
+          }
+        } catch (healthError: any) {
+          console.error("Error saving to HealthKit:", healthError);
+          captureException(new Error(`Apple Health weight sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
+            weight,
+            platform: Platform.OS,
+          });
         }
       }
       
@@ -176,6 +188,9 @@ export default function LogWeightScreen() {
       router.back();
     } catch (err) {
       console.error("Failed to save weight:", err);
+      captureException(new Error(`Failed to save weight: ${err instanceof Error ? err.message : JSON.stringify(err)}`), {
+        weight,
+      });
     } finally {
       setSaving(false);
     }

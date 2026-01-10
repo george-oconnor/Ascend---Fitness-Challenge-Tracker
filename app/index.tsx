@@ -1,7 +1,6 @@
 import ActivityProgressCard from "@/components/ActivityProgressCard";
 import ChallengeStatusCard from "@/components/ChallengeStatusCard";
 import Header from "@/components/Header";
-import StepsCard from "@/components/StepsCard";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
 import { useSessionStore } from "@/store/useSessionStore";
@@ -13,7 +12,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function HomeScreen() {
   const { user } = useSessionStore();
-  const { challenge, todayLog, fetchChallenge, syncHealthData } = useChallengeStore();
+  const { challenge, todayLog, fetchChallenge, fetchAllLogs, syncHealthData } = useChallengeStore();
   const { isAuthorized, fetchTodayData, steps, workouts } = useHealthStore();
   const [refreshing, setRefreshing] = useState(false);
 
@@ -22,6 +21,13 @@ export default function HomeScreen() {
       fetchChallenge(user.id);
     }
   }, [user?.id]);
+
+  // Fetch all logs when challenge is loaded (needed for photo frequency checking)
+  useEffect(() => {
+    if (challenge?.$id) {
+      fetchAllLogs(challenge.$id);
+    }
+  }, [challenge?.$id, fetchAllLogs]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -165,9 +171,6 @@ export default function HomeScreen() {
               </View>
             );
           })()}
-
-          {/* Steps Card - shows live Apple Health connection */}
-          <StepsCard />
         </View>
       </ScrollView>
     </SafeAreaView>

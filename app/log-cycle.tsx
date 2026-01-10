@@ -1,5 +1,6 @@
 import { createCycleLog, getCycleLog, getLastPeriodStart, updateCycleLog } from "@/lib/appwrite";
 import { cycleHealthService } from "@/lib/cycleHealth";
+import { captureException, captureMessage } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { CervicalMucus, CycleLog, CycleSymptom, PeriodFlow, SexualActivityType } from "@/types/type.d";
@@ -395,9 +396,18 @@ export default function LogCycleScreen() {
           ovulationTest: ovulationTest !== "not_taken" ? ovulationTest : undefined,
           sexualActivity: sexualActivity.hadActivity ? sexualActivity : undefined,
         });
-      } catch (healthError) {
-        // Don't block save if HealthKit sync fails
+        const flowStr = periodFlow !== "none" ? periodFlow : "none";
+        captureMessage(`Cycle synced to Apple Health: ${flowStr} flow`, "info");
+      } catch (healthError: any) {
         console.log("HealthKit sync skipped or failed:", healthError);
+        const flowStr = periodFlow !== "none" ? periodFlow : "none";
+        captureException(new Error(`Apple Health cycle sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
+          periodFlow: flowStr,
+          hasSymptoms: symptoms.size > 0,
+          symptomCount: symptoms.size,
+          cervicalMucus: cervicalMucus || undefined,
+          ovulationTest: ovulationTest !== "not_taken" ? ovulationTest : undefined,
+        });
       }
       
       // Sync mood to challenge store if mood was selected

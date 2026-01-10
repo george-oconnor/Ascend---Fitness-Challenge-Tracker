@@ -87,8 +87,12 @@ const TRACKING_OPTIONS: TrackingOption[] = [
   {
     key: "trackProgressPhoto",
     label: "Progress Photo",
-    description: "Take a daily progress photo",
+    description: "Take a progress photo",
     icon: "camera",
+    hasGoal: true,
+    goalLabel: "days",
+    goalKey: "progressPhotoDays",
+    goalType: "number",
     bgColor: "bg-fuchsia-100",
     iconColor: "#D946EF",
   },
@@ -183,6 +187,7 @@ export default function ChallengeSetupScreen() {
     caloriesGoal: String(challenge?.caloriesGoal ?? 2000),
     weightGoal: String(challenge?.weightGoal ?? 0),
     sleepGoalHours: String((challenge as any)?.sleepGoalHours ?? 8),
+    progressPhotoDays: String((challenge as any)?.progressPhotoDays ?? 1),
   });
 
   // Calorie goal direction (above or below)
@@ -221,6 +226,7 @@ export default function ChallengeSetupScreen() {
       caloriesGoalDirection,
       weightGoal: parseFloat(goals.weightGoal) || 0,
       sleepGoalHours: parseInt(goals.sleepGoalHours, 10) || 8,
+      progressPhotoDays: parseInt(goals.progressPhotoDays, 10) || 1,
     };
 
     try {
@@ -621,7 +627,9 @@ export default function ChallengeSetupScreen() {
                   {/* Goal input if enabled and has goal */}
                   {option.hasGoal && tracking[option.key] && option.goalKey && (
                     <View className="ml-13 mb-2 flex-row items-center bg-gray-50 rounded-lg px-3 py-3">
-                      <Text className="text-sm text-gray-600 mr-2">Goal:</Text>
+                      <Text className="text-sm text-gray-600 mr-2">
+                        {option.goalKey === "progressPhotoDays" ? "Photo every:" : "Goal:"}
+                      </Text>
                       <TextInput
                         value={goals[option.goalKey]}
                         onChangeText={(val) =>
@@ -631,7 +639,7 @@ export default function ChallengeSetupScreen() {
                         className="flex-1"
                         style={{ fontSize: 14, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
                       />
-                      <Text className="text-sm text-gray-500">{option.goalLabel}</Text>
+                      <Text className="text-sm text-gray-500 ml-2">{option.goalLabel}</Text>
                     </View>
                   )}
 

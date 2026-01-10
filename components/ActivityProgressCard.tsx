@@ -167,7 +167,7 @@ type Props = {
 };
 
 export default function ActivityProgressCard({ type, compact = false }: Props) {
-  const { challenge, todayLog } = useChallengeStore();
+  const { challenge, todayLog, isPhotoCompletedWithinDays } = useChallengeStore();
   const { steps: liveSteps, workouts: liveWorkouts, isAuthorized: healthAuthorized } = useHealthStore();
   const { hasLoggedToday: cycleLoggedToday } = useTodayCycleLog();
 
@@ -229,7 +229,9 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
       break;
     case "photo":
       isTracked = challenge.trackProgressPhoto;
-      isCompleted = todayLog.progressPhotoCompleted ?? false;
+      // Check if a photo was taken in the last X days
+      const photoDays = (challenge as any).progressPhotoDays ?? 1;
+      isCompleted = isPhotoCompletedWithinDays(photoDays);
       break;
     case "alcohol":
       isTracked = challenge.trackNoAlcohol;
@@ -288,6 +290,8 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
         return "/log-weight";
       case "diet":
         return "/log-diet";
+      case "photo":
+        return "/log-photo";
       case "workout1":
         return "/log-workout?workout=1";
       case "workout2":

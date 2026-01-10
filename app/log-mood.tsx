@@ -1,4 +1,5 @@
 import { healthSyncService } from "@/lib/healthSync";
+import { captureException, captureMessage } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -274,8 +275,13 @@ export default function LogMoodScreen() {
       // Sync to Apple Health State of Mind (iOS 17+)
       try {
         await healthSyncService.saveMood(selectedMood, selectedEmotions);
-      } catch (healthError) {
-        console.log("HealthKit mood sync skipped:", healthError);
+        captureMessage(`Mood synced to Apple Health: ${selectedMood}/5 with ${selectedEmotions.length} emotions`, "info");
+      } catch (healthError: any) {
+        console.error("Error saving mood to HealthKit:", healthError);
+        captureException(new Error(`Apple Health mood sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
+          moodScore: selectedMood,
+          emotionCount: selectedEmotions.length,
+        });
       }
       
       router.back();

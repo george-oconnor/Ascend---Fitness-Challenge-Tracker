@@ -20,6 +20,7 @@ export type Challenge = {
   trackReading: boolean;
   readingPages: number;
   trackProgressPhoto: boolean;
+  progressPhotoDays?: number; // Every X days (default 1 for daily)
   trackNoAlcohol: boolean;
   trackMood: boolean;
   trackSleep: boolean;

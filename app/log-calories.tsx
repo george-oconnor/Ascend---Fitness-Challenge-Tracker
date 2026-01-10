@@ -1,4 +1,5 @@
 import { healthService } from "@/lib/health";
+import { captureException, captureMessage } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -212,7 +213,17 @@ export default function LogCaloriesScreen() {
       
       // Sync to Apple Health
       if (healthService.isAvailable()) {
-        await healthService.saveMealCalories(mealCalories);
+        try {
+          await healthService.saveMealCalories(mealCalories);
+          const totalCalories = mealCalories.breakfast + mealCalories.lunch + mealCalories.dinner + mealCalories.snacks;
+          captureMessage(`Calories synced to Apple Health: ${totalCalories}kcal`, "info");
+        } catch (healthError: any) {
+          console.error("Error saving calories to HealthKit:", healthError);
+          const totalCalories = mealCalories.breakfast + mealCalories.lunch + mealCalories.dinner + mealCalories.snacks;
+          captureException(new Error(`Apple Health calories sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
+            totalCalories,
+          });
+        }
       }
       
       router.back();

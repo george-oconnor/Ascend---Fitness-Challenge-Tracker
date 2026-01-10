@@ -29,6 +29,8 @@ type ChallengeState = {
   fetchAllLogs: (challengeId: string) => Promise<void>;
   syncHealthData: () => Promise<void>;
   clearChallenge: () => void;
+  // Helper for photo completion checking
+  isPhotoCompletedWithinDays: (days: number) => boolean;
 };
 
 const getTodayDateString = () => {
@@ -320,6 +322,21 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       captureException(err instanceof Error ? err : new Error(errorMsg));
       console.error("syncHealthData error:", err);
     }
+  },
+
+  isPhotoCompletedWithinDays: (days: number): boolean => {
+    const { allLogs, todayLog } = get();
+    if (!todayLog) return false;
+    
+    const today = new Date();
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - (days - 1)); // -1 because we include today
+    const cutoffDateStr = cutoffDate.toISOString().split("T")[0];
+    
+    // Check if any log from the last X days has a photo
+    return allLogs.some(log => 
+      log.date >= cutoffDateStr && (log.progressPhotoCompleted ?? false)
+    );
   },
 
   clearChallenge: () => {

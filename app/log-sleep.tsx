@@ -1,4 +1,5 @@
 import { healthSyncService, HKCategoryValueSleepAnalysis } from "@/lib/healthSync";
+import { captureException, captureMessage } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -170,8 +171,13 @@ export default function LogSleepScreen() {
           wakeTime,
           HKCategoryValueSleepAnalysis.Asleep
         );
-      } catch (healthError) {
-        console.log("HealthKit sleep sync skipped:", healthError);
+        captureMessage(`Sleep synced to Apple Health: ${sleepHours.toFixed(1)}h`, "info");
+      } catch (healthError: any) {
+        console.error("HealthKit sleep sync error:", healthError);
+        captureException(new Error(`Apple Health sleep sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
+          sleepMinutes,
+          sleepHours,
+        });
       }
       
       router.back();
