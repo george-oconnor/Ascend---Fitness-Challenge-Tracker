@@ -9,7 +9,10 @@ import {
     updateChallenge,
     updateDailyLog,
 } from "@/lib/appwrite";
+import { isDayComplete } from "@/lib/dayCompletion";
+import { NotificationService } from "@/lib/notifications";
 import { captureException, logger } from "@/lib/sentry";
+import { useNotificationStore } from "@/store/useNotificationStore";
 import type { ActivityLog, ActivityType, Challenge, DailyLog } from "@/types/type";
 import { Platform } from "react-native";
 import { create } from "zustand";
@@ -145,7 +148,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   },
 
   toggleTask: async (taskKey: keyof DailyLog, value: boolean) => {
-    const { todayLog, challenge } = get();
+    const { todayLog, challenge, allLogs } = get();
 
     if (!todayLog?.$id || !challenge) return;
 
@@ -155,6 +158,25 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     try {
       const updated = await updateDailyLog(todayLog.$id, { [taskKey]: value });
       set({ todayLog: updated });
+      
+      // Check if day is now complete after this toggle
+      if (value && isDayComplete(challenge, updated, allLogs)) {
+        const notificationStore = useNotificationStore.getState();
+        const today = new Date().toISOString().split("T")[0];
+        const wasNotified = notificationStore.hasNotifiedDayComplete(today);
+        if (!wasNotified) {
+          notificationStore.markDayCompleteNotified(today);
+          await NotificationService.notifyDayComplete();
+          // Add to in-app notification tray
+          notificationStore.addNotification({
+            type: "day_complete",
+            title: "✅ Day Complete!",
+            body: "Amazing work! You completed all your tasks today!",
+            icon: "check-circle",
+            color: "#10B981",
+          });
+        }
+      }
     } catch (err) {
       // Rollback on error
       set({ todayLog });
@@ -165,7 +187,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   },
 
   updateProgress: async (progressData: Partial<DailyLog>) => {
-    const { todayLog, challenge } = get();
+    const { todayLog, challenge, allLogs } = get();
 
     if (!todayLog?.$id || !challenge) return;
 
@@ -175,6 +197,25 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     try {
       const updated = await updateDailyLog(todayLog.$id, progressData);
       set({ todayLog: updated });
+      
+      // Check if day is now complete after this progress update
+      if (isDayComplete(challenge, updated, allLogs)) {
+        const notificationStore = useNotificationStore.getState();
+        const today = new Date().toISOString().split("T")[0];
+        const wasNotified = notificationStore.hasNotifiedDayComplete(today);
+        if (!wasNotified) {
+          notificationStore.markDayCompleteNotified(today);
+          await NotificationService.notifyDayComplete();
+          // Add to in-app notification tray
+          notificationStore.addNotification({
+            type: "day_complete",
+            title: "✅ Day Complete!",
+            body: "Amazing work! You completed all your tasks today!",
+            icon: "check-circle",
+            color: "#10B981",
+          });
+        }
+      }
     } catch (err) {
       // Rollback on error
       set({ todayLog });
@@ -394,6 +435,77 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         set({ todayLog: updated });
         
         console.log("syncHealthData: Successfully synced health data to Appwrite");
+        
+        // Check for notification triggers
+        const notificationStore = useNotificationStore.getState();
+        const today = new Date().toISOString().split("T")[0];
+        
+        // Check if step goal was just achieved
+        if (updates.stepsCompleted && !todayLog.stepsCompleted) {
+          const wasNotified = notificationStore.hasNotifiedStepGoal(today);
+          if (!wasNotified) {
+            notificationStore.markStepGoalNotified(today);
+            await NotificationService.notifyStepGoalReached(updates.stepsCount ?? challenge.stepsGoal);
+            // Add to in-app notification tray
+            notificationStore.addNotification({
+              type: "step_goal",
+              title: "👣 Step Goal Reached!",
+              body: `You hit ${(updates.stepsCount ?? challenge.stepsGoal).toLocaleString()} steps today!`,
+              icon: "trending-up",
+              color: "#3B82F6",
+            });
+          }
+        }
+        
+        // Check if workout was just completed
+        if (updates.workout1Completed && !todayLog.workout1Completed) {
+          const wasNotified = notificationStore.hasNotifiedWorkout(today, "workout1");
+          if (!wasNotified) {
+            notificationStore.markWorkoutNotified(today, "workout1");
+            await NotificationService.notifyWorkoutDetected(updates.workout1Minutes ?? 0, "Workout 1");
+            // Add to in-app notification tray
+            notificationStore.addNotification({
+              type: "workout_complete",
+              title: "💪 Workout 1 Complete!",
+              body: `${updates.workout1Minutes ?? 0} minutes logged from Apple Health`,
+              icon: "activity",
+              color: "#F97316",
+            });
+          }
+        }
+        
+        if (updates.workout2Completed && !todayLog.workout2Completed) {
+          const wasNotified = notificationStore.hasNotifiedWorkout(today, "workout2");
+          if (!wasNotified) {
+            notificationStore.markWorkoutNotified(today, "workout2");
+            await NotificationService.notifyWorkoutDetected(updates.workout2Minutes ?? 0, "Workout 2");
+            // Add to in-app notification tray
+            notificationStore.addNotification({
+              type: "workout_complete",
+              title: "💪 Workout 2 Complete!",
+              body: `${updates.workout2Minutes ?? 0} minutes logged from Apple Health`,
+              icon: "activity",
+              color: "#8B5CF6",
+            });
+          }
+        }
+        
+        // Check if day is now complete
+        if (isDayComplete(challenge, updated)) {
+          const wasNotified = notificationStore.hasNotifiedDayComplete(today);
+          if (!wasNotified) {
+            notificationStore.markDayCompleteNotified(today);
+            await NotificationService.notifyDayComplete();
+            // Add to in-app notification tray
+            notificationStore.addNotification({
+              type: "day_complete",
+              title: "✅ Day Complete!",
+              body: "Amazing work! You completed all your tasks today!",
+              icon: "check-circle",
+              color: "#10B981",
+            });
+          }
+        }
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to sync health data";
