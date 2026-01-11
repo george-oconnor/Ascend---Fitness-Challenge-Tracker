@@ -29,10 +29,40 @@ export default function AnalyticsScreen() {
       return null;
     }
 
-    const completedDays = allLogs.length;
     const startDate = parseISO(challenge.startDate);
     const today = new Date();
-    const totalDays = Math.min(differenceInDays(today, startDate) + 1, challenge.totalDays || 75);
+    const challengeTotalDays = challenge.totalDays || 75;
+    
+    // Days elapsed since start (including today as in-progress)
+    const daysElapsed = differenceInDays(today, startDate) + 1;
+    
+    // Days actually completed = days elapsed - 1 (today is still in progress)
+    // But also count today if there's a log with activity
+    const todayStr = format(today, "yyyy-MM-dd");
+    const todayLog = allLogs.find((l: DailyLog) => format(parseISO(l.date), "yyyy-MM-dd") === todayStr);
+    const todayHasActivity = todayLog && (
+      todayLog.workout1Completed || todayLog.workout2Completed ||
+      todayLog.dietCompleted || todayLog.waterCompleted ||
+      todayLog.readingCompleted || todayLog.progressPhotoCompleted ||
+      todayLog.stepsCompleted
+    );
+    
+    // Count days with any completed activity
+    const daysWithActivity = allLogs.filter((log: DailyLog) => 
+      log.workout1Completed || log.workout2Completed ||
+      log.dietCompleted || log.waterCompleted ||
+      log.readingCompleted || log.progressPhotoCompleted ||
+      log.stepsCompleted ||
+      // Also consider logged values as activity
+      (log.stepsCount && log.stepsCount > 0) ||
+      (log.workout1Minutes && log.workout1Minutes > 0) ||
+      (log.workout2Minutes && log.workout2Minutes > 0) ||
+      (log.waterLiters && log.waterLiters > 0) ||
+      (log.readingPages && log.readingPages > 0)
+    ).length;
+    
+    // Completed days = days with actual completed tasks (not just logs existing)
+    const completedDays = daysWithActivity;
 
     // Calculate streak
     let currentStreak = 0;
@@ -40,15 +70,41 @@ export default function AnalyticsScreen() {
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
     
+    console.log("📊 Streak calculation:", {
+      todayStr,
+      sortedLogDates: sortedLogs.map(l => l.date),
+    });
+    
     for (let i = 0; i < sortedLogs.length; i++) {
-      const logDate = parseISO(sortedLogs[i].date);
+      const log = sortedLogs[i];
+      const logDate = parseISO(log.date);
       const expectedDate = subDays(today, i);
-      if (format(logDate, "yyyy-MM-dd") === format(expectedDate, "yyyy-MM-dd")) {
+      const expectedDateStr = format(expectedDate, "yyyy-MM-dd");
+      const logDateStr = format(logDate, "yyyy-MM-dd");
+      
+      // Check if this log has any activity (completed OR logged values)
+      const hasActivity = 
+        log.workout1Completed || log.workout2Completed ||
+        log.dietCompleted || log.waterCompleted ||
+        log.readingCompleted || log.progressPhotoCompleted ||
+        log.stepsCompleted ||
+        // Also consider logged values as activity
+        (log.stepsCount && log.stepsCount > 0) ||
+        (log.workout1Minutes && log.workout1Minutes > 0) ||
+        (log.workout2Minutes && log.workout2Minutes > 0) ||
+        (log.waterLiters && log.waterLiters > 0) ||
+        (log.readingPages && log.readingPages > 0);
+      
+      console.log(`📊 Streak check day ${i}: logDate=${logDateStr}, expected=${expectedDateStr}, match=${logDateStr === expectedDateStr}, hasActivity=${hasActivity}`);
+      
+      if (logDateStr === expectedDateStr && hasActivity) {
         currentStreak++;
       } else {
         break;
       }
     }
+    
+    console.log("📊 Final streak:", currentStreak);
 
     // Calculate averages
     const totalSteps = allLogs.reduce((sum: number, log: DailyLog) => sum + (log.stepsCount || 0), 0);
@@ -65,18 +121,20 @@ export default function AnalyticsScreen() {
     const dietCompletions = allLogs.filter((log: DailyLog) => log.dietCompleted).length;
     const photoCompletions = allLogs.filter((log: DailyLog) => log.progressPhotoCompleted).length;
 
+    // Use days elapsed for rate calculations (how many days have passed)
+    // Use challenge total days for the "X / Y" display
     return {
       completedDays,
-      totalDays,
-      completionRate: totalDays > 0 ? Math.round((completedDays / totalDays) * 100) : 0,
+      totalDays: challengeTotalDays,
+      completionRate: daysElapsed > 0 ? Math.min(100, Math.round((completedDays / daysElapsed) * 100)) : 0,
       currentStreak,
       avgSteps: completedDays > 0 ? Math.round(totalSteps / completedDays) : 0,
       avgWater: completedDays > 0 ? (totalWater / completedDays).toFixed(1) : "0",
       avgReading: completedDays > 0 ? Math.round(totalReading / completedDays) : 0,
       totalWorkoutTime,
-      workoutRate: totalDays > 0 ? Math.round((workoutCompletions / totalDays) * 100) : 0,
-      dietRate: totalDays > 0 ? Math.round((dietCompletions / totalDays) * 100) : 0,
-      photoRate: totalDays > 0 ? Math.round((photoCompletions / totalDays) * 100) : 0,
+      workoutRate: daysElapsed > 0 ? Math.min(100, Math.round((workoutCompletions / daysElapsed) * 100)) : 0,
+      dietRate: daysElapsed > 0 ? Math.min(100, Math.round((dietCompletions / daysElapsed) * 100)) : 0,
+      photoRate: daysElapsed > 0 ? Math.min(100, Math.round((photoCompletions / daysElapsed) * 100)) : 0,
     };
   }, [allLogs, challenge]);
 
@@ -88,22 +146,52 @@ export default function AnalyticsScreen() {
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const days = eachDayOfInterval({ start: weekStart, end: today });
 
+    console.log("📊 Analytics weeklyData:", {
+      today: format(today, "yyyy-MM-dd"),
+      weekStart: format(weekStart, "yyyy-MM-dd"),
+      daysCount: days.length,
+      allLogsCount: allLogs.length,
+      allLogDates: allLogs.map((l: DailyLog) => l.date),
+    });
+
     return days.map((day: Date) => {
       const dayStr = format(day, "yyyy-MM-dd");
-      const log = allLogs.find((l: DailyLog) => l.date === dayStr);
-      const hasActivity = log && (
+      // Parse the log date to compare properly (log.date might be ISO string)
+      const log = allLogs.find((l: DailyLog) => {
+        const logDateStr = format(parseISO(l.date), "yyyy-MM-dd");
+        return logDateStr === dayStr;
+      });
+      
+      // Check if log exists for this day
+      const hasLog = !!log;
+      
+      // Check if any activity was completed (not just logged)
+      const hasCompletedActivity = log && (
+        log.workout1Completed || log.workout2Completed ||
+        log.dietCompleted || log.waterCompleted ||
+        log.readingCompleted || log.progressPhotoCompleted ||
+        log.stepsCompleted ||
+        // Also consider logged values as activity
         (log.stepsCount && log.stepsCount > 0) ||
         (log.workout1Minutes && log.workout1Minutes > 0) ||
         (log.workout2Minutes && log.workout2Minutes > 0) ||
-        log.dietCompleted ||
         (log.waterLiters && log.waterLiters > 0) ||
         (log.readingPages && log.readingPages > 0)
       );
 
+      console.log(`📊 Day ${dayStr}: hasLog=${hasLog}, hasActivity=${hasCompletedActivity}`, log ? {
+        workout1Completed: log.workout1Completed,
+        dietCompleted: log.dietCompleted,
+        waterCompleted: log.waterCompleted,
+        stepsCount: log.stepsCount,
+        workout1Minutes: log.workout1Minutes,
+        waterLiters: log.waterLiters,
+      } : 'no log');
+
       return {
         day: format(day, "EEE"),
         date: format(day, "d"),
-        completed: hasActivity,
+        completed: hasCompletedActivity,
         steps: log?.stepsCount || 0,
       };
     });
