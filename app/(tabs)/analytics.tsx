@@ -3,19 +3,283 @@ import { createUserBadge, getUserBadges } from "@/lib/appwrite";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
-import { BadgeId, DailyLog, UserBadge } from "@/types/type.d";
+import { ActivityLog, ActivityType, BadgeId, DailyLog, UserBadge } from "@/types/type.d";
 import { Feather } from "@expo/vector-icons";
-import { differenceInDays, eachDayOfInterval, format, isAfter, isBefore, parseISO, startOfWeek, subDays } from "date-fns";
-import { router } from "expo-router";
+import { addDays, differenceInDays, eachDayOfInterval, format, isAfter, isBefore, parseISO, startOfWeek, subDays } from "date-fns";
+import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+// Activity type configurations for display
+const ACTIVITY_CONFIG: Record<ActivityType, { icon: keyof typeof Feather.glyphMap; color: string; bgColor: string }> = {
+  steps: { icon: "trending-up", color: "#10B981", bgColor: "#D1FAE5" },
+  workout1: { icon: "zap", color: "#F59E0B", bgColor: "#FEF3C7" },
+  workout2: { icon: "activity", color: "#8B5CF6", bgColor: "#EDE9FE" },
+  water: { icon: "droplet", color: "#3B82F6", bgColor: "#DBEAFE" },
+  diet: { icon: "check-circle", color: "#22C55E", bgColor: "#DCFCE7" },
+  reading: { icon: "book-open", color: "#A855F7", bgColor: "#F3E8FF" },
+  photo: { icon: "camera", color: "#EC4899", bgColor: "#FCE7F3" },
+  alcohol: { icon: "slash", color: "#EF4444", bgColor: "#FEE2E2" },
+  weight: { icon: "trending-down", color: "#6366F1", bgColor: "#E0E7FF" },
+  mood: { icon: "smile", color: "#F59E0B", bgColor: "#FEF3C7" },
+  calories: { icon: "pie-chart", color: "#14B8A6", bgColor: "#CCFBF1" },
+  cycle: { icon: "heart", color: "#EC4899", bgColor: "#FCE7F3" },
+  sleep: { icon: "moon", color: "#8B5CF6", bgColor: "#EDE9FE" },
+  skincare: { icon: "sun", color: "#14B8A6", bgColor: "#CCFBF1" },
+};
 
 export default function AnalyticsScreen() {
   const { user } = useSessionStore();
-  const { challenge, allLogs, fetchChallenge, fetchAllLogs } = useChallengeStore();
+  const { challenge, allLogs, activityLogs, fetchChallenge, fetchAllLogs, fetchActivityLogs } = useChallengeStore();
   const [savedBadges, setSavedBadges] = useState<UserBadge[]>([]);
   const [badgesLoading, setBadgesLoading] = useState(true);
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [showDayModal, setShowDayModal] = useState(false);
+  
+  // Handle date param from analytics navigation
+  const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
+
+  // Get log for a specific date
+  const getLogForDate = useCallback((date: Date): DailyLog | undefined => {
+    if (!allLogs) return undefined;
+    const dateStr = format(date, "yyyy-MM-dd");
+    return allLogs.find((log: DailyLog) => format(parseISO(log.date), "yyyy-MM-dd") === dateStr);
+  }, [allLogs]);
+
+  // Get activities for a specific date
+  const getActivitiesForDate = useCallback((date: Date): ActivityLog[] => {
+    if (!activityLogs) return [];
+    const dateStr = format(date, "yyyy-MM-dd");
+    return activityLogs.filter((log: ActivityLog) => {
+      const logDate = format(parseISO(log.date), "yyyy-MM-dd");
+      return logDate === dateStr;
+    });
+  }, [activityLogs]);
+
+  // Calculate day number in challenge
+  const getDayNumber = useCallback((date: Date): number | null => {
+    if (!challenge?.startDate) return null;
+    const start = parseISO(challenge.startDate);
+    const diff = differenceInDays(date, start);
+    if (diff < 0) return null;
+    return diff + 1;
+  }, [challenge?.startDate]);
+
+  // Selected day's data
+  const selectedDayLog = useMemo((): DailyLog | null => {
+    if (!selectedDate) return null;
+    return getLogForDate(selectedDate) || null;
+  }, [selectedDate, getLogForDate]);
+
+  const selectedDayActivities = useMemo(() => {
+    if (!selectedDate) return [];
+    return getActivitiesForDate(selectedDate);
+  }, [selectedDate, getActivitiesForDate]);
+
+  const getActivityConfig = (type: ActivityType) => {
+    return ACTIVITY_CONFIG[type] || { icon: "circle", color: "#6B7280", bgColor: "#F3F4F6" };
+  };
+
+  // Parse mood notes (could be JSON or plain text)
+  const parseMoodNotes = (moodNotes: string | undefined) => {
+    if (!moodNotes) return null;
+    
+    try {
+      // Check if it's JSON with emotions structure
+      if (moodNotes.startsWith('{"emotions":')) {
+        const parsed = JSON.parse(moodNotes);
+        const emotions = parsed.emotions || [];
+        const notes = parsed.notes || "";
+        
+        return {
+          emotions,
+          notes,
+          isStructured: true
+        };
+      } else {
+        // Plain text notes
+        return {
+          emotions: [],
+          notes: moodNotes,
+          isStructured: false
+        };
+      }
+    } catch {
+      // If JSON parsing fails, treat as plain text
+      return {
+        emotions: [],
+        notes: moodNotes,
+        isStructured: false
+      };
+    }
+  };
+
+  // Parse meal data from JSON string
+  const parseMealData = (mealsString: string | undefined) => {
+    if (!mealsString) return null;
+    
+    try {
+      const meals = JSON.parse(mealsString);
+      const mealTypes: { key: string; label: string; icon: keyof typeof Feather.glyphMap; color: string }[] = [
+        { key: 'breakfast', label: 'Breakfast', icon: 'sunrise', color: '#F97316' },
+        { key: 'lunch', label: 'Lunch', icon: 'sun', color: '#EAB308' },
+        { key: 'dinner', label: 'Dinner', icon: 'moon', color: '#8B5CF6' },
+        { key: 'snacks', label: 'Snacks', icon: 'coffee', color: '#10B981' },
+      ];
+      
+      return mealTypes
+        .filter(meal => meals[meal.key] && meals[meal.key].trim())
+        .map(meal => ({
+          ...meal,
+          content: meals[meal.key]
+        }));
+    } catch {
+      // If parsing fails, treat as legacy general notes
+      if (mealsString.trim()) {
+        return [{ key: 'general', label: 'Diet Notes', icon: 'utensils' as keyof typeof Feather.glyphMap, color: '#6B7280', content: mealsString }];
+      }
+      return null;
+    }
+  };
+
+  // Completion status for day modal
+  const getCompletionItems = (log: DailyLog | null) => {
+    if (!log || !challenge) return [];
+    
+    const items: { label: string; completed: boolean; value?: string; icon: keyof typeof Feather.glyphMap; color: string }[] = [];
+    
+    if (challenge.trackSteps) {
+      items.push({
+        label: "Steps",
+        completed: log.stepsCompleted || (log.stepsCount !== undefined && log.stepsCount >= (challenge.stepsGoal || 10000)),
+        value: log.stepsCount ? `${log.stepsCount.toLocaleString()} steps` : undefined,
+        icon: "trending-up",
+        color: "#10B981"
+      });
+    }
+    
+    if (challenge.trackWorkout1) {
+      items.push({
+        label: "Workout 1",
+        completed: log.workout1Completed || (log.workout1Minutes !== undefined && log.workout1Minutes >= (challenge.workoutMinutes || 45)),
+        value: log.workout1Minutes ? `${log.workout1Minutes} min` : undefined,
+        icon: "zap",
+        color: "#F59E0B"
+      });
+    }
+    
+    if (challenge.trackWorkout2) {
+      items.push({
+        label: "Workout 2",
+        completed: log.workout2Completed || (log.workout2Minutes !== undefined && log.workout2Minutes >= (challenge.workoutMinutes || 45)),
+        value: log.workout2Minutes ? `${log.workout2Minutes} min` : undefined,
+        icon: "activity",
+        color: "#8B5CF6"
+      });
+    }
+    
+    if (challenge.trackWater) {
+      items.push({
+        label: "Water",
+        completed: log.waterCompleted || (log.waterLiters !== undefined && log.waterLiters >= (challenge.waterLiters || 3.7)),
+        value: log.waterLiters ? `${log.waterLiters}L` : undefined,
+        icon: "droplet",
+        color: "#3B82F6"
+      });
+    }
+    
+    if (challenge.trackDiet) {
+      items.push({
+        label: "Diet",
+        completed: !!log.dietCompleted,
+        icon: "check-circle",
+        color: "#22C55E"
+      });
+    }
+    
+    if (challenge.trackReading) {
+      items.push({
+        label: "Reading",
+        completed: log.readingCompleted || (log.readingPages !== undefined && log.readingPages >= (challenge.readingPages || 10)),
+        value: log.readingPages ? `${log.readingPages} pages` : undefined,
+        icon: "book-open",
+        color: "#A855F7"
+      });
+    }
+    
+    if (challenge.trackProgressPhoto) {
+      items.push({
+        label: "Progress Photo",
+        completed: !!log.progressPhotoCompleted,
+        icon: "camera",
+        color: "#EC4899"
+      });
+    }
+    
+    if (challenge.trackNoAlcohol) {
+      items.push({
+        label: "No Alcohol",
+        completed: !!log.noAlcoholCompleted,
+        icon: "slash",
+        color: "#EF4444"
+      });
+    }
+    
+    if (challenge.trackSkincare) {
+      items.push({
+        label: "Skincare",
+        completed: !!log.skincareCompleted,
+        icon: "sun",
+        color: "#14B8A6"
+      });
+    }
+    
+    if (challenge.trackCalories && log.caloriesConsumed) {
+      items.push({
+        label: "Calories",
+        completed: true,
+        value: `${log.caloriesConsumed} cal`,
+        icon: "pie-chart",
+        color: "#14B8A6"
+      });
+    }
+    
+    if (challenge.trackWeight && log.currentWeight) {
+      items.push({
+        label: "Weight",
+        completed: true,
+        value: `${log.currentWeight} kg`,
+        icon: "trending-down",
+        color: "#6366F1"
+      });
+    }
+    
+    if (challenge.trackMood && log.moodScore) {
+      const moodEmojis = ["😢", "😕", "😐", "🙂", "😄"];
+      items.push({
+        label: "Mood",
+        completed: true,
+        value: moodEmojis[log.moodScore - 1] || "😐",
+        icon: "smile",
+        color: "#F59E0B"
+      });
+    }
+    
+    if (challenge.trackSleep && log.sleepMinutes) {
+      const hours = Math.floor(log.sleepMinutes / 60);
+      const mins = log.sleepMinutes % 60;
+      items.push({
+        label: "Sleep",
+        completed: true,
+        value: `${hours}h ${mins}m`,
+        icon: "moon",
+        color: "#8B5CF6"
+      });
+    }
+    
+    return items;
+  };
 
   // Load saved badges from Appwrite
   const loadBadges = useCallback(async () => {
@@ -41,8 +305,22 @@ export default function AnalyticsScreen() {
   useEffect(() => {
     if (challenge?.$id) {
       fetchAllLogs(challenge.$id);
+      fetchActivityLogs(challenge.$id);
     }
-  }, [challenge?.$id, fetchAllLogs]);
+  }, [challenge?.$id, fetchAllLogs, fetchActivityLogs]);
+
+  // Handle date param - open modal for that date
+  useEffect(() => {
+    if (dateParam && allLogs) {
+      try {
+        const date = parseISO(dateParam);
+        setSelectedDate(date);
+        setShowDayModal(true);
+      } catch {
+        // Silent catch - date param was invalid
+      }
+    }
+  }, [dateParam, allLogs]);
 
   // Calculate statistics
   const stats = useMemo(() => {
@@ -58,16 +336,6 @@ export default function AnalyticsScreen() {
     const daysElapsed = differenceInDays(today, startDate) + 1;
     
     // Days actually completed = days elapsed - 1 (today is still in progress)
-    // But also count today if there's a log with activity
-    const todayStr = format(today, "yyyy-MM-dd");
-    const todayLog = allLogs.find((l: DailyLog) => format(parseISO(l.date), "yyyy-MM-dd") === todayStr);
-    const todayHasActivity = todayLog && (
-      todayLog.workout1Completed || todayLog.workout2Completed ||
-      todayLog.dietCompleted || todayLog.waterCompleted ||
-      todayLog.readingCompleted || todayLog.progressPhotoCompleted ||
-      todayLog.stepsCompleted
-    );
-    
     // Count days with any completed activity
     const daysWithActivity = allLogs.filter((log: DailyLog) => 
       log.workout1Completed || log.workout2Completed ||
@@ -92,7 +360,7 @@ export default function AnalyticsScreen() {
     );
     
     console.log("📊 Streak calculation:", {
-      todayStr,
+      today: format(today, "yyyy-MM-dd"),
       sortedLogDates: sortedLogs.map(l => l.date),
     });
     
@@ -139,7 +407,6 @@ export default function AnalyticsScreen() {
     const workoutCompletions = allLogs.filter((log: DailyLog) => 
       (log.workout1Minutes && log.workout1Minutes > 0) || (log.workout2Minutes && log.workout2Minutes > 0)
     ).length;
-    const dietCompletions = allLogs.filter((log: DailyLog) => log.dietCompleted).length;
     const photoCompletions = allLogs.filter((log: DailyLog) => log.progressPhotoCompleted).length;
 
     // Use days elapsed for rate calculations (how many days have passed)
@@ -250,7 +517,7 @@ export default function AnalyticsScreen() {
         }
       });
     }
-  }, [user?.id, earnedBadges, savedBadgeIds, badgesLoading, challenge?.$id]);
+  }, [user?.id, earnedBadges, savedBadgeIds, badgesLoading, challenge?.$id, queueBadgeCelebration]);
 
   // Weekly activity data for chart
   const weeklyData = useMemo(() => {
@@ -259,6 +526,7 @@ export default function AnalyticsScreen() {
     const today = new Date();
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
     const challengeStart = parseISO(challenge.startDate);
+    const challengeEnd = addDays(challengeStart, (challenge.totalDays || 75) - 1);
     const days = eachDayOfInterval({ start: weekStart, end: today });
 
     console.log("📊 Analytics weeklyData:", {
@@ -278,8 +546,9 @@ export default function AnalyticsScreen() {
         return logDateStr === dayStr;
       });
       
-      // Check if this day is part of the challenge (on or after start date, not in future)
-      const isPartOfChallenge = !isBefore(day, challengeStart) && !isAfter(day, today);
+      // Check if this day is part of the challenge window (after start, before end, not future)
+      const withinChallengeWindow = !isBefore(day, challengeStart) && !isAfter(day, challengeEnd);
+      const isPartOfChallenge = withinChallengeWindow && !isAfter(day, today);
       
       // Check if log exists for this day
       const hasLog = !!log;
@@ -401,11 +670,9 @@ export default function AnalyticsScreen() {
                   
                   const handleDayPress = () => {
                     if (isClickable) {
-                      // Navigate to activity tab with the date
-                      router.push({
-                        pathname: "/(tabs)/activity",
-                        params: { date: format(day.fullDate, "yyyy-MM-dd") }
-                      });
+                      // Open the day detail modal
+                      setSelectedDate(day.fullDate);
+                      setShowDayModal(true);
                     }
                   };
                   
@@ -542,6 +809,201 @@ export default function AnalyticsScreen() {
           </View>
         )}
       </ScrollView>
+
+      {/* Day Detail Modal */}
+      <Modal
+        visible={showDayModal}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={() => setShowDayModal(false)}
+      >
+        <SafeAreaView className="flex-1 bg-gray-50">
+          {/* Modal Header */}
+          <View className="bg-white px-5 py-4 border-b border-gray-100 flex-row items-center justify-between">
+            <View>
+              <Text className="text-xl font-bold text-gray-900">
+                {selectedDate ? format(selectedDate, "EEEE, MMM d") : ""}
+              </Text>
+              {selectedDate && getDayNumber(selectedDate) && (
+                <Text className="text-sm text-purple-500">
+                  Day {getDayNumber(selectedDate)} of {challenge?.totalDays || 75}
+                </Text>
+              )}
+            </View>
+            <Pressable 
+              onPress={() => setShowDayModal(false)}
+              className="h-8 w-8 items-center justify-center rounded-full bg-gray-100"
+            >
+              <Feather name="x" size={20} color="#6B7280" />
+            </Pressable>
+          </View>
+
+          <ScrollView className="flex-1 p-4">
+            {/* Completion Status */}
+            <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+              <Text className="text-sm font-semibold text-gray-600 mb-4">Completions</Text>
+              {getCompletionItems(selectedDayLog).length > 0 ? (
+                <View>
+                  {getCompletionItems(selectedDayLog).map((item, index) => (
+                    <View 
+                      key={item.label} 
+                      className={`flex-row items-center py-3 ${
+                        index < getCompletionItems(selectedDayLog).length - 1 ? "border-b border-gray-100" : ""
+                      }`}
+                    >
+                      <View 
+                        className="h-10 w-10 rounded-full items-center justify-center mr-3"
+                        style={{ backgroundColor: item.completed ? `${item.color}20` : "#F3F4F6" }}
+                      >
+                        <Feather 
+                          name={item.icon} 
+                          size={20} 
+                          color={item.completed ? item.color : "#9CA3AF"} 
+                        />
+                      </View>
+                      <View className="flex-1">
+                        <Text className={`font-medium ${item.completed ? "text-gray-900" : "text-gray-400"}`}>
+                          {item.label}
+                        </Text>
+                        {item.value && (
+                          <Text className="text-sm text-gray-500">{item.value}</Text>
+                        )}
+                      </View>
+                      <View 
+                        className={`h-6 w-6 rounded-full items-center justify-center ${
+                          item.completed ? "bg-green-500" : "bg-gray-200"
+                        }`}
+                      >
+                        <Feather 
+                          name={item.completed ? "check" : "x"} 
+                          size={14} 
+                          color={item.completed ? "white" : "#9CA3AF"} 
+                        />
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <View className="items-center py-6">
+                  <Feather name="calendar" size={32} color="#9CA3AF" />
+                  <Text className="text-sm text-gray-400 mt-2">No data logged for this day</Text>
+                </View>
+              )}
+            </View>
+
+            {/* Notes & Details */}
+            {selectedDayLog?.notes && (
+              <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <Text className="text-sm font-semibold text-gray-600 mb-2">Notes</Text>
+                <Text className="text-gray-700">{selectedDayLog.notes}</Text>
+              </View>
+            )}
+
+            {selectedDayLog?.workoutDetails && (
+              <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <Text className="text-sm font-semibold text-gray-600 mb-2">Workout Details</Text>
+                <Text className="text-gray-700">{selectedDayLog.workoutDetails}</Text>
+              </View>
+            )}
+
+            {selectedDayLog?.moodNotes && (
+              <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <Text className="text-sm font-semibold text-gray-600 mb-2">Mood Notes</Text>
+                {(() => {
+                  const moodData = parseMoodNotes(selectedDayLog.moodNotes);
+                  if (!moodData) return null;
+                  
+                  return (
+                    <View>
+                      {/* Show emotions if structured data */}
+                      {moodData.isStructured && moodData.emotions.length > 0 && (
+                        <View className="mb-3">
+                          <Text className="text-xs font-medium text-gray-500 mb-2">Emotions</Text>
+                          <View className="flex-row flex-wrap gap-2">
+                            {moodData.emotions.map((emotion: string, index: number) => (
+                              <View key={index} className="bg-purple-100 rounded-full px-3 py-1">
+                                <Text className="text-sm text-purple-700">{emotion}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        </View>
+                      )}
+                      {/* Show notes if available */}
+                      {moodData.notes && (
+                        <Text className="text-gray-700">{moodData.notes}</Text>
+                      )}
+                    </View>
+                  );
+                })()}
+              </View>
+            )}
+
+            {/* Diet Notes - separated by meal */}
+            {selectedDayLog?.meals && (
+              <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <Text className="text-sm font-semibold text-gray-600 mb-2">Diet Notes</Text>
+                {(() => {
+                  const mealData = parseMealData(selectedDayLog.meals);
+                  if (!mealData || mealData.length === 0) return null;
+                  
+                  return (
+                    <View>
+                      {mealData.map((meal, index) => (
+                        <View key={meal.key} className={`${index < mealData.length - 1 ? 'mb-4' : ''}`}>
+                          <View className="flex-row items-center mb-2">
+                            <View 
+                              className="h-6 w-6 items-center justify-center rounded-full mr-2"
+                              style={{ backgroundColor: `${meal.color}20` }}
+                            >
+                              <Feather name={meal.icon} size={14} color={meal.color} />
+                            </View>
+                            <Text className="text-sm font-medium" style={{ color: meal.color }}>
+                              {meal.label}
+                            </Text>
+                          </View>
+                          <Text className="text-gray-700 ml-8">{meal.content}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  );
+                })()}
+              </View>
+            )}
+
+            {/* Activity Log for this day */}
+            {selectedDayActivities.length > 0 && (
+              <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <Text className="text-sm font-semibold text-gray-600 mb-4">Activity Log</Text>
+                {selectedDayActivities.map((activity, index) => {
+                  const config = getActivityConfig(activity.type);
+                  return (
+                    <View 
+                      key={activity.$id}
+                      className={`flex-row items-center py-3 ${
+                        index < selectedDayActivities.length - 1 ? "border-b border-gray-100" : ""
+                      }`}
+                    >
+                      <View
+                        className="h-10 w-10 items-center justify-center rounded-full mr-3"
+                        style={{ backgroundColor: config.bgColor }}
+                      >
+                        <Feather name={config.icon} size={20} color={config.color} />
+                      </View>
+                      <View className="flex-1">
+                        <Text className="font-medium text-gray-900">{activity.title}</Text>
+                        <Text className="text-sm text-gray-500">{activity.description}</Text>
+                      </View>
+                      <Text className="text-xs text-gray-400">
+                        {format(parseISO(activity.$createdAt || activity.date), "h:mm a")}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            )}
+          </ScrollView>
+        </SafeAreaView>
+      </Modal>
     </SafeAreaView>
   );
 }
