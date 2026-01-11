@@ -110,53 +110,69 @@ export function clearUser() {
 export const logger = {
   info: (message: string, data?: Record<string, any>) => {
     console.log(`ℹ️ ${message}`, data || "");
+    
+    // Always add breadcrumb for debugging
     Sentry.addBreadcrumb({
       category: "app.log",
       message,
       data,
       level: "info",
     });
+    
     // In non-dev builds, also send info logs as events so we can see them in Sentry
     if (!__DEV__) {
-      // Set context before capturing
-      if (data) {
-        Sentry.setContext("log_data", data);
-      }
-      Sentry.setTag("log_type", "debug_info");
-      Sentry.captureMessage(`[DEBUG] ${message}`, "info");
+      // Use withScope to isolate this message
+      Sentry.withScope((scope) => {
+        if (data) {
+          scope.setContext("log_data", data);
+        }
+        scope.setTag("log_type", "debug_info");
+        scope.setLevel("info");
+        Sentry.captureMessage(`[DEBUG] ${message}`);
+      });
     }
   },
   
   warn: (message: string, data?: Record<string, any>) => {
     console.warn(`⚠️ ${message}`, data || "");
+    
     Sentry.addBreadcrumb({
       category: "app.log",
       message,
       data,
       level: "warning",
     });
-    // Also send as a message so it appears in Sentry Issues
-    if (data) {
-      Sentry.setContext("log_data", data);
-    }
-    Sentry.setTag("log_type", "warning");
-    Sentry.captureMessage(`[WARN] ${message}`, "warning");
+    
+    // Use withScope to isolate this message
+    Sentry.withScope((scope) => {
+      if (data) {
+        scope.setContext("log_data", data);
+      }
+      scope.setTag("log_type", "warning");
+      scope.setLevel("warning");
+      Sentry.captureMessage(`[WARN] ${message}`);
+    });
   },
   
   error: (message: string, data?: Record<string, any>) => {
     console.error(`❌ ${message}`, data || "");
+    
     Sentry.addBreadcrumb({
       category: "app.log",
       message,
       data,
       level: "error",
     });
-    // Send as a message so it appears in Sentry Issues
-    if (data) {
-      Sentry.setContext("log_data", data);
-    }
-    Sentry.setTag("log_type", "error");
-    Sentry.captureMessage(`[ERROR] ${message}`, "error");
+    
+    // Use withScope to isolate this message
+    Sentry.withScope((scope) => {
+      if (data) {
+        scope.setContext("log_data", data);
+      }
+      scope.setTag("log_type", "error");
+      scope.setLevel("error");
+      Sentry.captureMessage(`[ERROR] ${message}`);
+    });
   },
   
   debug: (message: string, data?: Record<string, any>) => {
