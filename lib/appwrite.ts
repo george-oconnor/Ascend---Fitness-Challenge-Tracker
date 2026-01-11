@@ -1,4 +1,5 @@
-import type { ActivityLog, Challenge, CycleLog, DailyLog, UserProfile } from "@/types/type";
+import type { ActivityLog, Challenge, CycleLog, DailyLog, UserBadge, UserProfile } from "@/types/type";
+import { BadgeId } from "@/types/type";
 import { Account, Client, Databases, Query } from "appwrite";
 
 const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT;
@@ -12,6 +13,7 @@ const COLLECTIONS = {
   DAILY_LOGS: "dailyLogs",
   CYCLE_LOGS: "cycleLog",
   ACTIVITY_LOGS: "activityLogs",
+  USER_BADGES: "userBadges",
 };
 
 export const appwriteClient = new Client();
@@ -316,5 +318,79 @@ export async function getActivityLogsForChallenge(challengeId: string, limit: nu
   } catch (err) {
     console.error("getActivityLogsForChallenge error:", err);
     return [];
+  }
+}
+
+// User Badge functions
+export async function createUserBadge(userId: string, badgeId: BadgeId, challengeId?: string): Promise<UserBadge | null> {
+  try {
+    // Check if badge already exists for this user
+    const existing = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.USER_BADGES,
+      [
+        Query.equal("userId", userId),
+        Query.equal("badgeId", badgeId),
+        Query.limit(1)
+      ]
+    );
+    
+    if (existing.documents.length > 0) {
+      // Badge already earned, return existing
+      return existing.documents[0] as unknown as UserBadge;
+    }
+    
+    // Create new badge
+    const doc = await databases.createDocument(
+      DATABASE_ID,
+      COLLECTIONS.USER_BADGES,
+      "unique()",
+      {
+        userId,
+        badgeId,
+        ...(challengeId && { challengeId }),
+      }
+    );
+    console.log(`🏅 Badge earned: ${badgeId}`);
+    return doc as unknown as UserBadge;
+  } catch (err) {
+    console.error("createUserBadge error:", err);
+    return null;
+  }
+}
+
+export async function getUserBadges(userId: string): Promise<UserBadge[]> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.USER_BADGES,
+      [
+        Query.equal("userId", userId),
+        Query.orderDesc("$createdAt"),
+        Query.limit(100)
+      ]
+    );
+    return response.documents as unknown as UserBadge[];
+  } catch (err) {
+    console.error("getUserBadges error:", err);
+    return [];
+  }
+}
+
+export async function hasUserBadge(userId: string, badgeId: BadgeId): Promise<boolean> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.USER_BADGES,
+      [
+        Query.equal("userId", userId),
+        Query.equal("badgeId", badgeId),
+        Query.limit(1)
+      ]
+    );
+    return response.documents.length > 0;
+  } catch (err) {
+    console.error("hasUserBadge error:", err);
+    return false;
   }
 }

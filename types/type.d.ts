@@ -195,3 +195,12 @@ export type ActivityLog = {
   unit?: string; // Unit for the value (steps, min, L, kg, etc.)
   date: string; // The date this activity is for (YYYY-MM-DD)
 };
+
+// User Badge Types
+export type UserBadge = {
+  $id?: string;
+  $createdAt?: string; // When the badge was earned (Appwrite built-in)
+  userId: string;
+  badgeId: BadgeId;
+  challengeId?: string; // Which challenge they earned it in (optional for account-wide badges)
+};
