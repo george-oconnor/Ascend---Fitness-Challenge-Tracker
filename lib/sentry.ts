@@ -3,6 +3,9 @@ import Constants from "expo-constants";
 
 const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
 
+// Store environment globally so logger can access it
+let currentEnvironment = "development";
+
 /**
  * Determine the environment based on build context:
  * - "development": Expo Go, simulator, or __DEV__ mode
@@ -36,8 +39,8 @@ function getEnvironment(): string {
     return "production";
   }
 
-  // Fallback: Default to production for store builds
-  return "production";
+  // Fallback: Default to staging for non-dev builds so we get debug logs
+  return "staging";
 }
 
 export function initSentry() {
@@ -47,11 +50,11 @@ export function initSentry() {
   }
 
   const environment = getEnvironment();
+  currentEnvironment = environment; // Store for logger use
 
   Sentry.init({
     dsn,
     // Set tracesSampleRate to 1.0 to capture 100% of transactions for performance monitoring.
-    // We recommend adjusting this value in production
     tracesSampleRate: environment === "production" ? 0.2 : 1.0,
     // Set environment based on build type
     environment,
@@ -61,16 +64,18 @@ export function initSentry() {
     enableAutoSessionTracking: true,
     // Enable automatic breadcrumbs
     enableNativeCrashHandling: true,
-    // Enable structured logs
-    enableLogs: true,
-    // Only send 100% of logs in dev/staging, 50% in production
-    beforeSendLog: (log) => {
-      if (environment === "production" && Math.random() > 0.5) {
-        return null;
-      }
-      return log;
-    },
+    // Debug mode for staging to see what's happening
+    debug: environment === "staging",
   });
+
+  // Send a test message on init to verify Sentry is working
+  if (environment !== "development") {
+    Sentry.addBreadcrumb({
+      category: "app.lifecycle",
+      message: `App initialized (${environment})`,
+      level: "info",
+    });
+  }
 
   console.log(`✅ Sentry initialized (${environment})`);
 }
@@ -98,5 +103,71 @@ export function clearUser() {
   Sentry.setUser(null);
 }
 
-// Export Sentry logger for structured logging
-export const logger = Sentry.logger;
+/**
+ * Structured logger that sends events to Sentry
+ * In non-development builds, info logs are also sent as events for debugging
+ */
+export const logger = {
+  info: (message: string, data?: Record<string, any>) => {
+    console.log(`ℹ️ ${message}`, data || "");
+    Sentry.addBreadcrumb({
+      category: "app.log",
+      message,
+      data,
+      level: "info",
+    });
+    // In non-dev builds, also send info logs as events so we can see them in Sentry
+    if (!__DEV__) {
+      // Set context before capturing
+      if (data) {
+        Sentry.setContext("log_data", data);
+      }
+      Sentry.setTag("log_type", "debug_info");
+      Sentry.captureMessage(`[DEBUG] ${message}`, "info");
+    }
+  },
+  
+  warn: (message: string, data?: Record<string, any>) => {
+    console.warn(`⚠️ ${message}`, data || "");
+    Sentry.addBreadcrumb({
+      category: "app.log",
+      message,
+      data,
+      level: "warning",
+    });
+    // Also send as a message so it appears in Sentry Issues
+    if (data) {
+      Sentry.setContext("log_data", data);
+    }
+    Sentry.setTag("log_type", "warning");
+    Sentry.captureMessage(`[WARN] ${message}`, "warning");
+  },
+  
+  error: (message: string, data?: Record<string, any>) => {
+    console.error(`❌ ${message}`, data || "");
+    Sentry.addBreadcrumb({
+      category: "app.log",
+      message,
+      data,
+      level: "error",
+    });
+    // Send as a message so it appears in Sentry Issues
+    if (data) {
+      Sentry.setContext("log_data", data);
+    }
+    Sentry.setTag("log_type", "error");
+    Sentry.captureMessage(`[ERROR] ${message}`, "error");
+  },
+  
+  debug: (message: string, data?: Record<string, any>) => {
+    if (__DEV__) {
+      console.log(`🔍 ${message}`, data || "");
+    }
+    Sentry.addBreadcrumb({
+      category: "app.debug",
+      message,
+      data,
+      level: "debug",
+    });
+  },
+};

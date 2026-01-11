@@ -1,14 +1,29 @@
-import { initSentry } from "@/lib/sentry";
+import { BadgeCelebration } from "@/components/BadgeCelebration";
+import { captureMessage, initSentry, logger } from "@/lib/sentry";
+import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { useFonts } from "expo-font";
 import * as Linking from 'expo-linking';
+import * as Notifications from "expo-notifications";
 import { SplashScreen, Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef } from "react";
+import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import './globals.css';
 
 // Initialize Sentry before app renders
 initSentry();
+
+// Send a test message to verify Sentry is working (only in non-dev builds)
+if (!__DEV__) {
+  captureMessage("App started successfully", "info");
+  // Also test logger.info to ensure it works
+  logger.info("Logger test on startup", { 
+    platform: Platform.OS,
+    buildProfile: process.env.EXPO_PUBLIC_BUILD_PROFILE,
+    timestamp: new Date().toISOString()
+  });
+}
 
 export default function RootLayout() {
   const [fontsLoaded, error] = useFonts({
@@ -20,9 +35,44 @@ export default function RootLayout() {
   });
 
   const { checkSession, status } = useSessionStore();
+  const { initialize: initNotifications, celebratingBadge, dismissBadgeCelebration } = useNotificationStore();
   const router = useRouter();
   const segments = useSegments();
   const navigationAttempted = useRef(false);
+  const notificationListener = useRef<Notifications.Subscription>();
+  const responseListener = useRef<Notifications.Subscription>();
+
+  // Initialize notifications
+  useEffect(() => {
+    initNotifications();
+
+    // Listen for notifications received while app is foregrounded
+    notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
+      console.log("📬 Notification received:", notification.request.content.title);
+    });
+
+    // Listen for notification taps
+    responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
+      const data = response.notification.request.content.data;
+      console.log("📬 Notification tapped:", data);
+      
+      // Navigate based on notification type
+      if (data?.type === "badge_earned") {
+        router.push("/(tabs)/analytics");
+      } else if (data?.type === "reminder" || data?.type === "task_complete") {
+        router.push("/(tabs)");
+      }
+    });
+
+    return () => {
+      if (notificationListener.current) {
+        Notifications.removeNotificationSubscription(notificationListener.current);
+      }
+      if (responseListener.current) {
+        Notifications.removeNotificationSubscription(responseListener.current);
+      }
+    };
+  }, []);
 
   // Handle deep links for password reset
   useEffect(() => {
@@ -91,6 +141,13 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Stack screenOptions={{ headerShown: false }} />
+      
+      {/* Badge celebration modal - shows when user earns a new badge */}
+      <BadgeCelebration
+        badge={celebratingBadge}
+        visible={!!celebratingBadge}
+        onDismiss={dismissBadgeCelebration}
+      />
     </GestureHandlerRootView>
   );
 }
