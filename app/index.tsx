@@ -133,7 +133,7 @@ export default function HomeScreen() {
                   }
                   
                   // Build list of tracked activities
-                  type ActivityType = "steps" | "workout1" | "workout2" | "water" | "diet" | "reading" | "photo" | "alcohol" | "weight" | "mood" | "calories" | "cycle";
+                  type ActivityType = "steps" | "workout1" | "workout2" | "water" | "diet" | "reading" | "photo" | "alcohol" | "weight" | "mood" | "calories" | "cycle" | "sleep" | "skincare";
                   const trackedActivities: ActivityType[] = [];
                   
                   if (challenge.trackSteps) trackedActivities.push("steps");

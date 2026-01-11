@@ -29,6 +29,7 @@ export type Challenge = {
   averageCycleLength?: number;
   averagePeriodLength?: number;
   lastPeriodStart?: string;
+  trackSkincare: boolean;
 };
 
 export type DailyLog = {
@@ -66,6 +67,9 @@ export type DailyLog = {
   sleepStartTime?: string;
   sleepEndTime?: string;
   sleepQuality?: number; // 1-5 rating
+  // Skincare tracking
+  skincareCompleted?: boolean;
+  skincareNotes?: string;
 };
 
 export type UserProfile = {

@@ -134,6 +134,14 @@ const TRACKING_OPTIONS: TrackingOption[] = [
     iconColor: "#EC4899",
   },
   {
+    key: "trackSkincare",
+    label: "Skincare Routine",
+    description: "Complete daily skincare routine",
+    icon: "droplets",
+    bgColor: "bg-teal-100",
+    iconColor: "#14B8A6",
+  },
+  {
     key: "trackSteps",
     label: "Daily Steps",
     description: "Hit your step count goal",
@@ -176,6 +184,7 @@ export default function ChallengeSetupScreen() {
     trackCycle: (challenge as any)?.trackCycle ?? false,
     trackSteps: challenge?.trackSteps ?? false,
     trackWeight: challenge?.trackWeight ?? false,
+    trackSkincare: challenge?.trackSkincare ?? false,
   });
 
   // Goals
@@ -218,6 +227,7 @@ export default function ChallengeSetupScreen() {
       trackCycle: tracking.trackCycle,
       trackSteps: tracking.trackSteps,
       trackWeight: tracking.trackWeight,
+      trackSkincare: tracking.trackSkincare,
       workoutMinutes: parseInt(goals.workoutMinutes, 10) || 45,
       waterLiters: parseFloat(goals.waterLiters) || 3.0,
       readingPages: parseInt(goals.readingPages, 10) || 10,

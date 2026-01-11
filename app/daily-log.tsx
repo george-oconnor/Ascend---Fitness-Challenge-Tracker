@@ -306,6 +306,16 @@ export default function DailyLogScreen() {
     });
   }
 
+  if (challenge.trackSkincare) {
+    tasks.push({
+      key: "skincareCompleted",
+      label: "Skincare Routine",
+      description: "Completed daily skincare",
+      icon: "droplets",
+      route: "/log-skincare",
+    });
+  }
+
   if (challenge.trackSteps) {
     const meetsGoal = steps >= challenge.stepsGoal;
     tasks.push({

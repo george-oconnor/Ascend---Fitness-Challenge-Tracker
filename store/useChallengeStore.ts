@@ -118,6 +118,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             readingPages: 0,
             progressPhotoCompleted: false,
             noAlcoholCompleted: false,
+            skincareCompleted: false,
             meals: "",
           });
         }

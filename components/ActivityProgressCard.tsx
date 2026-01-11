@@ -6,7 +6,7 @@ import { router } from "expo-router";
 import { Platform, Pressable, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
-type ActivityType = "steps" | "workout1" | "workout2" | "water" | "diet" | "reading" | "photo" | "alcohol" | "weight" | "mood" | "calories" | "cycle" | "sleep";
+type ActivityType = "steps" | "workout1" | "workout2" | "water" | "diet" | "reading" | "photo" | "alcohol" | "weight" | "mood" | "calories" | "cycle" | "sleep" | "skincare";
 
 type ActivityConfig = {
   label: string;
@@ -306,6 +306,8 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
         return "/log-cycle";
       case "sleep":
         return "/log-sleep";
+      case "skincare":
+        return "/log-skincare";
       default:
         return "/daily-log";
     }
