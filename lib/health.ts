@@ -61,14 +61,17 @@ class HealthService {
     }
 
     this.moduleLoadAttempted = true;
+    logger.info("HealthKit loadModule started", { platform: Platform.OS });
 
     if (Platform.OS !== "ios") {
       this.moduleLoadError = "HealthKit is only available on iOS";
+      logger.warn("HealthKit not available", { reason: "not iOS", platform: Platform.OS });
       return false;
     }
 
     try {
       // Import the library - with our patch, it uses a Proxy for lazy loading
+      logger.info("HealthKit importing react-native-health module");
       const HealthKitModule = require("react-native-health");
       
       // The library exports as module.exports = HealthKit
@@ -78,23 +81,25 @@ class HealthService {
       // So we try to access it to trigger lazy loading
       const hasInitHealthKit = typeof this.HealthKit?.initHealthKit === "function";
       
-      console.log("📦 react-native-health module loaded:", {
+      logger.info("HealthKit module load result", {
         hasModule: !!this.HealthKit,
         hasInitHealthKit,
         hasConstants: !!this.HealthKit?.Constants,
+        moduleKeys: this.HealthKit ? Object.keys(this.HealthKit).slice(0, 10) : [],
       });
 
       if (!hasInitHealthKit) {
         this.moduleLoadError = "HealthKit native module not linked - initHealthKit not available";
+        logger.warn("HealthKit initHealthKit not found", { moduleLoadError: this.moduleLoadError });
         this.HealthKit = null;
         return false;
       }
 
-      console.log("✅ react-native-health module loaded successfully");
+      logger.info("HealthKit module loaded successfully");
       return true;
     } catch (error: any) {
       this.moduleLoadError = error?.message || "Failed to load react-native-health";
-      console.log("❌ Failed to load react-native-health:", this.moduleLoadError);
+      logger.error("HealthKit module load failed", { error: this.moduleLoadError });
       return false;
     }
   }
@@ -156,37 +161,46 @@ class HealthService {
    * Initialize HealthKit and request permissions
    */
   async initialize(): Promise<boolean> {
+    logger.info("HealthKit initialize called", { platform: Platform.OS });
+    
     if (Platform.OS !== "ios") {
-      console.log("HealthKit is only available on iOS");
+      logger.warn("HealthKit initialize skipped", { reason: "not iOS" });
       return false;
     }
 
     // Try to load module
     if (!this.loadModule()) {
-      console.warn("HealthKit native module not available:", this.moduleLoadError);
+      logger.warn("HealthKit initialize failed", { reason: "module not loaded", error: this.moduleLoadError });
       return false;
     }
 
     const permissions = this.getPermissions();
+    logger.info("HealthKit requesting permissions", { 
+      readPermissions: permissions.permissions.read.length,
+      writePermissions: permissions.permissions.write.length,
+    });
 
     return new Promise((resolve) => {
       try {
         this.HealthKit.initHealthKit(permissions, (error: any) => {
           if (error) {
-            console.error("Error initializing HealthKit:", error);
+            logger.error("HealthKit initHealthKit callback error", { 
+              error: error?.message || String(error),
+              errorType: typeof error,
+            });
             this.isInitialized = false;
             this.isAuthorized = false;
             resolve(false);
             return;
           }
 
-          console.log("✅ HealthKit initialized successfully");
+          logger.info("HealthKit initialized and authorized successfully");
           this.isInitialized = true;
           this.isAuthorized = true;
           resolve(true);
         });
       } catch (error: any) {
-        console.error("Exception calling initHealthKit:", error);
+        logger.error("HealthKit initHealthKit exception", { error: error?.message || String(error) });
         this.moduleLoadError = error?.message || "Exception during HealthKit init";
         this.isInitialized = false;
         this.isAuthorized = false;
@@ -238,11 +252,24 @@ class HealthService {
    * Get workouts for a specific date
    */
   async getWorkoutsForDate(date: Date): Promise<WorkoutData[]> {
-    if (!this.isNativeModuleLinked()) return [];
+    logger.info("HealthKit getWorkoutsForDate called", { 
+      date: date.toISOString(),
+      isModuleLinked: this.isNativeModuleLinked(),
+      isAuthorized: this.isAuthorized,
+    });
+    
+    if (!this.isNativeModuleLinked()) {
+      logger.warn("HealthKit getWorkoutsForDate skipped", { reason: "module not linked" });
+      return [];
+    }
 
     if (!this.isAuthorized) {
+      logger.info("HealthKit getWorkoutsForDate: not authorized, initializing...");
       const initialized = await this.initialize();
-      if (!initialized) return [];
+      if (!initialized) {
+        logger.warn("HealthKit getWorkoutsForDate failed", { reason: "initialization failed" });
+        return [];
+      }
     }
 
     const startOfDay = new Date(date);
@@ -257,22 +284,28 @@ class HealthService {
       type: "Workout",
     };
 
-    console.log("🏋️ getWorkoutsForDate: Fetching workouts with options:", JSON.stringify(options));
+    logger.info("HealthKit getSamples request", { options });
     
     return new Promise((resolve) => {
       try {
         this.HealthKit.getSamples(options, (error: any, results: any) => {
           if (error) {
-            console.error("❌ Error getting workouts:", error);
-            logger.error("HealthKit workout fetch error", {
+            logger.error("HealthKit getSamples error", {
               error: error?.message || String(error),
+              errorType: typeof error,
               options,
             });
             resolve([]);
             return;
           }
 
-          console.log("🏋️ getWorkoutsForDate: Raw results count:", results?.length || 0);
+          logger.info("HealthKit getSamples response", {
+            resultsCount: results?.length || 0,
+            resultsType: typeof results,
+            isArray: Array.isArray(results),
+            firstResult: results?.[0] ? JSON.stringify(results[0]).slice(0, 200) : null,
+          });
+          
           if (results?.length > 0) {
             console.log("🏋️ First workout raw data:", JSON.stringify(results[0]));
           }
