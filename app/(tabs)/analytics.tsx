@@ -1,22 +1,42 @@
 import { BADGES } from "@/constants/badges";
+import { createUserBadge, getUserBadges } from "@/lib/appwrite";
 import { useChallengeStore } from "@/store/useChallengeStore";
+import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
-import { BadgeId, DailyLog } from "@/types/type.d";
+import { BadgeId, DailyLog, UserBadge } from "@/types/type.d";
 import { Feather } from "@expo/vector-icons";
-import { differenceInDays, eachDayOfInterval, format, parseISO, startOfWeek, subDays } from "date-fns";
-import { useEffect, useMemo } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { differenceInDays, eachDayOfInterval, format, isAfter, isBefore, parseISO, startOfWeek, subDays } from "date-fns";
+import { router } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function AnalyticsScreen() {
   const { user } = useSessionStore();
   const { challenge, allLogs, fetchChallenge, fetchAllLogs } = useChallengeStore();
+  const [savedBadges, setSavedBadges] = useState<UserBadge[]>([]);
+  const [badgesLoading, setBadgesLoading] = useState(true);
+
+  // Load saved badges from Appwrite
+  const loadBadges = useCallback(async () => {
+    if (!user?.id) return;
+    setBadgesLoading(true);
+    try {
+      const badges = await getUserBadges(user.id);
+      setSavedBadges(badges);
+    } catch (err) {
+      console.error("Failed to load badges:", err);
+    } finally {
+      setBadgesLoading(false);
+    }
+  }, [user?.id]);
 
   useEffect(() => {
     if (user?.id) {
       fetchChallenge(user.id);
+      loadBadges();
     }
-  }, [user?.id, fetchChallenge]);
+  }, [user?.id, fetchChallenge, loadBadges]);
 
   useEffect(() => {
     if (challenge?.$id) {
@@ -193,17 +213,58 @@ export default function AnalyticsScreen() {
     return badges;
   }, [stats, allLogs]);
 
+  // Get all earned badge IDs (from saved + newly calculated)
+  const savedBadgeIds = useMemo(() => 
+    savedBadges.map(b => b.badgeId), 
+    [savedBadges]
+  );
+
+  // Combined badges (saved from DB + newly earned)
+  const allEarnedBadges = useMemo(() => {
+    const combined = new Set([...savedBadgeIds, ...earnedBadges]);
+    return Array.from(combined) as BadgeId[];
+  }, [savedBadgeIds, earnedBadges]);
+
+  // Save any newly earned badges to Appwrite
+  const { queueBadgeCelebration } = useNotificationStore();
+  
+  useEffect(() => {
+    if (!user?.id || badgesLoading || earnedBadges.length === 0) return;
+    
+    // Find badges that are earned but not yet saved
+    const newBadges = earnedBadges.filter(badgeId => !savedBadgeIds.includes(badgeId));
+    
+    if (newBadges.length > 0) {
+      console.log("🏅 Saving new badges:", newBadges);
+      // Save each new badge and trigger celebration
+      newBadges.forEach(async (badgeId) => {
+        const saved = await createUserBadge(user.id, badgeId, challenge?.$id);
+        if (saved) {
+          setSavedBadges(prev => [...prev, saved]);
+          
+          // Trigger badge celebration!
+          const badge = BADGES[badgeId];
+          if (badge) {
+            queueBadgeCelebration(badge);
+          }
+        }
+      });
+    }
+  }, [user?.id, earnedBadges, savedBadgeIds, badgesLoading, challenge?.$id]);
+
   // Weekly activity data for chart
   const weeklyData = useMemo(() => {
-    if (!allLogs) return [];
+    if (!allLogs || !challenge) return [];
 
     const today = new Date();
     const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    const challengeStart = parseISO(challenge.startDate);
     const days = eachDayOfInterval({ start: weekStart, end: today });
 
     console.log("📊 Analytics weeklyData:", {
       today: format(today, "yyyy-MM-dd"),
       weekStart: format(weekStart, "yyyy-MM-dd"),
+      challengeStart: format(challengeStart, "yyyy-MM-dd"),
       daysCount: days.length,
       allLogsCount: allLogs.length,
       allLogDates: allLogs.map((l: DailyLog) => l.date),
@@ -216,6 +277,9 @@ export default function AnalyticsScreen() {
         const logDateStr = format(parseISO(l.date), "yyyy-MM-dd");
         return logDateStr === dayStr;
       });
+      
+      // Check if this day is part of the challenge (on or after start date, not in future)
+      const isPartOfChallenge = !isBefore(day, challengeStart) && !isAfter(day, today);
       
       // Check if log exists for this day
       const hasLog = !!log;
@@ -234,7 +298,7 @@ export default function AnalyticsScreen() {
         (log.readingPages && log.readingPages > 0)
       );
 
-      console.log(`📊 Day ${dayStr}: hasLog=${hasLog}, hasActivity=${hasCompletedActivity}`, log ? {
+      console.log(`📊 Day ${dayStr}: hasLog=${hasLog}, hasActivity=${hasCompletedActivity}, isPartOfChallenge=${isPartOfChallenge}`, log ? {
         workout1Completed: log.workout1Completed,
         dietCompleted: log.dietCompleted,
         waterCompleted: log.waterCompleted,
@@ -246,11 +310,13 @@ export default function AnalyticsScreen() {
       return {
         day: format(day, "EEE"),
         date: format(day, "d"),
+        fullDate: day,
         completed: hasCompletedActivity,
+        isPartOfChallenge,
         steps: log?.stepsCount || 0,
       };
     });
-  }, [allLogs]);
+  }, [allLogs, challenge]);
 
   const StatCard = ({ 
     icon, 
@@ -329,75 +395,118 @@ export default function AnalyticsScreen() {
             <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
               <Text className="text-sm font-semibold text-gray-600 mb-4">This Week</Text>
               <View className="flex-row justify-between">
-                {weeklyData.map((day, index) => (
-                  <View key={index} className="items-center">
-                    <Text className="text-xs text-gray-400 mb-2">{day.day}</Text>
-                    <View 
-                      className={`h-10 w-10 rounded-full items-center justify-center ${
-                        day.completed ? "bg-purple-500" : "bg-gray-100"
-                      }`}
+                {weeklyData.map((day, index) => {
+                  const isClickable = day.isPartOfChallenge;
+                  const showActivity = day.isPartOfChallenge && day.completed;
+                  
+                  const handleDayPress = () => {
+                    if (isClickable) {
+                      // Navigate to activity tab with the date
+                      router.push({
+                        pathname: "/(tabs)/activity",
+                        params: { date: format(day.fullDate, "yyyy-MM-dd") }
+                      });
+                    }
+                  };
+                  
+                  return (
+                    <Pressable 
+                      key={index} 
+                      className="items-center"
+                      onPress={handleDayPress}
+                      disabled={!isClickable}
                     >
-                      <Text className={`text-sm font-semibold ${
-                        day.completed ? "text-white" : "text-gray-400"
-                      }`}>
-                        {day.date}
-                      </Text>
-                    </View>
-                    {day.completed && (
-                      <Feather name="check" size={12} color="#10B981" style={{ marginTop: 4 }} />
-                    )}
-                  </View>
-                ))}
+                      <Text className="text-xs text-gray-400 mb-2">{day.day}</Text>
+                      <View 
+                        className={`h-10 w-10 rounded-full items-center justify-center ${
+                          showActivity ? "bg-purple-500" : 
+                          day.isPartOfChallenge ? "bg-gray-100" : "bg-transparent"
+                        }`}
+                      >
+                        <Text className={`text-sm font-semibold ${
+                          showActivity ? "text-white" : 
+                          day.isPartOfChallenge ? "text-gray-600" : "text-gray-300"
+                        }`}>
+                          {day.date}
+                        </Text>
+                      </View>
+                      {showActivity && (
+                        <Feather name="check" size={12} color="#10B981" style={{ marginTop: 4 }} />
+                      )}
+                      {day.isPartOfChallenge && !day.completed && (
+                        <View style={{ height: 16 }} />
+                      )}
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
 
-            {/* Averages */}
-            <Text className="text-sm font-semibold text-gray-500 mb-3 ml-1">Daily Averages</Text>
-            <View className="flex-row gap-3 mb-4">
-              <StatCard
-                icon="activity"
-                label="Avg Steps"
-                value={stats.avgSteps.toLocaleString()}
-                color="#10B981"
-                bgColor="#D1FAE5"
-              />
-              <StatCard
-                icon="droplet"
-                label="Avg Water"
-                value={stats.avgWater}
-                unit="L"
-                color="#3B82F6"
-                bgColor="#DBEAFE"
-              />
-            </View>
-            <View className="flex-row gap-3 mb-4">
-              <StatCard
-                icon="book-open"
-                label="Avg Reading"
-                value={stats.avgReading}
-                unit="pages"
-                color="#8B5CF6"
-                bgColor="#EDE9FE"
-              />
-              <StatCard
-                icon="clock"
-                label="Total Workout"
-                value={stats.totalWorkoutTime}
-                unit="min"
-                color="#F59E0B"
-                bgColor="#FEF3C7"
-              />
-            </View>
+            {/* Averages - only show for tracked activities */}
+            {(challenge?.trackSteps || challenge?.trackWater || challenge?.trackReading || challenge?.trackWorkout1 || challenge?.trackWorkout2) && (
+              <>
+                <Text className="text-sm font-semibold text-gray-500 mb-3 ml-1">Daily Averages</Text>
+                <View className="flex-row gap-3 mb-4">
+                  {challenge?.trackSteps && (
+                    <StatCard
+                      icon="activity"
+                      label="Avg Steps"
+                      value={stats.avgSteps.toLocaleString()}
+                      color="#10B981"
+                      bgColor="#D1FAE5"
+                    />
+                  )}
+                  {challenge?.trackWater && (
+                    <StatCard
+                      icon="droplet"
+                      label="Avg Water"
+                      value={stats.avgWater}
+                      unit="L"
+                      color="#3B82F6"
+                      bgColor="#DBEAFE"
+                    />
+                  )}
+                  {/* Fill space if only one card */}
+                  {challenge?.trackSteps && !challenge?.trackWater && <View className="flex-1" />}
+                  {!challenge?.trackSteps && challenge?.trackWater && <View className="flex-1" />}
+                </View>
+                <View className="flex-row gap-3 mb-4">
+                  {challenge?.trackReading && (
+                    <StatCard
+                      icon="book-open"
+                      label="Avg Reading"
+                      value={stats.avgReading}
+                      unit="pages"
+                      color="#8B5CF6"
+                      bgColor="#EDE9FE"
+                    />
+                  )}
+                  {(challenge?.trackWorkout1 || challenge?.trackWorkout2) && (
+                    <StatCard
+                      icon="clock"
+                      label="Total Workout"
+                      value={stats.totalWorkoutTime}
+                      unit="min"
+                      color="#F59E0B"
+                      bgColor="#FEF3C7"
+                    />
+                  )}
+                  {/* Fill space if only one card */}
+                  {challenge?.trackReading && !challenge?.trackWorkout1 && !challenge?.trackWorkout2 && <View className="flex-1" />}
+                  {!challenge?.trackReading && (challenge?.trackWorkout1 || challenge?.trackWorkout2) && <View className="flex-1" />}
+                </View>
+              </>
+            )}
 
             {/* Milestones & Badges */}
             <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
               <View className="flex-row items-center justify-between mb-4">
                 <Text className="text-sm font-semibold text-gray-600">Milestones</Text>
-                <Text className="text-xs text-gray-400">{earnedBadges.length} earned</Text>
+                <Text className="text-xs text-gray-400">{allEarnedBadges.length} earned</Text>
               </View>
-              {earnedBadges.length > 0 ? (
+              {allEarnedBadges.length > 0 ? (
                 <View className="flex-row flex-wrap gap-3">
-                  {earnedBadges.slice(0, 8).map((badgeId) => {
+                  {allEarnedBadges.slice(0, 8).map((badgeId) => {
                     const badge = BADGES[badgeId];
                     return (
                       <View key={badgeId} className="items-center" style={{ width: 70 }}>
@@ -424,9 +533,9 @@ export default function AnalyticsScreen() {
                   </Text>
                 </View>
               )}
-              {earnedBadges.length > 8 && (
+              {allEarnedBadges.length > 8 && (
                 <Text className="text-xs text-purple-500 text-center mt-3">
-                  +{earnedBadges.length - 8} more badges earned
+                  +{allEarnedBadges.length - 8} more badges earned
                 </Text>
               )}
             </View>
