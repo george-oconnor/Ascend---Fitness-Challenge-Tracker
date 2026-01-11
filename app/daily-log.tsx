@@ -311,7 +311,7 @@ export default function DailyLogScreen() {
       key: "skincareCompleted",
       label: "Skincare Routine",
       description: "Completed daily skincare",
-      icon: "droplets",
+      icon: "sun",
       route: "/log-skincare",
     });
   }

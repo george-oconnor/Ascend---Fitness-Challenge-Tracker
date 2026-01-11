@@ -70,9 +70,15 @@ export const useHealthStore = create<HealthState>((set, get) => ({
   },
 
   fetchTodayData: async () => {
+    console.log("🏃 fetchTodayData: Starting fetch...");
     set({ isLoading: true, error: null });
     try {
       const data = await healthService.getTodayHealthData();
+      console.log("🏃 fetchTodayData: Got data:", {
+        steps: data.steps,
+        workoutsCount: data.workouts.length,
+        workouts: data.workouts.map(w => ({ name: w.activityName, duration: w.duration })),
+      });
       set({
         steps: data.steps,
         workouts: data.workouts,
@@ -83,6 +89,7 @@ export const useHealthStore = create<HealthState>((set, get) => ({
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to fetch health data";
       captureException(err instanceof Error ? err : new Error(errorMsg));
+      console.error("❌ fetchTodayData error:", errorMsg);
       set({ error: errorMsg, isLoading: false });
     }
   },

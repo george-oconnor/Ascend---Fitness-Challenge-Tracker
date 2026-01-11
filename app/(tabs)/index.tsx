@@ -58,7 +58,7 @@ export default function HomeScreen() {
   }, [steps, workouts, isAuthorized, challenge?.$id, todayLog?.$id]);
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
       <Header name={user?.name} />
       
       <ScrollView 
@@ -108,7 +108,8 @@ export default function HomeScreen() {
                     challenge.trackNoAlcohol ||
                     challenge.trackMood ||
                     challenge.trackWeight ||
-                    (challenge as any).trackCycle;
+                    (challenge as any).trackCycle ||
+                    (challenge as any).trackSkincare;
                   
                   if (!hasTrackedActivities) {
                     return (
@@ -149,6 +150,7 @@ export default function HomeScreen() {
                   if (challenge.trackWeight) trackedActivities.push("weight");
                   if ((challenge as any).trackSleep) trackedActivities.push("sleep");
                   if ((challenge as any).trackCycle) trackedActivities.push("cycle");
+                  if ((challenge as any).trackSkincare) trackedActivities.push("skincare");
                   
                   // Group into pairs for 2-column layout
                   const rows: ActivityType[][] = [];

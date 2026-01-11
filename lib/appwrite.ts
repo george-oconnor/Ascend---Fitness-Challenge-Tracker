@@ -1,4 +1,4 @@
-import type { Challenge, CycleLog, DailyLog, UserProfile } from "@/types/type";
+import type { ActivityLog, Challenge, CycleLog, DailyLog, UserProfile } from "@/types/type";
 import { Account, Client, Databases, Query } from "appwrite";
 
 const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT;
@@ -11,6 +11,7 @@ const COLLECTIONS = {
   CHALLENGES: "challenges",
   DAILY_LOGS: "dailyLogs",
   CYCLE_LOGS: "cycleLog",
+  ACTIVITY_LOGS: "activityLogs",
 };
 
 export const appwriteClient = new Client();
@@ -261,4 +262,49 @@ export async function getLastPeriodStart(userId: string): Promise<CycleLog | nul
   }
 }
 
+// Activity Log functions
+export async function createActivityLog(log: Omit<ActivityLog, "$id">): Promise<ActivityLog> {
+  const doc = await databases.createDocument(
+    DATABASE_ID,
+    COLLECTIONS.ACTIVITY_LOGS,
+    "unique()",
+    log
+  );
+  return doc as unknown as ActivityLog;
+}
 
+export async function getActivityLogs(userId: string, limit: number = 50): Promise<ActivityLog[]> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.ACTIVITY_LOGS,
+      [
+        Query.equal("userId", userId),
+        Query.orderDesc("createdAt"),
+        Query.limit(limit)
+      ]
+    );
+    return response.documents as unknown as ActivityLog[];
+  } catch (err) {
+    console.error("getActivityLogs error:", err);
+    return [];
+  }
+}
+
+export async function getActivityLogsForChallenge(challengeId: string, limit: number = 100): Promise<ActivityLog[]> {
+  try {
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.ACTIVITY_LOGS,
+      [
+        Query.equal("challengeId", challengeId),
+        Query.orderDesc("$createdAt"),
+        Query.limit(limit)
+      ]
+    );
+    return response.documents as unknown as ActivityLog[];
+  } catch (err) {
+    console.error("getActivityLogsForChallenge error:", err);
+    return [];
+  }
+}

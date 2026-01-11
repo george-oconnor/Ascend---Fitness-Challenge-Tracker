@@ -1,6 +1,8 @@
 import {
+    createActivityLog,
     createChallenge,
     createDailyLog,
+    getActivityLogsForChallenge,
     getChallenge,
     getDailyLog,
     getDailyLogsForChallenge,
@@ -8,7 +10,7 @@ import {
     updateDailyLog,
 } from "@/lib/appwrite";
 import { captureException, logger } from "@/lib/sentry";
-import type { Challenge, DailyLog } from "@/types/type";
+import type { ActivityLog, ActivityType, Challenge, DailyLog } from "@/types/type";
 import { Platform } from "react-native";
 import { create } from "zustand";
 
@@ -16,6 +18,7 @@ type ChallengeState = {
   challenge: Challenge | null;
   todayLog: DailyLog | null;
   allLogs: DailyLog[];
+  activityLogs: ActivityLog[];
   isLoading: boolean;
   error: string | null;
 
@@ -27,6 +30,14 @@ type ChallengeState = {
   toggleTask: (taskKey: keyof DailyLog, value: boolean) => Promise<void>;
   updateProgress: (progressData: Partial<DailyLog>) => Promise<void>;
   fetchAllLogs: (challengeId: string) => Promise<void>;
+  fetchActivityLogs: (challengeId: string) => Promise<void>;
+  logActivity: (activity: {
+    type: ActivityType;
+    title: string;
+    description: string;
+    value?: number;
+    unit?: string;
+  }) => Promise<void>;
   syncHealthData: () => Promise<void>;
   clearChallenge: () => void;
   // Helper for photo completion checking
@@ -42,6 +53,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   challenge: null,
   todayLog: null,
   allLogs: [],
+  activityLogs: [],
   isLoading: false,
   error: null,
 
@@ -183,6 +195,52 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     }
   },
 
+  fetchActivityLogs: async (challengeId: string) => {
+    try {
+      const logs = await getActivityLogsForChallenge(challengeId);
+      set({ activityLogs: logs });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to fetch activity logs";
+      captureException(err instanceof Error ? err : new Error(errorMsg));
+      console.error("fetchActivityLogs error:", err);
+    }
+  },
+
+  logActivity: async (activity) => {
+    const { challenge, activityLogs } = get();
+    
+    if (!challenge?.$id) {
+      console.log("logActivity: No challenge available");
+      return;
+    }
+
+    try {
+      const newLog = await createActivityLog({
+        userId: challenge.userId,
+        challengeId: challenge.$id,
+        type: activity.type,
+        title: activity.title,
+        description: activity.description,
+        value: activity.value,
+        unit: activity.unit,
+        date: getTodayDateString(),
+      });
+      
+      // Add to local state (prepend since it's newest)
+      set({ activityLogs: [newLog, ...activityLogs] });
+      
+      logger.info("Activity logged", { 
+        type: activity.type, 
+        challengeId: challenge.$id,
+        value: activity.value 
+      });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to log activity";
+      captureException(err instanceof Error ? err : new Error(errorMsg));
+      console.error("logActivity error:", err);
+    }
+  },
+
   syncHealthData: async () => {
     const { todayLog, challenge } = get();
 
@@ -261,6 +319,13 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       }
 
       // Sync workout data if tracking is enabled
+      console.log("🏋️ syncHealthData: Checking workout sync", {
+        trackWorkout1: challenge.trackWorkout1,
+        trackWorkout2: challenge.trackWorkout2,
+        workoutsCount: healthState.workouts.length,
+        workouts: healthState.workouts.map(w => ({ name: w.activityName, duration: w.duration })),
+      });
+      
       if (challenge.trackWorkout1 || challenge.trackWorkout2) {
         const workouts = healthState.workouts;
         const workoutGoalMinutes = challenge.workoutMinutes || 45;
@@ -282,6 +347,14 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
                 ? Math.min(totalMinutes, workoutGoalMinutes) // Cap at goal if tracking both
                 : totalMinutes // Use all time if only tracking workout1
             );
+            
+            console.log("🏋️ syncHealthData: Workout1 check", {
+              totalMinutes,
+              workout1Minutes,
+              currentWorkout1Minutes: todayLog.workout1Minutes,
+              workoutGoalMinutes,
+              willUpdate: workout1Minutes !== todayLog.workout1Minutes,
+            });
             
             if (workout1Minutes !== todayLog.workout1Minutes) {
               updates.workout1Minutes = workout1Minutes;
@@ -345,6 +418,6 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   },
 
   clearChallenge: () => {
-    set({ challenge: null, todayLog: null, allLogs: [], error: null });
+    set({ challenge: null, todayLog: null, allLogs: [], activityLogs: [], error: null });
   },
 }));

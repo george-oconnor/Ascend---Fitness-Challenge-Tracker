@@ -257,16 +257,31 @@ class HealthService {
       type: "Workout",
     };
 
+    console.log("🏋️ getWorkoutsForDate: Fetching workouts with options:", JSON.stringify(options));
+    
     return new Promise((resolve) => {
       try {
         this.HealthKit.getSamples(options, (error: any, results: any) => {
           if (error) {
-            console.error("Error getting workouts:", error);
+            console.error("❌ Error getting workouts:", error);
+            logger.error("HealthKit workout fetch error", {
+              error: error?.message || String(error),
+              options,
+            });
             resolve([]);
             return;
           }
 
+          console.log("🏋️ getWorkoutsForDate: Raw results count:", results?.length || 0);
+          if (results?.length > 0) {
+            console.log("🏋️ First workout raw data:", JSON.stringify(results[0]));
+          }
+
           if (!results || results.length === 0) {
+            console.log("🏋️ getWorkoutsForDate: No workouts found for today");
+            logger.warn("HealthKit returned no workouts", {
+              dateRange: { start: options.startDate, end: options.endDate },
+            });
             resolve([]);
             return;
           }
@@ -278,6 +293,8 @@ class HealthService {
             const startDate = new Date(workout.start || workout.startDate);
             const endDate = new Date(workout.end || workout.endDate);
             const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+
+            console.log(`🏋️ Processing workout: ${workoutInfo.name}, duration: ${Math.round(duration)}min, activityId: ${activityType}`);
 
             return {
               id: workout.id || `${startDate.getTime()}`,
@@ -292,10 +309,15 @@ class HealthService {
             };
           });
 
+          console.log(`🏋️ getWorkoutsForDate: Returning ${workouts.length} workouts`);
           resolve(workouts);
         });
-      } catch (error) {
+      } catch (error: any) {
         console.error("Exception getting workouts:", error);
+        logger.error("HealthKit workout fetch exception", {
+          error: error?.message || String(error),
+          dateRange: { start: options.startDate, end: options.endDate },
+        });
         resolve([]);
       }
     });

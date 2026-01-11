@@ -108,6 +108,13 @@ const ACTIVITY_CONFIG: Record<ActivityType, ActivityConfig> = {
     color: "#8B5CF6",
     lightBgColor: "#EDE9FE",
   },
+  skincare: {
+    label: "Skincare",
+    shortLabel: "Skin",
+    icon: "sun",
+    color: "#14B8A6",
+    lightBgColor: "#CCFBF1",
+  },
 };
 
 // Circular progress component
@@ -218,6 +225,20 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
       break;
     case "diet":
       isTracked = challenge.trackDiet;
+      // Parse meals to count how many have been logged
+      let mealsLogged = 0;
+      if (todayLog.meals) {
+        try {
+          const mealsData = JSON.parse(todayLog.meals);
+          mealsLogged = Object.values(mealsData).filter((m: any) => typeof m === 'string' && m.trim().length > 0).length;
+        } catch {
+          // If parsing fails, check if meals has any content
+          mealsLogged = todayLog.meals.trim().length > 0 ? 1 : 0;
+        }
+      }
+      current = mealsLogged;
+      goal = 4; // 4 meals: breakfast, lunch, dinner, snacks
+      unit = "";
       isCompleted = todayLog.dietCompleted ?? false;
       break;
     case "reading":
@@ -265,6 +286,10 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
       current = Math.round((sleepMinutes / 60) * 10) / 10; // Convert to hours with 1 decimal
       goal = sleepGoalHours;
       unit = "h";
+      break;
+    case "skincare":
+      isTracked = challenge.trackSkincare ?? false;
+      isCompleted = todayLog.skincareCompleted ?? false;
       break;
   }
 

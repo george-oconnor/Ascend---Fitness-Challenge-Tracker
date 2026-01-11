@@ -137,7 +137,7 @@ const TRACKING_OPTIONS: TrackingOption[] = [
     key: "trackSkincare",
     label: "Skincare Routine",
     description: "Complete daily skincare routine",
-    icon: "droplets",
+    icon: "sun",
     bgColor: "bg-teal-100",
     iconColor: "#14B8A6",
   },
@@ -605,7 +605,7 @@ export default function ChallengeSetupScreen() {
           <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
             <Text className="text-sm font-semibold text-gray-700 mb-4">Habits</Text>
 
-            {["trackReading", "trackProgressPhoto", "trackMood", "trackSleep"].map((key, index, arr) => {
+            {["trackReading", "trackProgressPhoto", "trackMood", "trackSleep", "trackSkincare"].map((key, index, arr) => {
               const option = TRACKING_OPTIONS.find((o) => o.key === key)!;
               return (
                 <View key={option.key}>

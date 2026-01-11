@@ -147,3 +147,22 @@ export type CycleLog = {
   notes?: string;
   cycleDay?: number;
 };
+
+// Activity Feed Types
+export type ActivityType = 
+  | "steps" | "workout1" | "workout2" | "water" | "diet" 
+  | "reading" | "photo" | "alcohol" | "weight" | "mood" 
+  | "calories" | "cycle" | "sleep" | "skincare";
+
+export type ActivityLog = {
+  $id?: string;
+  $createdAt?: string; // Appwrite's built-in timestamp
+  userId: string;
+  challengeId: string;
+  type: ActivityType;
+  title: string;
+  description: string;
+  value?: number; // Numeric value if applicable (steps, minutes, liters, etc.)
+  unit?: string; // Unit for the value (steps, min, L, kg, etc.)
+  date: string; // The date this activity is for (YYYY-MM-DD)
+};
