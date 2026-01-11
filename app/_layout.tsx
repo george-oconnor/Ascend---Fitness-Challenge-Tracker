@@ -1,5 +1,6 @@
 import { BadgeCelebration } from "@/components/BadgeCelebration";
 import { captureMessage, initSentry, logger } from "@/lib/sentry";
+import { useHealthStore } from "@/store/useHealthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { useFonts } from "expo-font";
@@ -36,9 +37,11 @@ export default function RootLayout() {
 
   const { checkSession, status } = useSessionStore();
   const { initialize: initNotifications, celebratingBadge, dismissBadgeCelebration } = useNotificationStore();
+  const { initialize: initHealth, isNativeModuleAvailable, isAuthorized, error: healthError } = useHealthStore();
   const router = useRouter();
   const segments = useSegments();
   const navigationAttempted = useRef(false);
+  const healthInitAttempted = useRef(false);
   const notificationListener = useRef<Notifications.Subscription>();
   const responseListener = useRef<Notifications.Subscription>();
 
@@ -72,6 +75,26 @@ export default function RootLayout() {
         Notifications.removeNotificationSubscription(responseListener.current);
       }
     };
+  }, []);
+
+  // Initialize HealthKit early on iOS
+  useEffect(() => {
+    if (Platform.OS === "ios" && !healthInitAttempted.current) {
+      healthInitAttempted.current = true;
+      logger.info("Starting HealthKit initialization from _layout");
+      
+      initHealth().then((authorized) => {
+        logger.info("HealthKit initialization complete", {
+          authorized,
+          isNativeModuleAvailable,
+          healthError,
+        });
+      }).catch((err) => {
+        logger.error("HealthKit initialization error in _layout", {
+          error: err?.message || String(err),
+        });
+      });
+    }
   }, []);
 
   // Handle deep links for password reset
