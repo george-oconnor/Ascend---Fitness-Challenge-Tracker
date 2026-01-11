@@ -98,6 +98,16 @@ export async function getUserProfile(authId: string): Promise<UserProfile | null
   }
 }
 
+export async function updateUserProfile(profileId: string, data: Partial<UserProfile>): Promise<UserProfile> {
+  const doc = await databases.updateDocument(
+    DATABASE_ID,
+    COLLECTIONS.USERS,
+    profileId,
+    data
+  );
+  return doc as unknown as UserProfile;
+}
+
 // Challenge functions
 export async function createChallenge(challenge: Omit<Challenge, "$id">): Promise<Challenge> {
   const doc = await databases.createDocument(

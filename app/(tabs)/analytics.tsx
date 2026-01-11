@@ -1,6 +1,7 @@
+import { BADGES } from "@/constants/badges";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useSessionStore } from "@/store/useSessionStore";
-import { DailyLog } from "@/types/type.d";
+import { BadgeId, DailyLog } from "@/types/type.d";
 import { Feather } from "@expo/vector-icons";
 import { differenceInDays, eachDayOfInterval, format, parseISO, startOfWeek, subDays } from "date-fns";
 import { useEffect, useMemo } from "react";
@@ -132,11 +133,65 @@ export default function AnalyticsScreen() {
       avgWater: completedDays > 0 ? (totalWater / completedDays).toFixed(1) : "0",
       avgReading: completedDays > 0 ? Math.round(totalReading / completedDays) : 0,
       totalWorkoutTime,
-      workoutRate: daysElapsed > 0 ? Math.min(100, Math.round((workoutCompletions / daysElapsed) * 100)) : 0,
-      dietRate: daysElapsed > 0 ? Math.min(100, Math.round((dietCompletions / daysElapsed) * 100)) : 0,
-      photoRate: daysElapsed > 0 ? Math.min(100, Math.round((photoCompletions / daysElapsed) * 100)) : 0,
+      totalPages: totalReading,
+      totalWater,
+      workoutCompletions,
+      photoCompletions,
+      waterCompletions: allLogs.filter((log: DailyLog) => log.waterCompleted).length,
+      maxSteps: Math.max(...allLogs.map((log: DailyLog) => log.stepsCount || 0), 0),
     };
   }, [allLogs, challenge]);
+
+  // Calculate earned badges based on stats
+  const earnedBadges = useMemo(() => {
+    if (!stats || !allLogs || allLogs.length === 0) return [];
+    
+    const badges: BadgeId[] = [];
+    
+    // Progress badges
+    if (stats.completedDays >= 1) badges.push("day_1");
+    if (stats.completedDays >= 7) badges.push("week_1");
+    if (stats.completedDays >= 25) badges.push("day_25");
+    if (stats.completedDays >= 50) badges.push("day_50");
+    if (stats.completedDays >= 75) badges.push("day_75");
+    if (stats.completedDays >= stats.totalDays) badges.push("challenge_complete");
+    
+    // Streak badges
+    if (stats.currentStreak >= 3) badges.push("streak_3");
+    if (stats.currentStreak >= 7) badges.push("streak_7");
+    if (stats.currentStreak >= 14) badges.push("streak_14");
+    if (stats.currentStreak >= 30) badges.push("streak_30");
+    
+    // Workout badges
+    if (stats.workoutCompletions >= 10) badges.push("workout_10");
+    if (stats.workoutCompletions >= 25) badges.push("workout_25");
+    if (stats.workoutCompletions >= 50) badges.push("workout_50");
+    if (stats.workoutCompletions >= 100) badges.push("workout_100");
+    
+    // Reading badges
+    if (stats.totalPages >= 100) badges.push("pages_100");
+    if (stats.totalPages >= 500) badges.push("pages_500");
+    if (stats.totalPages >= 1000) badges.push("pages_1000");
+    
+    // Check if any book was finished
+    const finishedBook = allLogs.some((log: DailyLog) => log.finishedBook);
+    if (finishedBook) badges.push("book_finished");
+    
+    // Steps badges
+    if (stats.maxSteps >= 10000) badges.push("steps_10k");
+    if (stats.maxSteps >= 15000) badges.push("steps_15k");
+    if (stats.maxSteps >= 20000) badges.push("steps_20k");
+    
+    // Water badges
+    if (stats.waterCompletions >= 7) badges.push("hydration_7");
+    if (stats.waterCompletions >= 30) badges.push("hydration_30");
+    
+    // Photo badges
+    if (stats.photoCompletions >= 7) badges.push("photo_7");
+    if (stats.photoCompletions >= 30) badges.push("photo_30");
+    
+    return badges;
+  }, [stats, allLogs]);
 
   // Weekly activity data for chart
   const weeklyData = useMemo(() => {
@@ -225,29 +280,6 @@ export default function AnalyticsScreen() {
       <View className="flex-row items-baseline">
         <Text className="text-2xl font-bold text-gray-900">{value}</Text>
         {unit && <Text className="text-sm text-gray-500 ml-1">{unit}</Text>}
-      </View>
-    </View>
-  );
-
-  const ProgressBar = ({ 
-    label, 
-    value, 
-    color 
-  }: { 
-    label: string; 
-    value: number; 
-    color: string;
-  }) => (
-    <View className="mb-4">
-      <View className="flex-row justify-between mb-1">
-        <Text className="text-sm text-gray-600">{label}</Text>
-        <Text className="text-sm font-semibold text-gray-900">{value}%</Text>
-      </View>
-      <View className="h-2 bg-gray-200 rounded-full overflow-hidden">
-        <View 
-          className="h-full rounded-full"
-          style={{ width: `${value}%`, backgroundColor: color }}
-        />
       </View>
     </View>
   );
@@ -343,7 +375,7 @@ export default function AnalyticsScreen() {
                 icon="book-open"
                 label="Avg Reading"
                 value={stats.avgReading}
-                unit="min"
+                unit="pages"
                 color="#8B5CF6"
                 bgColor="#EDE9FE"
               />
@@ -357,13 +389,46 @@ export default function AnalyticsScreen() {
               />
             </View>
 
-            {/* Completion Rates */}
+            {/* Milestones & Badges */}
             <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-              <Text className="text-sm font-semibold text-gray-600 mb-4">Completion Rates</Text>
-              <ProgressBar label="Overall" value={stats.completionRate} color="#8B5CF6" />
-              <ProgressBar label="Workouts" value={stats.workoutRate} color="#F59E0B" />
-              <ProgressBar label="Diet" value={stats.dietRate} color="#10B981" />
-              <ProgressBar label="Photos" value={stats.photoRate} color="#EC4899" />
+              <View className="flex-row items-center justify-between mb-4">
+                <Text className="text-sm font-semibold text-gray-600">Milestones</Text>
+                <Text className="text-xs text-gray-400">{earnedBadges.length} earned</Text>
+              </View>
+              {earnedBadges.length > 0 ? (
+                <View className="flex-row flex-wrap gap-3">
+                  {earnedBadges.slice(0, 8).map((badgeId) => {
+                    const badge = BADGES[badgeId];
+                    return (
+                      <View key={badgeId} className="items-center" style={{ width: 70 }}>
+                        <View 
+                          className="h-12 w-12 rounded-full items-center justify-center mb-1"
+                          style={{ backgroundColor: badge.bgColor }}
+                        >
+                          <Feather name={badge.icon as keyof typeof Feather.glyphMap} size={20} color={badge.color} />
+                        </View>
+                        <Text className="text-xs text-gray-600 text-center" numberOfLines={2}>
+                          {badge.name}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View className="items-center py-4">
+                  <View className="h-12 w-12 rounded-full items-center justify-center bg-gray-100 mb-2">
+                    <Feather name="award" size={20} color="#9CA3AF" />
+                  </View>
+                  <Text className="text-sm text-gray-400 text-center">
+                    Complete activities to earn badges!
+                  </Text>
+                </View>
+              )}
+              {earnedBadges.length > 8 && (
+                <Text className="text-xs text-purple-500 text-center mt-3">
+                  +{earnedBadges.length - 8} more badges earned
+                </Text>
+              )}
             </View>
           </View>
         )}

@@ -79,6 +79,35 @@ export type UserProfile = {
   firstName?: string;
   lastName?: string;
   createdAt: string;
+  badges?: string; // JSON array of earned badge IDs
+};
+
+// Badge System Types
+export type BadgeId = 
+  // Streak badges
+  | "streak_3" | "streak_7" | "streak_14" | "streak_30"
+  // Challenge progress badges
+  | "day_1" | "week_1" | "day_25" | "day_50" | "day_75" | "challenge_complete"
+  // Workout badges
+  | "workout_10" | "workout_25" | "workout_50" | "workout_100"
+  // Reading badges
+  | "pages_100" | "pages_500" | "pages_1000" | "book_finished"
+  // Steps badges
+  | "steps_10k" | "steps_15k" | "steps_20k"
+  // Water badges
+  | "hydration_7" | "hydration_30"
+  // Photo badges
+  | "photo_7" | "photo_30"
+  // Special badges
+  | "early_bird" | "night_owl" | "perfect_day";
+
+export type Badge = {
+  id: BadgeId;
+  name: string;
+  description: string;
+  icon: string; // Feather icon name
+  color: string;
+  bgColor: string;
 };
 
 export type SessionStatus = "idle" | "loading" | "authenticated" | "unauthenticated" | "error";

@@ -1,5 +1,5 @@
 import { healthService, WorkoutData } from "@/lib/health";
-import { captureException } from "@/lib/sentry";
+import { captureException, logger } from "@/lib/sentry";
 import { create } from "zustand";
 
 type HealthState = {
@@ -32,9 +32,13 @@ export const useHealthStore = create<HealthState>((set, get) => ({
   initialize: async () => {
     set({ isLoading: true, error: null });
     
+    logger.info("HealthKit initialization started");
+    
     // Check if native module is available (this triggers lazy loading)
     const isLinked = healthService.isNativeModuleLinked();
     set({ isNativeModuleAvailable: isLinked });
+    
+    logger.info("HealthKit module check", { isLinked });
     
     if (!isLinked) {
       const loadError = healthService.getModuleLoadError();
@@ -43,12 +47,14 @@ export const useHealthStore = create<HealthState>((set, get) => ({
         isLoading: false,
         isNativeModuleAvailable: false,
       });
+      logger.warn("HealthKit module not linked", { loadError });
       console.log("HealthKit module not linked. Error:", loadError);
       return false;
     }
     
     try {
       const authorized = await healthService.initialize();
+      logger.info("HealthKit authorization result", { authorized });
       set({ 
         isAuthorized: authorized, 
         isAvailable: true,
@@ -58,12 +64,15 @@ export const useHealthStore = create<HealthState>((set, get) => ({
       if (authorized) {
         // Fetch today's data after initialization
         await get().fetchTodayData();
+      } else {
+        logger.warn("HealthKit authorization denied");
       }
       
       return authorized;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to initialize HealthKit";
       captureException(err instanceof Error ? err : new Error(errorMsg));
+      logger.error("HealthKit initialization failed", { error: errorMsg });
       set({ error: errorMsg, isLoading: false, isAvailable: false });
       return false;
     }
@@ -71,9 +80,16 @@ export const useHealthStore = create<HealthState>((set, get) => ({
 
   fetchTodayData: async () => {
     console.log("🏃 fetchTodayData: Starting fetch...");
+    logger.info("Fetching today health data");
     set({ isLoading: true, error: null });
     try {
       const data = await healthService.getTodayHealthData();
+      logger.info("Health data fetched", {
+        steps: data.steps,
+        workoutsCount: data.workouts.length,
+        isAvailable: data.isAvailable,
+        isAuthorized: data.isAuthorized,
+      });
       console.log("🏃 fetchTodayData: Got data:", {
         steps: data.steps,
         workoutsCount: data.workouts.length,
