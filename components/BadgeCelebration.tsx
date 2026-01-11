@@ -1,19 +1,8 @@
 import type { Badge } from "@/types/type";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useState } from "react";
-import { Dimensions, Modal, Pressable, StyleSheet, Text, View } from "react-native";
-import Animated, {
-    Easing,
-    interpolate,
-    runOnJS,
-    useAnimatedStyle,
-    useSharedValue,
-    withDelay,
-    withSequence,
-    withSpring,
-    withTiming,
-} from "react-native-reanimated";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, Dimensions, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 
@@ -25,11 +14,11 @@ interface BadgeCelebrationProps {
 
 // Confetti particle component
 const ConfettiParticle = ({ delay, startX }: { delay: number; startX: number }) => {
-  const translateY = useSharedValue(-50);
-  const translateX = useSharedValue(startX);
-  const rotate = useSharedValue(0);
-  const opacity = useSharedValue(1);
-  const scale = useSharedValue(0);
+  const translateY = useRef(new Animated.Value(-50)).current;
+  const translateX = useRef(new Animated.Value(startX)).current;
+  const rotate = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(1)).current;
+  const scale = useRef(new Animated.Value(0)).current;
 
   const colors = ["#8B5CF6", "#F59E0B", "#10B981", "#EF4444", "#3B82F6", "#EC4899"];
   const color = colors[Math.floor(Math.random() * colors.length)];
@@ -38,35 +27,36 @@ const ConfettiParticle = ({ delay, startX }: { delay: number; startX: number }) 
   useEffect(() => {
     const randomEndX = startX + (Math.random() - 0.5) * 150;
     
-    scale.value = withDelay(delay, withSpring(1, { damping: 10 }));
-    translateY.value = withDelay(
-      delay,
-      withTiming(SCREEN_HEIGHT * 0.7, { duration: 2500, easing: Easing.out(Easing.quad) })
-    );
-    translateX.value = withDelay(
-      delay,
-      withTiming(randomEndX, { duration: 2500, easing: Easing.out(Easing.quad) })
-    );
-    rotate.value = withDelay(
-      delay,
-      withTiming(Math.random() * 720 - 360, { duration: 2500 })
-    );
-    opacity.value = withDelay(
-      delay + 1500,
-      withTiming(0, { duration: 1000 })
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.spring(scale, { toValue: 1, useNativeDriver: true }),
+        Animated.timing(translateY, {
+          toValue: SCREEN_HEIGHT * 0.7,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(translateX, {
+          toValue: randomEndX,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.timing(rotate, {
+          toValue: Math.random() * 720 - 360,
+          duration: 2500,
+          useNativeDriver: true,
+        }),
+        Animated.sequence([
+          Animated.delay(1500),
+          Animated.timing(opacity, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    ]).start();
   }, []);
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { rotate: `${rotate.value}deg` },
-      { scale: scale.value },
-    ],
-    opacity: opacity.value,
-  }));
 
   return (
     <Animated.View
@@ -78,7 +68,18 @@ const ConfettiParticle = ({ delay, startX }: { delay: number; startX: number }) 
           backgroundColor: color,
           borderRadius: Math.random() > 0.5 ? size / 2 : 2,
         },
-        animatedStyle,
+        {
+          transform: [
+            { translateX },
+            { translateY },
+            { rotate: rotate.interpolate({
+              inputRange: [0, 360],
+              outputRange: ['0deg', '360deg']
+            }) },
+            { scale },
+          ],
+          opacity,
+        },
       ]}
     />
   );
@@ -86,33 +87,39 @@ const ConfettiParticle = ({ delay, startX }: { delay: number; startX: number }) 
 
 // Star burst component
 const StarBurst = ({ delay }: { delay: number }) => {
-  const scale = useSharedValue(0);
-  const opacity = useSharedValue(0);
-  const rotation = useSharedValue(0);
+  const scale = useRef(new Animated.Value(0)).current;
+  const opacity = useRef(new Animated.Value(0)).current;
+  const rotation = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    scale.value = withDelay(
-      delay,
-      withSequence(
-        withSpring(1.2, { damping: 8 }),
-        withTiming(0.8, { duration: 200 })
-      )
-    );
-    opacity.value = withDelay(delay, withTiming(1, { duration: 300 }));
-    rotation.value = withDelay(
-      delay,
-      withTiming(360, { duration: 2000, easing: Easing.linear })
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    Animated.sequence([
+      Animated.delay(delay),
+      Animated.parallel([
+        Animated.sequence([
+          Animated.spring(scale, { toValue: 1.2, useNativeDriver: true }),
+          Animated.timing(scale, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+        ]),
+        Animated.timing(opacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.timing(rotation, {
+          toValue: 360,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ]),
+    ]).start();
   }, []);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: scale.value }, { rotate: `${rotation.value}deg` }],
-    opacity: opacity.value,
-  }));
-
   return (
-    <Animated.View style={[styles.starBurst, animatedStyle]}>
+    <Animated.View style={[styles.starBurst, {
+      transform: [
+        { scale },
+        { rotate: rotation.interpolate({
+          inputRange: [0, 360],
+          outputRange: ['0deg', '360deg']
+        }) }
+      ],
+      opacity,
+    }]}>
       {[...Array(8)].map((_, i) => (
         <View
           key={i}
@@ -127,17 +134,17 @@ const StarBurst = ({ delay }: { delay: number }) => {
 };
 
 export function BadgeCelebration({ badge, visible, onDismiss }: BadgeCelebrationProps) {
-  // Animation values
-  const backdropOpacity = useSharedValue(0);
-  const cardScale = useSharedValue(0.3);
-  const cardOpacity = useSharedValue(0);
-  const cardTranslateY = useSharedValue(50);
-  const badgeScale = useSharedValue(0);
-  const badgeRotation = useSharedValue(-30);
-  const titleOpacity = useSharedValue(0);
-  const descriptionOpacity = useSharedValue(0);
-  const buttonOpacity = useSharedValue(0);
-  const shimmerPosition = useSharedValue(-1);
+  // Animation values using React Native Animated
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
+  const cardScale = useRef(new Animated.Value(0.3)).current;
+  const cardOpacity = useRef(new Animated.Value(0)).current;
+  const cardTranslateY = useRef(new Animated.Value(50)).current;
+  const badgeScale = useRef(new Animated.Value(0)).current;
+  const badgeRotation = useRef(new Animated.Value(-30)).current;
+  const titleOpacity = useRef(new Animated.Value(0)).current;
+  const descriptionOpacity = useRef(new Animated.Value(0)).current;
+  const buttonOpacity = useRef(new Animated.Value(0)).current;
+  const shimmerPosition = useRef(new Animated.Value(-1)).current;
   
   const [showConfetti, setShowConfetti] = useState(false);
 
@@ -152,97 +159,104 @@ export function BadgeCelebration({ badge, visible, onDismiss }: BadgeCelebration
   useEffect(() => {
     if (visible && badge) {
       // Reset values
-      backdropOpacity.value = 0;
-      cardScale.value = 0.3;
-      cardOpacity.value = 0;
-      cardTranslateY.value = 50;
-      badgeScale.value = 0;
-      badgeRotation.value = -30;
-      titleOpacity.value = 0;
-      descriptionOpacity.value = 0;
-      buttonOpacity.value = 0;
-      shimmerPosition.value = -1;
+      backdropOpacity.setValue(0);
+      cardScale.setValue(0.3);
+      cardOpacity.setValue(0);
+      cardTranslateY.setValue(50);
+      badgeScale.setValue(0);
+      badgeRotation.setValue(-30);
+      titleOpacity.setValue(0);
+      descriptionOpacity.setValue(0);
+      buttonOpacity.setValue(0);
+      shimmerPosition.setValue(-1);
       setShowConfetti(false);
 
       // Animate in sequence
-      backdropOpacity.value = withTiming(1, { duration: 300 });
-      
-      cardScale.value = withDelay(100, withSpring(1, { damping: 12 }));
-      cardOpacity.value = withDelay(100, withTiming(1, { duration: 200 }));
-      cardTranslateY.value = withDelay(100, withSpring(0, { damping: 15 }));
-      
-      badgeScale.value = withDelay(400, withSpring(1, { damping: 8, stiffness: 150 }));
-      badgeRotation.value = withDelay(400, withSpring(0, { damping: 10 }));
-      
+      const animations = [
+        Animated.timing(backdropOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(100),
+        Animated.parallel([
+          Animated.spring(cardScale, { toValue: 1, useNativeDriver: true }),
+          Animated.timing(cardOpacity, { toValue: 1, duration: 200, useNativeDriver: true }),
+          Animated.spring(cardTranslateY, { toValue: 0, useNativeDriver: true }),
+        ]),
+        Animated.delay(300),
+        Animated.parallel([
+          Animated.spring(badgeScale, { toValue: 1, useNativeDriver: true }),
+          Animated.spring(badgeRotation, { toValue: 0, useNativeDriver: true }),
+        ]),
+        Animated.delay(200),
+        Animated.timing(titleOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(200),
+        Animated.timing(descriptionOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(200),
+        Animated.timing(buttonOpacity, { toValue: 1, duration: 300, useNativeDriver: true }),
+        Animated.delay(200),
+        Animated.timing(shimmerPosition, { toValue: 1, duration: 1500, useNativeDriver: true }),
+      ];
+
       // Trigger haptics when badge appears
-      setTimeout(() => runOnJS(triggerHaptics)(), 400);
+      setTimeout(triggerHaptics, 400);
       
       // Start confetti
-      setTimeout(() => runOnJS(startConfetti)(), 500);
+      setTimeout(startConfetti, 500);
       
-      titleOpacity.value = withDelay(600, withTiming(1, { duration: 300 }));
-      descriptionOpacity.value = withDelay(800, withTiming(1, { duration: 300 }));
-      buttonOpacity.value = withDelay(1000, withTiming(1, { duration: 300 }));
-      
-      // Shimmer effect
-      shimmerPosition.value = withDelay(
-        1200,
-        withTiming(1, { duration: 1500, easing: Easing.inOut(Easing.ease) })
-      );
+      Animated.sequence(animations).start();
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, badge]);
 
   const handleClose = () => {
-    backdropOpacity.value = withTiming(0, { duration: 200 });
-    cardScale.value = withTiming(0.8, { duration: 200 });
-    cardOpacity.value = withTiming(0, { duration: 200 });
-    
-    setTimeout(onDismiss, 200);
+    Animated.parallel([
+      Animated.timing(backdropOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+      Animated.timing(cardScale, { toValue: 0.8, duration: 200, useNativeDriver: true }),
+      Animated.timing(cardOpacity, { toValue: 0, duration: 200, useNativeDriver: true }),
+    ]).start(() => onDismiss());
   };
 
-  const backdropStyle = useAnimatedStyle(() => ({
-    opacity: backdropOpacity.value,
-  }));
+  const backdropStyle = {
+    opacity: backdropOpacity,
+  };
 
-  const cardStyle = useAnimatedStyle(() => ({
+  const cardStyle = {
     transform: [
-      { scale: cardScale.value },
-      { translateY: cardTranslateY.value },
+      { scale: cardScale },
+      { translateY: cardTranslateY },
     ],
-    opacity: cardOpacity.value,
-  }));
+    opacity: cardOpacity,
+  };
 
-  const badgeStyle = useAnimatedStyle(() => ({
+  const badgeStyle = {
     transform: [
-      { scale: badgeScale.value },
-      { rotate: `${badgeRotation.value}deg` },
+      { scale: badgeScale },
+      { rotate: badgeRotation.interpolate({
+        inputRange: [-30, 0],
+        outputRange: ['-30deg', '0deg']
+      }) },
     ],
-  }));
+  };
 
-  const titleStyle = useAnimatedStyle(() => ({
-    opacity: titleOpacity.value,
-  }));
+  const titleStyle = {
+    opacity: titleOpacity,
+  };
 
-  const descriptionStyle = useAnimatedStyle(() => ({
-    opacity: descriptionOpacity.value,
-  }));
+  const descriptionStyle = {
+    opacity: descriptionOpacity,
+  };
 
-  const buttonStyle = useAnimatedStyle(() => ({
-    opacity: buttonOpacity.value,
-  }));
+  const buttonStyle = {
+    opacity: buttonOpacity,
+  };
 
-  const shimmerStyle = useAnimatedStyle(() => ({
+  const shimmerStyle = {
     transform: [
       {
-        translateX: interpolate(
-          shimmerPosition.value,
-          [-1, 1],
-          [-SCREEN_WIDTH, SCREEN_WIDTH]
-        ),
+        translateX: shimmerPosition.interpolate({
+          inputRange: [-1, 1],
+          outputRange: [-SCREEN_WIDTH, SCREEN_WIDTH]
+        }),
       },
     ],
-  }));
+  };
 
   if (!badge) return null;
 
