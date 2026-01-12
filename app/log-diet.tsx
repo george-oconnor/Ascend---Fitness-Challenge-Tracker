@@ -299,15 +299,41 @@ export default function LogDietScreen() {
         }
       }
 
-      // Log activity to feed
+      // Log activity to feed - create individual logs for each meal
       const { logActivity } = useChallengeStore.getState();
-      await logActivity({
-        type: "diet",
-        title: "Diet Logged",
-        description: `${mealsLogged} meal${mealsLogged !== 1 ? 's' : ''} logged${trackCalories ? ` - ${totalCalories} calories` : ""}${dietCompleted ? " ✓ Diet followed!" : ""}`,
-        value: totalCalories,
-        unit: trackCalories ? "calories" : undefined,
-      });
+      const previousMeals = parseMeals(todayLog?.meals);
+      
+      // Check which meals are new and create activity logs for them
+      const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snacks"];
+      for (const mealType of mealTypes) {
+        const currentMeal = meals[mealType].trim();
+        const previousMeal = previousMeals[mealType].trim();
+        
+        // If this meal has content and wasn't previously logged (or was updated)
+        if (currentMeal && currentMeal !== previousMeal) {
+          const mealLabel = MEAL_CONFIG[mealType].label;
+          const mealCalorieValue = trackCalories ? mealCalories[mealType] : undefined;
+          
+          await logActivity({
+            type: "diet",
+            title: `${mealLabel} Logged`,
+            description: trackCalories && mealCalorieValue 
+              ? `${currentMeal.substring(0, 50)}${currentMeal.length > 50 ? '...' : ''} - ${mealCalorieValue} cal`
+              : currentMeal.substring(0, 100) + (currentMeal.length > 100 ? '...' : ''),
+            value: mealCalorieValue,
+            unit: trackCalories && mealCalorieValue ? "calories" : undefined,
+          });
+        }
+      }
+      
+      // If diet compliance was just marked as complete, log that separately
+      if (dietCompleted && !todayLog?.dietCompleted) {
+        await logActivity({
+          type: "diet",
+          title: "Diet Followed",
+          description: "✓ Stuck to diet plan today!",
+        });
+      }
       
       router.back();
     } catch (err) {
