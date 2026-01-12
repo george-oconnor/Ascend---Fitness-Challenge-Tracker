@@ -115,12 +115,16 @@ export const useHealthStore = create<HealthState>((set, get) => ({
   },
 
   getOutdoorWorkoutMinutes: () => {
-    return get().workouts
-      .filter((w) => w.isOutdoor)
-      .reduce((total, w) => total + w.duration, 0);
+    const workouts = get().workouts;
+    if (!workouts || !Array.isArray(workouts)) return 0;
+    return workouts
+      .filter((w) => w?.isOutdoor)
+      .reduce((total, w) => total + (w?.duration || 0), 0);
   },
 
   getTotalWorkoutMinutes: () => {
-    return get().workouts.reduce((total, w) => total + w.duration, 0);
+    const workouts = get().workouts;
+    if (!workouts || !Array.isArray(workouts)) return 0;
+    return workouts.reduce((total, w) => total + (w?.duration || 0), 0);
   },
 }));
