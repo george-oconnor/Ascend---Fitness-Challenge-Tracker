@@ -89,46 +89,50 @@ export default function AnalyticsScreen() {
   const handleResyncHealthData = async () => {
     if (!selectedDate || !selectedDayLog?.$id || !challenge?.$id || resyncing) return;
     
-    console.log('🔄 Starting resync, showing modal...');
-    setResyncing(true);
-    setResyncLogs([]);
-    setShowResyncModal(true);
+    // First close the day modal and show resync modal
+    setShowDayModal(false);
     
-    const addLog = (message: string) => {
-      console.log('📝 Adding log:', message);
-      setResyncLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
-    };
-    
-    try {
-      addLog('🔄 Starting health data resync...');
-      await resyncHealthDataForDate(selectedDate, selectedDayLog.$id, addLog);
-      addLog('✅ Resync complete!');
+    // Small delay to allow day modal to close before showing resync modal
+    setTimeout(async () => {
+      console.log('🔄 Starting resync, showing modal...');
+      setResyncing(true);
+      setResyncLogs([]);
+      setShowResyncModal(true);
       
-      // Refresh to show updated data
-      addLog('📥 Refreshing logs...');
-      await fetchAllLogs(challenge.$id);
-      await fetchActivityLogs(challenge.$id);
-      addLog('✅ Logs refreshed!');
+      const addLog = (message: string) => {
+        console.log('📝 Adding log:', message);
+        setResyncLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+      };
       
-      // Update the selected day log with fresh data
-      if (selectedDate) {
+      try {
+        addLog('🔄 Starting health data resync...');
+        await resyncHealthDataForDate(selectedDate!, selectedDayLog!.$id, addLog);
+        addLog('✅ Resync complete!');
+        
+        // Refresh to show updated data
+        addLog('📥 Refreshing logs...');
+        await fetchAllLogs(challenge!.$id);
+        await fetchActivityLogs(challenge!.$id);
+        addLog('✅ Logs refreshed!');
+        
+        // Update the selected day log with fresh data
         const updatedLogs = useChallengeStore.getState().allLogs;
-        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const dateStr = format(selectedDate!, 'yyyy-MM-dd');
         const updatedLog = updatedLogs.find(log => log.date === dateStr);
         if (updatedLog) {
           setSelectedDayLog(updatedLog);
           addLog('🔄 Display updated with fresh data');
         }
+        
+        addLog('👆 Tap Close when ready');
+      } catch (error) {
+        const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+        addLog(`❌ Error: ${errorMsg}`);
+        console.error("Failed to re-sync health data:", error);
+      } finally {
+        setResyncing(false);
       }
-      
-      addLog('👆 Tap Close when ready');
-    } catch (error) {
-      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
-      addLog(`❌ Error: ${errorMsg}`);
-      console.error("Failed to re-sync health data:", error);
-    } finally {
-      setResyncing(false);
-    }
+    }, 300);
   };
 
   // Parse mood notes (could be JSON or plain text)
@@ -940,8 +944,8 @@ export default function AnalyticsScreen() {
           </View>
 
           <ScrollView className="flex-1 p-4">
-            {/* Re-sync from Apple Health button (iOS only, if workouts are tracked) */}
-            {Platform.OS === "ios" && (challenge?.trackWorkout1 || challenge?.trackWorkout2) && selectedDayLog && (
+            {/* Re-sync from Apple Health button (iOS only) */}
+            {Platform.OS === "ios" && selectedDayLog && (
               <Pressable
                 onPress={handleResyncHealthData}
                 disabled={resyncing}
@@ -951,7 +955,7 @@ export default function AnalyticsScreen() {
               >
                 <Feather name={resyncing ? "loader" : "refresh-cw"} size={16} color="#8B5CF6" />
                 <Text className="text-sm font-semibold text-purple-600 ml-2">
-                  {resyncing ? "Re-syncing..." : "Re-sync Workouts from Apple Health"}
+                  {resyncing ? "Re-syncing..." : "Re-sync from Apple Health"}
                 </Text>
               </Pressable>
             )}
@@ -1032,60 +1036,80 @@ export default function AnalyticsScreen() {
                   const hasWorkout1 = (selectedDayLog.workout1Minutes ?? 0) > 0;
                   const hasWorkout2 = (selectedDayLog.workout2Minutes ?? 0) > 0;
                   
+                  const renderWorkoutDetails = (workout: any, workoutNum: number, minutes: number) => {
+                    const activityName = workout?.activityName || workout?.type?.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()) || 'Workout';
+                    const isOrange = workoutNum === 1;
+                    
+                    return (
+                      <View>
+                        <View className="flex-row items-center mb-2">
+                          <View className={`h-10 w-10 rounded-full items-center justify-center mr-3 ${isOrange ? 'bg-orange-100' : 'bg-purple-100'}`}>
+                            <Feather name="activity" size={20} color={isOrange ? '#F97316' : '#8B5CF6'} />
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-base font-semibold text-gray-900">{activityName}</Text>
+                            <Text className="text-sm text-gray-500">{minutes} minutes • Workout {workoutNum}</Text>
+                          </View>
+                          {workout?.syncedFromHealth && (
+                            <View className="flex-row items-center bg-purple-50 px-2 py-1 rounded-full">
+                              <Feather name="heart" size={12} color="#8B5CF6" />
+                              <Text className="text-xs text-purple-600 ml-1">Apple Health</Text>
+                            </View>
+                          )}
+                        </View>
+                        
+                        {/* Workout Stats */}
+                        <View className="flex-row flex-wrap gap-2 mt-2">
+                          {workout?.calories && (
+                            <View className="flex-row items-center bg-red-50 px-3 py-1.5 rounded-full">
+                              <Feather name="flame" size={14} color="#EF4444" />
+                              <Text className="text-sm text-red-600 ml-1">{workout.calories} cal</Text>
+                            </View>
+                          )}
+                          {workout?.distance && (
+                            <View className="flex-row items-center bg-blue-50 px-3 py-1.5 rounded-full">
+                              <Feather name="map-pin" size={14} color="#3B82F6" />
+                              <Text className="text-sm text-blue-600 ml-1">{workout.distance}km</Text>
+                            </View>
+                          )}
+                          {workout?.isOutdoor !== undefined && (
+                            <View className="flex-row items-center bg-green-50 px-3 py-1.5 rounded-full">
+                              <Feather name={workout.isOutdoor ? "sun" : "home"} size={14} color="#10B981" />
+                              <Text className="text-sm text-green-600 ml-1">{workout.isOutdoor ? 'Outdoor' : 'Indoor'}</Text>
+                            </View>
+                          )}
+                        </View>
+                        
+                        {/* Time Info */}
+                        {(workout?.startTime || workout?.endTime) && (
+                          <View className="flex-row items-center mt-2">
+                            <Feather name="clock" size={14} color="#6B7280" />
+                            <Text className="text-sm text-gray-500 ml-1">
+                              {workout?.startTime && format(new Date(workout.startTime), 'h:mm a')}
+                              {workout?.startTime && workout?.endTime && ' - '}
+                              {workout?.endTime && format(new Date(workout.endTime), 'h:mm a')}
+                            </Text>
+                          </View>
+                        )}
+                        
+                        {/* Notes */}
+                        {workout?.notes && !workout?.syncedFromHealth && (
+                          <Text className="text-sm text-gray-600 mt-2">{workout.notes}</Text>
+                        )}
+                      </View>
+                    );
+                  };
+                  
                   return (
                     <View>
                       {hasWorkout1 && (
-                        <View className={hasWorkout2 ? "mb-4" : ""}>
-                          <View className="flex-row items-center mb-2">
-                            <View className="h-8 w-8 rounded-full bg-orange-100 items-center justify-center mr-2">
-                              <Feather name="activity" size={16} color="#F97316" />
-                            </View>
-                            <View>
-                              <Text className="text-sm font-semibold text-gray-900">Workout 1</Text>
-                              <Text className="text-xs text-gray-500">{selectedDayLog.workout1Minutes} minutes</Text>
-                            </View>
-                          </View>
-                          {details.workout1?.type && (
-                            <Text className="text-sm text-gray-700 mb-1">
-                              Type: <Text className="font-medium">{details.workout1.type.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</Text>
-                            </Text>
-                          )}
-                          {details.workout1?.syncedFromHealth && (
-                            <View className="flex-row items-center mb-1">
-                              <Feather name="heart" size={12} color="#8B5CF6" />
-                              <Text className="text-xs text-purple-600 ml-1">Synced from Apple Health</Text>
-                            </View>
-                          )}
-                          {details.workout1?.notes && (
-                            <Text className="text-sm text-gray-600 mt-1">{details.workout1.notes}</Text>
-                          )}
+                        <View className={hasWorkout2 ? "mb-4 pb-4 border-b border-gray-100" : ""}>
+                          {renderWorkoutDetails(details.workout1, 1, selectedDayLog.workout1Minutes ?? 0)}
                         </View>
                       )}
                       {hasWorkout2 && (
-                        <View className={hasWorkout1 ? "pt-4 border-t border-gray-100" : ""}>
-                          <View className="flex-row items-center mb-2">
-                            <View className="h-8 w-8 rounded-full bg-purple-100 items-center justify-center mr-2">
-                              <Feather name="activity" size={16} color="#8B5CF6" />
-                            </View>
-                            <View>
-                              <Text className="text-sm font-semibold text-gray-900">Workout 2</Text>
-                              <Text className="text-xs text-gray-500">{selectedDayLog.workout2Minutes} minutes</Text>
-                            </View>
-                          </View>
-                          {details.workout2?.type && (
-                            <Text className="text-sm text-gray-700 mb-1">
-                              Type: <Text className="font-medium">{details.workout2.type.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</Text>
-                            </Text>
-                          )}
-                          {details.workout2?.syncedFromHealth && (
-                            <View className="flex-row items-center mb-1">
-                              <Feather name="heart" size={12} color="#8B5CF6" />
-                              <Text className="text-xs text-purple-600 ml-1">Synced from Apple Health</Text>
-                            </View>
-                          )}
-                          {details.workout2?.notes && (
-                            <Text className="text-sm text-gray-600 mt-1">{details.workout2.notes}</Text>
-                          )}
+                        <View>
+                          {renderWorkoutDetails(details.workout2, 2, selectedDayLog.workout2Minutes ?? 0)}
                         </View>
                       )}
                     </View>
@@ -1194,25 +1218,35 @@ export default function AnalyticsScreen() {
       </Modal>
 
       {/* Resync Progress Modal */}
-      <Modal visible={showResyncModal} animationType="slide" transparent>
+      <Modal visible={showResyncModal} animationType="fade" transparent>
         <View className="flex-1 bg-black/50 justify-center items-center p-6">
           <View className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl">
             <Text className="text-xl font-bold text-gray-900 mb-4">Resync Progress</Text>
             
             <ScrollView className="max-h-96 mb-4">
-              {resyncLogs.map((log, index) => (
-                <Text key={index} className="text-sm text-gray-700 mb-2 font-mono">
-                  {log}
-                </Text>
-              ))}
+              {resyncLogs.length === 0 ? (
+                <Text className="text-sm text-gray-500">Starting...</Text>
+              ) : (
+                resyncLogs.map((log, index) => (
+                  <Text key={index} className="text-sm text-gray-700 mb-2 font-mono">
+                    {log}
+                  </Text>
+                ))
+              )}
             </ScrollView>
             
             {!resyncing && (
               <Pressable
-                onPress={() => setShowResyncModal(false)}
+                onPress={() => {
+                  setShowResyncModal(false);
+                  // Re-open day modal after a brief delay
+                  setTimeout(() => {
+                    setShowDayModal(true);
+                  }, 200);
+                }}
                 className="bg-orange-500 rounded-xl py-3 px-6 items-center active:opacity-80"
               >
-                <Text className="text-white font-semibold">Close</Text>
+                <Text className="text-white font-semibold">Close & View Updated Day</Text>
               </Pressable>
             )}
             
