@@ -86,7 +86,7 @@ const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
   62: { name: "Flexibility", isOutdoor: false },
   64: { name: "Kickboxing", isOutdoor: false },
   65: { name: "Stairs", isOutdoor: false },
-  66: { name: "Step Training", isOutdoor: false },
+  66: { name: "Pilates", isOutdoor: false },
   67: { name: "Jump Rope", isOutdoor: false },
   70: { name: "Barre", isOutdoor: false },
   71: { name: "Cooldown", isOutdoor: false },
@@ -99,6 +99,7 @@ const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
   82: { name: "Cardio", isOutdoor: false },
   // Default
   0: { name: "Other Workout", isOutdoor: false },
+  3000: { name: "Other", isOutdoor: false },
 };
 
 function getWorkoutInfo(activityType: number): { name: string; isOutdoor: boolean; isUnknown?: boolean } {
