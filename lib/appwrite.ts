@@ -1,4 +1,4 @@
-import type { ActivityLog, Challenge, CycleLog, DailyLog, UserBadge, UserProfile } from "@/types/type";
+import type { ActivityLog, ActivityType, Challenge, CycleLog, DailyLog, UserBadge, UserProfile } from "@/types/type";
 import { BadgeId } from "@/types/type";
 import { Account, Client, Databases, Query } from "appwrite";
 
@@ -319,6 +319,45 @@ export async function getActivityLogsForChallenge(challengeId: string, limit: nu
     console.error("getActivityLogsForChallenge error:", err);
     return [];
   }
+}
+
+export async function getActivityLogsForDate(challengeId: string, date: string, type?: ActivityType): Promise<ActivityLog[]> {
+  try {
+    const queries = [
+      Query.equal("challengeId", challengeId),
+      Query.equal("date", date),
+    ];
+    if (type) {
+      queries.push(Query.equal("type", type));
+    }
+    const response = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.ACTIVITY_LOGS,
+      queries
+    );
+    return response.documents as unknown as ActivityLog[];
+  } catch (err) {
+    console.error("getActivityLogsForDate error:", err);
+    return [];
+  }
+}
+
+export async function updateActivityLog(logId: string, data: Partial<ActivityLog>): Promise<ActivityLog> {
+  const doc = await databases.updateDocument(
+    DATABASE_ID,
+    COLLECTIONS.ACTIVITY_LOGS,
+    logId,
+    data
+  );
+  return doc as unknown as ActivityLog;
+}
+
+export async function deleteActivityLog(logId: string): Promise<void> {
+  await databases.deleteDocument(
+    DATABASE_ID,
+    COLLECTIONS.ACTIVITY_LOGS,
+    logId
+  );
 }
 
 // User Badge functions
