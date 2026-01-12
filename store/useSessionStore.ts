@@ -1,4 +1,4 @@
-import { createAccount, createUserProfile, getCurrentSession, getCurrentUser, signIn, signOut } from "@/lib/appwrite";
+import { createAccount, createUserProfile, getCurrentSession, getCurrentUser, getUserProfile, signIn, signOut } from "@/lib/appwrite";
 import { captureException, clearUser as clearSentryUser, logger, setUser as setSentryUser } from "@/lib/sentry";
 import type { SessionState } from "@/types/type";
 import { create } from "zustand";
@@ -39,6 +39,16 @@ export const useSessionStore = create<SessionState>((set) => ({
       await signIn(email, password);
       const user = await getCurrentUser();
       if (user) {
+        // Check if user profile exists, create if missing (migration for existing users)
+        const existingProfile = await getUserProfile(user.$id);
+        if (!existingProfile) {
+          const nameParts = (user.name || "").split(" ");
+          const firstName = nameParts[0] || "";
+          const lastName = nameParts.slice(1).join(" ") || "";
+          await createUserProfile(user.$id, user.email, firstName, lastName);
+          logger.info("Created missing user profile during login", { userId: user.$id });
+        }
+        
         setSentryUser({ id: user.$id, email: user.email, username: user.name });
         logger.info("User logged in", { userId: user.$id });
         set({ user: { id: user.$id, email: user.email, name: user.name }, token: user.$id, status: "authenticated", error: null });
