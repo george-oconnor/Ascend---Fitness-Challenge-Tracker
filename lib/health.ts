@@ -376,7 +376,8 @@ class HealthService {
           });
           
           if (results?.length > 0) {
-            console.log("🏋️ First workout raw data:", JSON.stringify(results[0]));
+            console.log("🏋️ First workout raw data (ALL PROPERTIES):", JSON.stringify(results[0], null, 2));
+            console.log("🏋️ Available keys:", Object.keys(results[0]));
           }
 
           if (!results || results.length === 0) {
@@ -389,19 +390,43 @@ class HealthService {
           }
 
           const workouts: WorkoutData[] = results.map((workout: any) => {
-            const activityType = workout.activityId || 0;
+            const activityType = workout.activityId || workout.activityType || 0;
             const workoutInfo = getWorkoutInfo(activityType);
+            
+            // react-native-health may return the activity name directly from Apple Health
+            // Use it if available, otherwise fall back to our mapping
+            const appleActivityName = workout.activityName || workout.type || workout.workoutActivityType;
 
             const startDate = new Date(workout.start || workout.startDate);
             const endDate = new Date(workout.end || workout.endDate);
             const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
 
-            console.log(`🏋️ Processing workout: ${workoutInfo.name}, duration: ${Math.round(duration)}min, activityId: ${activityType}`);
+            console.log(`🏋️ Processing workout:`, {
+              ourMappedName: workoutInfo.name,
+              appleActivityName,
+              activityId: activityType,
+              duration: Math.round(duration),
+              allWorkoutKeys: Object.keys(workout),
+            });
+            
+            // Prefer Apple's activity name if it exists and differs from our mapping
+            // This handles cases where Apple returns a name we haven't mapped
+            const finalActivityName = appleActivityName || workoutInfo.name;
+            
+            // Log to Sentry if there's a mismatch between Apple's name and our mapping
+            if (appleActivityName && appleActivityName.toLowerCase() !== workoutInfo.name.toLowerCase()) {
+              logger.warn("Workout type mismatch - Apple name differs from our mapping", {
+                appleActivityName,
+                ourMappedName: workoutInfo.name,
+                activityId: activityType,
+                rawWorkoutData: JSON.stringify(workout).slice(0, 500),
+              });
+            }
 
             return {
               id: workout.id || `${startDate.getTime()}`,
               activityType: String(activityType),
-              activityName: workoutInfo.name,
+              activityName: finalActivityName,
               duration: Math.round(duration),
               calories: workout.calories || 0,
               distance: workout.distance || undefined,
