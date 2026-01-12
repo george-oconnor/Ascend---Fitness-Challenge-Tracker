@@ -8,7 +8,7 @@ import { Feather } from "@expo/vector-icons";
 import { addDays, differenceInDays, eachDayOfInterval, format, isAfter, isBefore, parseISO, startOfWeek, subDays } from "date-fns";
 import { useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Modal, Pressable, ScrollView, Text, View } from "react-native";
+import { Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Activity type configurations for display
@@ -31,11 +31,15 @@ const ACTIVITY_CONFIG: Record<ActivityType, { icon: keyof typeof Feather.glyphMa
 
 export default function AnalyticsScreen() {
   const { user } = useSessionStore();
-  const { challenge, allLogs, activityLogs, fetchChallenge, fetchAllLogs, fetchActivityLogs } = useChallengeStore();
+  const { challenge, allLogs, activityLogs, fetchChallenge, fetchAllLogs, fetchActivityLogs, resyncHealthDataForDate } = useChallengeStore();
   const [savedBadges, setSavedBadges] = useState<UserBadge[]>([]);
   const [badgesLoading, setBadgesLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [showDayModal, setShowDayModal] = useState(false);
+  const [weekOffset, setWeekOffset] = useState(0); // 0 = current week, -1 = previous week, +1 = next week
+  const [resyncing, setResyncing] = useState(false);
+  const [resyncLogs, setResyncLogs] = useState<string[]>([]);
+  const [showResyncModal, setShowResyncModal] = useState(false);
   
   // Handle date param from analytics navigation
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
@@ -79,6 +83,36 @@ export default function AnalyticsScreen() {
 
   const getActivityConfig = (type: ActivityType) => {
     return ACTIVITY_CONFIG[type] || { icon: "circle", color: "#6B7280", bgColor: "#F3F4F6" };
+  };
+
+  // Handle re-sync from Apple Health
+  const handleResyncHealthData = async () => {
+    if (!selectedDate || !selectedDayLog?.$id || !challenge?.$id || resyncing) return;
+    
+    setResyncing(true);
+    setResyncLogs([]);
+    setShowResyncModal(true);
+    
+    const addLog = (message: string) => {
+      setResyncLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
+    };
+    
+    try {
+      addLog('🔄 Starting health data resync...');
+      await resyncHealthDataForDate(selectedDate, selectedDayLog.$id, addLog);
+      addLog('✅ Resync complete!');
+      
+      // Refresh to show updated data
+      addLog('📥 Refreshing logs...');
+      await fetchAllLogs(challenge.$id);
+      addLog('✅ Logs refreshed!');
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      addLog(`❌ Error: ${errorMsg}`);
+      console.error("Failed to re-sync health data:", error);
+    } finally {
+      setResyncing(false);
+    }
   };
 
   // Parse mood notes (could be JSON or plain text)
@@ -331,13 +365,27 @@ export default function AnalyticsScreen() {
     const startDate = parseISO(challenge.startDate);
     const today = new Date();
     const challengeTotalDays = challenge.totalDays || 75;
+    const challengeEndDate = addDays(startDate, challengeTotalDays - 1);
+    
+    // Filter logs to only include those within the challenge date range
+    const logsInChallengeRange = allLogs.filter((log: DailyLog) => {
+      const logDate = parseISO(log.date);
+      return !isBefore(logDate, startDate) && !isAfter(logDate, challengeEndDate) && !isAfter(logDate, today);
+    });
+    
+    console.log("📊 Analytics stats calculation:", {
+      startDate: format(startDate, "yyyy-MM-dd"),
+      today: format(today, "yyyy-MM-dd"),
+      challengeEndDate: format(challengeEndDate, "yyyy-MM-dd"),
+      totalLogs: allLogs.length,
+      logsInRange: logsInChallengeRange.length,
+    });
     
     // Days elapsed since start (including today as in-progress)
-    const daysElapsed = differenceInDays(today, startDate) + 1;
+    const daysElapsed = Math.min(differenceInDays(today, startDate) + 1, challengeTotalDays);
     
-    // Days actually completed = days elapsed - 1 (today is still in progress)
-    // Count days with any completed activity
-    const daysWithActivity = allLogs.filter((log: DailyLog) => 
+    // Count days with any completed activity (only within challenge range)
+    const daysWithActivity = logsInChallengeRange.filter((log: DailyLog) => 
       log.workout1Completed || log.workout2Completed ||
       log.dietCompleted || log.waterCompleted ||
       log.readingCompleted || log.progressPhotoCompleted ||
@@ -353,9 +401,9 @@ export default function AnalyticsScreen() {
     // Completed days = days with actual completed tasks (not just logs existing)
     const completedDays = daysWithActivity;
 
-    // Calculate streak
+    // Calculate streak - only count consecutive days from today backwards
     let currentStreak = 0;
-    const sortedLogs = [...allLogs].sort((a, b) => 
+    const sortedLogs = [...logsInChallengeRange].sort((a, b) => 
       new Date(b.date).getTime() - new Date(a.date).getTime()
     );
     
@@ -368,6 +416,12 @@ export default function AnalyticsScreen() {
       const log = sortedLogs[i];
       const logDate = parseISO(log.date);
       const expectedDate = subDays(today, i);
+      
+      // Make sure expected date is not before challenge start
+      if (isBefore(expectedDate, startDate)) {
+        break;
+      }
+      
       const expectedDateStr = format(expectedDate, "yyyy-MM-dd");
       const logDateStr = format(logDate, "yyyy-MM-dd");
       
@@ -395,19 +449,19 @@ export default function AnalyticsScreen() {
     
     console.log("📊 Final streak:", currentStreak);
 
-    // Calculate averages
-    const totalSteps = allLogs.reduce((sum: number, log: DailyLog) => sum + (log.stepsCount || 0), 0);
-    const totalWater = allLogs.reduce((sum: number, log: DailyLog) => sum + (log.waterLiters || 0), 0);
-    const totalReading = allLogs.reduce((sum: number, log: DailyLog) => sum + (log.readingPages || 0), 0);
-    const totalWorkoutTime = allLogs.reduce((sum: number, log: DailyLog) => 
+    // Calculate averages (use logs in challenge range only)
+    const totalSteps = logsInChallengeRange.reduce((sum: number, log: DailyLog) => sum + (log.stepsCount || 0), 0);
+    const totalWater = logsInChallengeRange.reduce((sum: number, log: DailyLog) => sum + (log.waterLiters || 0), 0);
+    const totalReading = logsInChallengeRange.reduce((sum: number, log: DailyLog) => sum + (log.readingPages || 0), 0);
+    const totalWorkoutTime = logsInChallengeRange.reduce((sum: number, log: DailyLog) => 
       sum + (log.workout1Minutes || 0) + (log.workout2Minutes || 0), 0
     );
 
-    // Completion rates
-    const workoutCompletions = allLogs.filter((log: DailyLog) => 
+    // Completion rates (use logs in challenge range only)
+    const workoutCompletions = logsInChallengeRange.filter((log: DailyLog) => 
       (log.workout1Minutes && log.workout1Minutes > 0) || (log.workout2Minutes && log.workout2Minutes > 0)
     ).length;
-    const photoCompletions = allLogs.filter((log: DailyLog) => log.progressPhotoCompleted).length;
+    const photoCompletions = logsInChallengeRange.filter((log: DailyLog) => log.progressPhotoCompleted).length;
 
     // Use days elapsed for rate calculations (how many days have passed)
     // Use challenge total days for the "X / Y" display
@@ -524,10 +578,13 @@ export default function AnalyticsScreen() {
     if (!allLogs || !challenge) return [];
 
     const today = new Date();
-    const weekStart = startOfWeek(today, { weekStartsOn: 1 });
+    // Calculate week based on offset
+    const targetDate = addDays(today, weekOffset * 7);
+    const weekStart = startOfWeek(targetDate, { weekStartsOn: 1 });
+    const weekEnd = addDays(weekStart, 6);
     const challengeStart = parseISO(challenge.startDate);
     const challengeEnd = addDays(challengeStart, (challenge.totalDays || 75) - 1);
-    const days = eachDayOfInterval({ start: weekStart, end: today });
+    const days = eachDayOfInterval({ start: weekStart, end: weekEnd });
 
     console.log("📊 Analytics weeklyData:", {
       today: format(today, "yyyy-MM-dd"),
@@ -576,6 +633,11 @@ export default function AnalyticsScreen() {
         waterLiters: log.waterLiters,
       } : 'no log');
 
+      // Calculate day number in challenge
+      const dayNumber = !isBefore(day, challengeStart) && !isAfter(day, challengeEnd)
+        ? differenceInDays(day, challengeStart) + 1
+        : null;
+
       return {
         day: format(day, "EEE"),
         date: format(day, "d"),
@@ -583,9 +645,10 @@ export default function AnalyticsScreen() {
         completed: hasCompletedActivity,
         isPartOfChallenge,
         steps: log?.stepsCount || 0,
+        dayNumber,
       };
     });
-  }, [allLogs, challenge]);
+  }, [allLogs, challenge, weekOffset]);
 
   const StatCard = ({ 
     icon, 
@@ -662,7 +725,26 @@ export default function AnalyticsScreen() {
 
             {/* Weekly Activity */}
             <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-              <Text className="text-sm font-semibold text-gray-600 mb-4">This Week</Text>
+              <View className="flex-row items-center justify-between mb-4">
+                <Pressable
+                  onPress={() => setWeekOffset(weekOffset - 1)}
+                  className="h-8 w-8 items-center justify-center rounded-full bg-orange-100"
+                >
+                  <Feather name="chevron-left" size={18} color="#F97316" />
+                </Pressable>
+                <Text className="text-sm font-semibold text-gray-600">
+                  {weekOffset === 0 ? "This Week" : weekOffset === -1 ? "Last Week" : weekOffset === 1 ? "Next Week" : `${Math.abs(weekOffset)} Weeks ${weekOffset < 0 ? 'Ago' : 'Ahead'}`}
+                </Text>
+                <Pressable
+                  onPress={() => setWeekOffset(weekOffset + 1)}
+                  disabled={weekOffset >= 0}
+                  className={`h-8 w-8 items-center justify-center rounded-full ${
+                    weekOffset >= 0 ? 'bg-gray-50' : 'bg-orange-100'
+                  }`}
+                >
+                  <Feather name="chevron-right" size={18} color={weekOffset >= 0 ? "#D1D5DB" : "#F97316"} />
+                </Pressable>
+              </View>
               <View className="flex-row justify-between">
                 {weeklyData.map((day, index) => {
                   const isClickable = day.isPartOfChallenge;
@@ -679,11 +761,14 @@ export default function AnalyticsScreen() {
                   return (
                     <Pressable 
                       key={index} 
-                      className="items-center"
+                      className="items-center flex-1"
                       onPress={handleDayPress}
                       disabled={!isClickable}
                     >
-                      <Text className="text-xs text-gray-400 mb-2">{day.day}</Text>
+                      <Text className="text-xs text-gray-400 mb-1">{day.day}</Text>
+                      {day.dayNumber && (
+                        <Text className="text-[10px] text-gray-400 mb-1">Day {day.dayNumber}</Text>
+                      )}
                       <View 
                         className={`h-10 w-10 rounded-full items-center justify-center ${
                           showActivity ? "bg-purple-500" : 
@@ -713,54 +798,54 @@ export default function AnalyticsScreen() {
             {(challenge?.trackSteps || challenge?.trackWater || challenge?.trackReading || challenge?.trackWorkout1 || challenge?.trackWorkout2) && (
               <>
                 <Text className="text-sm font-semibold text-gray-500 mb-3 ml-1">Daily Averages</Text>
-                <View className="flex-row gap-3 mb-4">
+                <View className="flex-row flex-wrap gap-3 mb-4">
                   {challenge?.trackSteps && (
-                    <StatCard
-                      icon="activity"
-                      label="Avg Steps"
-                      value={stats.avgSteps.toLocaleString()}
-                      color="#10B981"
-                      bgColor="#D1FAE5"
-                    />
+                    <View className="flex-1 min-w-[45%]">
+                      <StatCard
+                        icon="activity"
+                        label="Avg Steps"
+                        value={stats.avgSteps.toLocaleString()}
+                        color="#10B981"
+                        bgColor="#D1FAE5"
+                      />
+                    </View>
                   )}
                   {challenge?.trackWater && (
-                    <StatCard
-                      icon="droplet"
-                      label="Avg Water"
-                      value={stats.avgWater}
-                      unit="L"
-                      color="#3B82F6"
-                      bgColor="#DBEAFE"
-                    />
+                    <View className="flex-1 min-w-[45%]">
+                      <StatCard
+                        icon="droplet"
+                        label="Avg Water"
+                        value={stats.avgWater}
+                        unit="L"
+                        color="#3B82F6"
+                        bgColor="#DBEAFE"
+                      />
+                    </View>
                   )}
-                  {/* Fill space if only one card */}
-                  {challenge?.trackSteps && !challenge?.trackWater && <View className="flex-1" />}
-                  {!challenge?.trackSteps && challenge?.trackWater && <View className="flex-1" />}
-                </View>
-                <View className="flex-row gap-3 mb-4">
                   {challenge?.trackReading && (
-                    <StatCard
-                      icon="book-open"
-                      label="Avg Reading"
-                      value={stats.avgReading}
-                      unit="pages"
-                      color="#8B5CF6"
-                      bgColor="#EDE9FE"
-                    />
+                    <View className="flex-1 min-w-[45%]">
+                      <StatCard
+                        icon="book-open"
+                        label="Avg Reading"
+                        value={stats.avgReading}
+                        unit="pages"
+                        color="#8B5CF6"
+                        bgColor="#EDE9FE"
+                      />
+                    </View>
                   )}
                   {(challenge?.trackWorkout1 || challenge?.trackWorkout2) && (
-                    <StatCard
-                      icon="clock"
-                      label="Total Workout"
-                      value={stats.totalWorkoutTime}
-                      unit="min"
-                      color="#F59E0B"
-                      bgColor="#FEF3C7"
-                    />
+                    <View className="flex-1 min-w-[45%]">
+                      <StatCard
+                        icon="clock"
+                        label="Total Workout"
+                        value={stats.totalWorkoutTime}
+                        unit="min"
+                        color="#F59E0B"
+                        bgColor="#FEF3C7"
+                      />
+                    </View>
                   )}
-                  {/* Fill space if only one card */}
-                  {challenge?.trackReading && !challenge?.trackWorkout1 && !challenge?.trackWorkout2 && <View className="flex-1" />}
-                  {!challenge?.trackReading && (challenge?.trackWorkout1 || challenge?.trackWorkout2) && <View className="flex-1" />}
                 </View>
               </>
             )}
@@ -839,6 +924,22 @@ export default function AnalyticsScreen() {
           </View>
 
           <ScrollView className="flex-1 p-4">
+            {/* Re-sync from Apple Health button (iOS only, if workouts are tracked) */}
+            {Platform.OS === "ios" && (challenge?.trackWorkout1 || challenge?.trackWorkout2) && selectedDayLog && (
+              <Pressable
+                onPress={handleResyncHealthData}
+                disabled={resyncing}
+                className={`flex-row items-center justify-center bg-purple-50 rounded-2xl p-3 mb-4 ${
+                  resyncing ? 'opacity-50' : ''
+                }`}
+              >
+                <Feather name={resyncing ? "loader" : "refresh-cw"} size={16} color="#8B5CF6" />
+                <Text className="text-sm font-semibold text-purple-600 ml-2">
+                  {resyncing ? "Re-syncing..." : "Re-sync Workouts from Apple Health"}
+                </Text>
+              </Pressable>
+            )}
+
             {/* Completion Status */}
             <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
               <Text className="text-sm font-semibold text-gray-600 mb-4">Completions</Text>
@@ -899,10 +1000,81 @@ export default function AnalyticsScreen() {
               </View>
             )}
 
-            {selectedDayLog?.workoutDetails && (
+            {/* Workout Details Card - Show if any workout logged */}
+            {selectedDayLog && ((selectedDayLog.workout1Minutes ?? 0) > 0 || (selectedDayLog.workout2Minutes ?? 0) > 0) && (
               <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-                <Text className="text-sm font-semibold text-gray-600 mb-2">Workout Details</Text>
-                <Text className="text-gray-700">{selectedDayLog.workoutDetails}</Text>
+                <Text className="text-sm font-semibold text-gray-600 mb-3">Workout Details</Text>
+                {(() => {
+                  const details = selectedDayLog.workoutDetails ? (() => {
+                    try {
+                      return JSON.parse(selectedDayLog.workoutDetails);
+                    } catch {
+                      return {};
+                    }
+                  })() : {};
+                  
+                  const hasWorkout1 = (selectedDayLog.workout1Minutes ?? 0) > 0;
+                  const hasWorkout2 = (selectedDayLog.workout2Minutes ?? 0) > 0;
+                  
+                  return (
+                    <View>
+                      {hasWorkout1 && (
+                        <View className={hasWorkout2 ? "mb-4" : ""}>
+                          <View className="flex-row items-center mb-2">
+                            <View className="h-8 w-8 rounded-full bg-orange-100 items-center justify-center mr-2">
+                              <Feather name="activity" size={16} color="#F97316" />
+                            </View>
+                            <View>
+                              <Text className="text-sm font-semibold text-gray-900">Workout 1</Text>
+                              <Text className="text-xs text-gray-500">{selectedDayLog.workout1Minutes} minutes</Text>
+                            </View>
+                          </View>
+                          {details.workout1?.type && (
+                            <Text className="text-sm text-gray-700 mb-1">
+                              Type: <Text className="font-medium">{details.workout1.type.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</Text>
+                            </Text>
+                          )}
+                          {details.workout1?.syncedFromHealth && (
+                            <View className="flex-row items-center mb-1">
+                              <Feather name="heart" size={12} color="#8B5CF6" />
+                              <Text className="text-xs text-purple-600 ml-1">Synced from Apple Health</Text>
+                            </View>
+                          )}
+                          {details.workout1?.notes && (
+                            <Text className="text-sm text-gray-600 mt-1">{details.workout1.notes}</Text>
+                          )}
+                        </View>
+                      )}
+                      {hasWorkout2 && (
+                        <View className={hasWorkout1 ? "pt-4 border-t border-gray-100" : ""}>
+                          <View className="flex-row items-center mb-2">
+                            <View className="h-8 w-8 rounded-full bg-purple-100 items-center justify-center mr-2">
+                              <Feather name="activity" size={16} color="#8B5CF6" />
+                            </View>
+                            <View>
+                              <Text className="text-sm font-semibold text-gray-900">Workout 2</Text>
+                              <Text className="text-xs text-gray-500">{selectedDayLog.workout2Minutes} minutes</Text>
+                            </View>
+                          </View>
+                          {details.workout2?.type && (
+                            <Text className="text-sm text-gray-700 mb-1">
+                              Type: <Text className="font-medium">{details.workout2.type.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase())}</Text>
+                            </Text>
+                          )}
+                          {details.workout2?.syncedFromHealth && (
+                            <View className="flex-row items-center mb-1">
+                              <Feather name="heart" size={12} color="#8B5CF6" />
+                              <Text className="text-xs text-purple-600 ml-1">Synced from Apple Health</Text>
+                            </View>
+                          )}
+                          {details.workout2?.notes && (
+                            <Text className="text-sm text-gray-600 mt-1">{details.workout2.notes}</Text>
+                          )}
+                        </View>
+                      )}
+                    </View>
+                  );
+                })()}
               </View>
             )}
 
@@ -1003,6 +1175,38 @@ export default function AnalyticsScreen() {
             )}
           </ScrollView>
         </SafeAreaView>
+      </Modal>
+
+      {/* Resync Progress Modal */}
+      <Modal visible={showResyncModal} animationType="slide" transparent>
+        <View className="flex-1 bg-black/50 justify-center items-center p-6">
+          <View className="bg-white rounded-3xl w-full max-w-md p-6 shadow-xl">
+            <Text className="text-xl font-bold text-gray-900 mb-4">Resync Progress</Text>
+            
+            <ScrollView className="max-h-96 mb-4">
+              {resyncLogs.map((log, index) => (
+                <Text key={index} className="text-sm text-gray-700 mb-2 font-mono">
+                  {log}
+                </Text>
+              ))}
+            </ScrollView>
+            
+            {!resyncing && (
+              <Pressable
+                onPress={() => setShowResyncModal(false)}
+                className="bg-orange-500 rounded-xl py-3 px-6 items-center active:opacity-80"
+              >
+                <Text className="text-white font-semibold">Close</Text>
+              </Pressable>
+            )}
+            
+            {resyncing && (
+              <View className="py-3 items-center">
+                <Text className="text-gray-500">Processing...</Text>
+              </View>
+            )}
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
