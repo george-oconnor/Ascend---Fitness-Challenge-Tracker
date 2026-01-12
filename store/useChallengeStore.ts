@@ -482,7 +482,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         }
         
         // Refresh all logs to update the list
-        const allLogs = await getUserDailyLogs(challenge.userId, challenge.$id);
+        const allLogs = await getDailyLogsForChallenge(challenge.$id);
         set({ allLogs });
         
         log(`✅ Daily log updated successfully`);
