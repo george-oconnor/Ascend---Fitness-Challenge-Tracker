@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "description": "75 Hard - Fitness Challenge - Built with Expo and Appwrite",
     "ios": {
-        "buildNumber": "31",
+        "buildNumber": "32",
       "supportsTablet": true,
       "bundleIdentifier": "com.georgeoc.75hardapp",
       "entitlements": {
