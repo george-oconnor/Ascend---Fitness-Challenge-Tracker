@@ -28,6 +28,7 @@ const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
   13: { name: "Cycling", isOutdoor: true },
   24: { name: "Hiking", isOutdoor: true },
   46: { name: "Swimming (Open Water)", isOutdoor: true },
+  56: { name: "Rowing (Outdoor)", isOutdoor: true },
   // Indoor activities
   20: { name: "Functional Training", isOutdoor: false },
   50: { name: "Traditional Strength Training", isOutdoor: false },
@@ -37,12 +38,80 @@ const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
   45: { name: "Swimming (Pool)", isOutdoor: false },
   19: { name: "Elliptical", isOutdoor: false },
   83: { name: "Indoor Running", isOutdoor: false },
+  57: { name: "Rowing", isOutdoor: false },
+  // Other common types
+  1: { name: "American Football", isOutdoor: true },
+  2: { name: "Archery", isOutdoor: true },
+  3: { name: "Australian Football", isOutdoor: true },
+  4: { name: "Badminton", isOutdoor: true },
+  5: { name: "Baseball", isOutdoor: true },
+  6: { name: "Basketball", isOutdoor: true },
+  7: { name: "Bowling", isOutdoor: false },
+  8: { name: "Boxing", isOutdoor: false },
+  9: { name: "Climbing", isOutdoor: true },
+  10: { name: "Cricket", isOutdoor: true },
+  11: { name: "Cross Training", isOutdoor: false },
+  12: { name: "Curling", isOutdoor: false },
+  14: { name: "Dance", isOutdoor: false },
+  16: { name: "Fencing", isOutdoor: false },
+  17: { name: "Fishing", isOutdoor: true },
+  21: { name: "Golf", isOutdoor: true },
+  22: { name: "Gymnastics", isOutdoor: false },
+  23: { name: "Handball", isOutdoor: true },
+  26: { name: "Hockey", isOutdoor: true },
+  27: { name: "Hunting", isOutdoor: true },
+  28: { name: "Lacrosse", isOutdoor: true },
+  29: { name: "Martial Arts", isOutdoor: false },
+  30: { name: "Mind and Body", isOutdoor: false },
+  32: { name: "Paddle Sports", isOutdoor: true },
+  33: { name: "Play", isOutdoor: true },
+  36: { name: "Racquetball", isOutdoor: false },
+  38: { name: "Rugby", isOutdoor: true },
+  39: { name: "Sailing", isOutdoor: true },
+  40: { name: "Skating", isOutdoor: true },
+  41: { name: "Snow Sports", isOutdoor: true },
+  42: { name: "Soccer", isOutdoor: true },
+  43: { name: "Softball", isOutdoor: true },
+  44: { name: "Squash", isOutdoor: false },
+  47: { name: "Surfing", isOutdoor: true },
+  48: { name: "Table Tennis", isOutdoor: false },
+  49: { name: "Tennis", isOutdoor: true },
+  51: { name: "Track and Field", isOutdoor: true },
+  53: { name: "Volleyball", isOutdoor: true },
+  54: { name: "Water Fitness", isOutdoor: false },
+  55: { name: "Water Polo", isOutdoor: true },
+  58: { name: "Water Sports", isOutdoor: true },
+  59: { name: "Wrestling", isOutdoor: false },
+  60: { name: "Core Training", isOutdoor: false },
+  62: { name: "Flexibility", isOutdoor: false },
+  64: { name: "Kickboxing", isOutdoor: false },
+  65: { name: "Stairs", isOutdoor: false },
+  66: { name: "Step Training", isOutdoor: false },
+  67: { name: "Jump Rope", isOutdoor: false },
+  70: { name: "Barre", isOutdoor: false },
+  71: { name: "Cooldown", isOutdoor: false },
+  73: { name: "Hand Cycling", isOutdoor: true },
+  74: { name: "Mixed Cardio", isOutdoor: false },
+  76: { name: "Tai Chi", isOutdoor: false },
+  77: { name: "Indoor Walk", isOutdoor: false },
+  79: { name: "Indoor Cycling", isOutdoor: false },
+  80: { name: "Pickleball", isOutdoor: true },
+  82: { name: "Cardio", isOutdoor: false },
   // Default
   0: { name: "Other Workout", isOutdoor: false },
 };
 
-function getWorkoutInfo(activityType: number): { name: string; isOutdoor: boolean } {
-  return WORKOUT_TYPE_MAP[activityType] || WORKOUT_TYPE_MAP[0];
+function getWorkoutInfo(activityType: number): { name: string; isOutdoor: boolean; isUnknown?: boolean } {
+  const info = WORKOUT_TYPE_MAP[activityType];
+  if (info) {
+    return info;
+  }
+  // Log unknown workout type to Sentry for future mapping
+  logger.warn("Unknown workout type from Apple Health", { 
+    activityType, 
+    message: `Workout type ${activityType} not mapped - defaulting to "Other Workout"`
+  });
+  return { ...WORKOUT_TYPE_MAP[0], isUnknown: true };
 }
 
 class HealthService {
