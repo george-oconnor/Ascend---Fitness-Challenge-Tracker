@@ -1,16 +1,14 @@
 import {
-    createActivityLog,
-    createChallenge,
-    createDailyLog,
-    deleteActivityLog,
-    getActivityLogsForChallenge,
-    getActivityLogsForDate,
-    getChallenge,
-    getDailyLog,
-    getDailyLogsForChallenge,
-    updateActivityLog,
-    updateChallenge,
-    updateDailyLog,
+  createActivityLog,
+  createChallenge,
+  createDailyLog,
+  getActivityLogsForChallenge,
+  getActivityLogsForDate,
+  getChallenge,
+  getDailyLog,
+  getDailyLogsForChallenge,
+  updateChallenge,
+  updateDailyLog
 } from "@/lib/appwrite";
 import { isDayComplete } from "@/lib/dayCompletion";
 import { NotificationService } from "@/lib/notifications";
@@ -294,10 +292,12 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       logCallback?.(msg);
     };
 
-    if (!challenge) {
+    if (!challenge || !challenge.$id) {
       log("resyncHealthDataForDate: No challenge available");
       return;
     }
+
+    const challengeId = challenge.$id;
 
     // Only sync on iOS where Apple Health is available
     if (Platform.OS !== "ios") {
@@ -316,19 +316,19 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       log(`🏋️ Found ${workouts.length} workout(s)`);
       if (workouts.length > 0) {
         workouts.forEach((w, idx) => {
-          log(`  ${idx + 1}. ${w.activityName}: ${w.duration} min`);
+          log(`  ${idx + 1}. ${w.activityName} (type: ${w.activityType}): ${w.duration} min, ${w.isOutdoor ? 'outdoor' : 'indoor'}`);
         });
       }
 
       const updates: Partial<DailyLog> = {};
-      const activityLogsToCreate: Array<Omit<ActivityLog, "$id">> = [];
-      const activityLogsToUpdate: Array<{ id: string; data: Partial<ActivityLog> }> = [];
+      const activityLogsToCreate: Omit<ActivityLog, "$id">[] = [];
+      const activityLogsToUpdate: { id: string; data: Partial<ActivityLog> }[] = [];
       const activityLogsToDelete: string[] = [];
       const dateStr = format(date, 'yyyy-MM-dd');
       
       // Fetch existing workout activity logs for this date
-      const existingWorkout1Logs = await getActivityLogsForDate(challenge.$id, dateStr, 'workout1');
-      const existingWorkout2Logs = await getActivityLogsForDate(challenge.$id, dateStr, 'workout2');
+      const existingWorkout1Logs = await getActivityLogsForDate(challengeId, dateStr, 'workout1');
+      const existingWorkout2Logs = await getActivityLogsForDate(challengeId, dateStr, 'workout2');
       
       log(`📋 Found ${existingWorkout1Logs.length} existing workout1 log(s), ${existingWorkout2Logs.length} existing workout2 log(s)`);
       
@@ -392,7 +392,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             // Manage workout1 activity log
             const workout1LogData = {
               userId: challenge.userId,
-              challengeId: challenge.$id,
+              challengeId: challengeId,
               type: 'workout1' as const,
               title: `${w1.activityName} (Workout 1)`,
               description: `${workout1Minutes} min - ${notesArr}`,
@@ -442,7 +442,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             // Manage workout2 activity log
             const workout2LogData = {
               userId: challenge.userId,
-              challengeId: challenge.$id,
+              challengeId: challengeId,
               type: 'workout2' as const,
               title: `${w2.activityName} (Workout 2)`,
               description: `${workout2Minutes} min - ${notesArr}`,
@@ -506,7 +506,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             // Manage workout1 activity log
             const workout1LogData = {
               userId: challenge.userId,
-              challengeId: challenge.$id,
+              challengeId: challengeId,
               type: 'workout1' as const,
               title: `${w.activityName} (Workout 1)`,
               description: `${workout1Minutes} min - ${notesArr}`,
@@ -565,7 +565,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             // Manage workout2 activity log
             const workout2LogData = {
               userId: challenge.userId,
-              challengeId: challenge.$id,
+              challengeId: challengeId,
               type: 'workout2' as const,
               title: `${w.activityName} (Workout 2)`,
               description: `${workout2Minutes} min - ${notesArr}`,
@@ -599,23 +599,23 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         try {
           log("💧 Fetching water data...");
           const { healthSyncService } = await import("@/lib/healthSync");
-          const waterData = await healthSyncService.getWaterForDate(date);
-          if (waterData.totalLiters > 0) {
+          const waterLiters = await healthSyncService.getWaterIntakeForDate(date);
+          if (waterLiters && waterLiters > 0) {
             const waterGoal = (challenge as any).waterGoalLiters || 3.7;
-            const waterGoalMet = waterData.totalLiters >= waterGoal;
+            const waterGoalMet = waterLiters >= waterGoal;
             
-            log(`💧 Water: ${waterData.totalLiters.toFixed(2)}L ${waterGoalMet ? '✅' : '❌'}`);
+            log(`💧 Water: ${waterLiters.toFixed(2)}L ${waterGoalMet ? '✅' : '❌'}`);
             
-            updates.waterLiters = waterData.totalLiters;
+            updates.waterLiters = waterLiters;
             updates.waterCompleted = waterGoalMet;
             
             activityLogsToCreate.push({
               userId: challenge.userId,
-              challengeId: challenge.$id,
+              challengeId: challengeId,
               type: 'water',
               title: 'Water Intake (Resync)',
-              description: `${waterData.totalLiters.toFixed(2)}L from Apple Health`,
-              value: waterData.totalLiters,
+              description: `${waterLiters.toFixed(2)}L from Apple Health`,
+              value: waterLiters,
               unit: 'L',
               date: dateStr,
             });
@@ -633,7 +633,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           log("😴 Fetching sleep data...");
           const { healthSyncService } = await import("@/lib/healthSync");
           const sleepData = await healthSyncService.getSleepForDate(date);
-          if (sleepData.asleepMinutes > 0) {
+          if (sleepData && sleepData.asleepMinutes > 0) {
             const sleepGoalMinutes = ((challenge as any).sleepGoalHours || 8) * 60;
             const sleepGoalMet = sleepData.asleepMinutes >= sleepGoalMinutes;
             const sleepHours = Math.floor(sleepData.asleepMinutes / 60);
@@ -643,14 +643,14 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             
             updates.sleepMinutes = sleepData.asleepMinutes;
             updates.sleepLogged = sleepGoalMet;
-            if (sleepData.sleepStart && sleepData.wakeTime) {
-              updates.sleepStartTime = sleepData.sleepStart.toISOString();
-              updates.sleepEndTime = sleepData.wakeTime.toISOString();
+            if (sleepData.startTime && sleepData.endTime) {
+              updates.sleepStartTime = sleepData.startTime.toISOString();
+              updates.sleepEndTime = sleepData.endTime.toISOString();
             }
             
             activityLogsToCreate.push({
               userId: challenge.userId,
-              challengeId: challenge.$id,
+              challengeId: challengeId,
               type: 'sleep',
               title: 'Sleep (Resync)',
               description: `${sleepHours}h ${sleepMins}m from Apple Health`,
@@ -670,24 +670,24 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       if ((challenge as any).trackSteps) {
         try {
           log("👟 Fetching steps data...");
-          const { healthSyncService } = await import("@/lib/healthSync");
-          const stepsData = await healthSyncService.getStepsForDate(date);
-          if (stepsData.count > 0) {
+          const { healthService } = await import("@/lib/health");
+          const stepsCount = await healthService.getStepsForDate(date);
+          if (stepsCount > 0) {
             const stepsGoal = (challenge as any).stepsGoal || 10000;
-            const stepsGoalMet = stepsData.count >= stepsGoal;
+            const stepsGoalMet = stepsCount >= stepsGoal;
             
-            log(`👟 Steps: ${stepsData.count.toLocaleString()} ${stepsGoalMet ? '✅' : '❌'}`);
+            log(`👟 Steps: ${stepsCount.toLocaleString()} ${stepsGoalMet ? '✅' : '❌'}`);
             
-            updates.steps = stepsData.count;
+            updates.stepsCount = stepsCount;
             updates.stepsCompleted = stepsGoalMet;
             
             activityLogsToCreate.push({
               userId: challenge.userId,
-              challengeId: challenge.$id,
+              challengeId: challengeId,
               type: 'steps',
               title: 'Steps (Resync)',
-              description: `${stepsData.count.toLocaleString()} steps from Apple Health`,
-              value: stepsData.count,
+              description: `${stepsCount.toLocaleString()} steps from Apple Health`,
+              value: stepsCount,
               unit: 'steps',
               date: dateStr,
             });
@@ -713,7 +713,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         }
         
         // Refresh all logs to update the list
-        const allLogs = await getDailyLogsForChallenge(challenge.$id);
+        const allLogs = await getDailyLogsForChallenge(challengeId);
         set({ allLogs });
         
         log(`✅ Daily log updated successfully`);
@@ -729,39 +729,13 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           log(`✅ Created: ${activityLog.title}`);
         }
         log(`✅ All activity logs created`);
-      }
-      
-      // Update existing activity logs
-      if (activityLogsToUpdate.length > 0) {
-        log(`📝 Updating ${activityLogsToUpdate.length} activity log(s)...`);
-        for (const { id, data } of activityLogsToUpdate) {
-          await updateActivityLog(id, data);
-          log(`✅ Updated: ${data.title}`);
-        }
-        log(`✅ All activity logs updated`);
-      }
-      
-      // Delete removed activity logs
-      if (activityLogsToDelete.length > 0) {
-        log(`🗑️ Deleting ${activityLogsToDelete.length} activity log(s)...`);
-        for (const logId of activityLogsToDelete) {
-          try {
-            await deleteActivityLog(logId);
-            log(`✅ Deleted activity log`);
-          } catch (err) {
-            log(`⚠️ Failed to delete activity log: ${err instanceof Error ? err.message : 'Unknown error'}`);
-          }
-        }
-        log(`✅ Activity logs cleanup complete`);
-      }
-      
-      // Refresh activity logs if any changes were made
-      if (activityLogsToCreate.length > 0 || activityLogsToUpdate.length > 0 || activityLogsToDelete.length > 0) {
+        
+        // Refresh activity logs to show new ones
         const refreshedActivityLogs = await getActivityLogsForChallenge(challenge.$id);
         set({ activityLogs: refreshedActivityLogs });
         log(`🔄 Activity logs refreshed`);
       } else {
-        log(`ℹ️ No activity log changes needed`);
+        log(`ℹ️ No activity logs to create`);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to re-sync health data";
@@ -812,11 +786,11 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       if (challenge.trackWater) {
         try {
           const { healthSyncService } = await import("@/lib/healthSync");
-          const waterData = await healthSyncService.getWaterIntakeForDate(new Date());
-          if (waterData.totalLiters > 0) {
-            const waterGoalMet = waterData.totalLiters >= (challenge.waterLiters || 0);
-            if (waterData.totalLiters !== todayLog.waterLiters) {
-              updates.waterLiters = waterData.totalLiters;
+          const waterLiters = await healthSyncService.getWaterIntakeForDate(new Date());
+          if (waterLiters && waterLiters > 0) {
+            const waterGoalMet = waterLiters >= (challenge.waterLiters || 0);
+            if (waterLiters !== todayLog.waterLiters) {
+              updates.waterLiters = waterLiters;
               updates.waterCompleted = waterGoalMet;
             }
           }
@@ -830,16 +804,16 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         try {
           const { healthSyncService } = await import("@/lib/healthSync");
           const sleepData = await healthSyncService.getSleepForDate(new Date());
-          if (sleepData.asleepMinutes > 0) {
+          if (sleepData && sleepData.asleepMinutes > 0) {
             const sleepGoalMinutes = ((challenge as any).sleepGoalHours || 8) * 60;
             const sleepGoalMet = sleepData.asleepMinutes >= sleepGoalMinutes;
             if (sleepData.asleepMinutes !== todayLog.sleepMinutes) {
               updates.sleepMinutes = sleepData.asleepMinutes;
               updates.sleepLogged = sleepGoalMet;
               // Also sync the times if available
-              if (sleepData.sleepStart && sleepData.wakeTime) {
-                updates.sleepStartTime = sleepData.sleepStart.toISOString();
-                updates.sleepEndTime = sleepData.wakeTime.toISOString();
+              if (sleepData.startTime && sleepData.endTime) {
+                updates.sleepStartTime = sleepData.startTime.toISOString();
+                updates.sleepEndTime = sleepData.endTime.toISOString();
               }
             }
           }
@@ -1035,7 +1009,6 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     const { allLogs, todayLog } = get();
     if (!todayLog) return false;
     
-    const today = new Date();
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - (days - 1)); // -1 because we include today
     const cutoffDateStr = cutoffDate.toISOString().split("T")[0];
