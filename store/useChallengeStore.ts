@@ -7,6 +7,7 @@ import {
   getChallenge,
   getDailyLog,
   getDailyLogsForChallenge,
+  updateActivityLog,
   updateChallenge,
   updateDailyLog
 } from "@/lib/appwrite";
@@ -840,38 +841,70 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
           );
 
-          // Calculate total minutes
-          const totalMinutes = sortedWorkouts.reduce((sum, w) => sum + w.duration, 0);
-
-          // Strategy: Assign complete workouts to slots, don't split individual workouts
-          // If tracking both workouts, assign individual workouts to slots based on chronological order
-          // If tracking only one workout, assign all workout time to that slot
-
           if (challenge.trackWorkout1 && challenge.trackWorkout2) {
-            // Tracking both - assign workouts chronologically to slots
+            // Tracking both workouts - 1:1 assignment
             let workout1Minutes = 0;
             let workout2Minutes = 0;
             
-            // Assign first workout(s) to workout1 until goal is met or exceeded
-            for (const workout of sortedWorkouts) {
-              if (workout1Minutes === 0 || (workout1Minutes < workoutGoalMinutes && workout2Minutes === 0)) {
-                workout1Minutes += workout.duration;
-              } else {
-                workout2Minutes += workout.duration;
-              }
+            // Simple 1:1 assignment: first workout → slot 1, second workout → slot 2
+            if (sortedWorkouts.length >= 1) {
+              workout1Minutes = Math.round(sortedWorkouts[0].duration);
+            }
+            if (sortedWorkouts.length >= 2) {
+              workout2Minutes = Math.round(sortedWorkouts[1].duration);
             }
             
-            // Round the minutes
-            workout1Minutes = Math.round(workout1Minutes);
-            workout2Minutes = Math.round(workout2Minutes);
-            
             console.log("🏋️ syncHealthData: Both workouts tracking", {
-              totalMinutes,
               workout1Minutes,
               workout2Minutes,
               currentWorkout1Minutes: todayLog.workout1Minutes,
               currentWorkout2Minutes: todayLog.workout2Minutes,
             });
+            
+            // Build workoutDetails JSON with all Apple Health data
+            const workoutDetailsObj: Record<string, any> = {};
+            
+            if (workout1Minutes > 0 && sortedWorkouts.length >= 1) {
+              const w1 = sortedWorkouts[0];
+              workoutDetailsObj.workout1 = {
+                type: w1.activityName.toLowerCase().replace(/\s+/g, '-'),
+                notes: [
+                  w1.calories ? `${Math.round(w1.calories)} calories burned` : null,
+                  w1.distance ? `${(w1.distance / 1000).toFixed(2)}km distance` : null,
+                  w1.isOutdoor ? 'Outdoor workout' : 'Indoor workout',
+                  `Started: ${format(new Date(w1.startDate), 'h:mm a')}`,
+                  `Ended: ${format(new Date(w1.endDate), 'h:mm a')}`,
+                ].filter(Boolean).join(' • '),
+                syncedFromHealth: true,
+                activityName: w1.activityName,
+                calories: w1.calories ? Math.round(w1.calories) : undefined,
+                distance: w1.distance ? (w1.distance / 1000).toFixed(2) : undefined,
+                isOutdoor: w1.isOutdoor,
+                startTime: w1.startDate,
+                endTime: w1.endDate,
+              };
+            }
+            
+            if (workout2Minutes > 0 && sortedWorkouts.length >= 2) {
+              const w2 = sortedWorkouts[1];
+              workoutDetailsObj.workout2 = {
+                type: w2.activityName.toLowerCase().replace(/\s+/g, '-'),
+                notes: [
+                  w2.calories ? `${Math.round(w2.calories)} calories burned` : null,
+                  w2.distance ? `${(w2.distance / 1000).toFixed(2)}km distance` : null,
+                  w2.isOutdoor ? 'Outdoor workout' : 'Indoor workout',
+                  `Started: ${format(new Date(w2.startDate), 'h:mm a')}`,
+                  `Ended: ${format(new Date(w2.endDate), 'h:mm a')}`,
+                ].filter(Boolean).join(' • '),
+                syncedFromHealth: true,
+                activityName: w2.activityName,
+                calories: w2.calories ? Math.round(w2.calories) : undefined,
+                distance: w2.distance ? (w2.distance / 1000).toFixed(2) : undefined,
+                isOutdoor: w2.isOutdoor,
+                startTime: w2.startDate,
+                endTime: w2.endDate,
+              };
+            }
             
             if (workout1Minutes !== todayLog.workout1Minutes) {
               updates.workout1Minutes = workout1Minutes;
@@ -882,29 +915,77 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
               updates.workout2Minutes = workout2Minutes;
               updates.workout2Completed = workout2Minutes >= workoutGoalMinutes;
             }
+            
+            // Update workoutDetails
+            updates.workoutDetails = JSON.stringify(workoutDetailsObj);
+            
           } else if (challenge.trackWorkout1) {
-            // Only tracking workout1 - assign all workout time to workout1
-            const workout1Minutes = Math.round(totalMinutes);
+            // Only tracking workout1
+            const workout1Minutes = sortedWorkouts.length >= 1 ? Math.round(sortedWorkouts[0].duration) : 0;
             
             console.log("🏋️ syncHealthData: Workout1 only", {
-              totalMinutes,
               workout1Minutes,
               currentWorkout1Minutes: todayLog.workout1Minutes,
             });
+            
+            if (workout1Minutes > 0 && sortedWorkouts.length >= 1) {
+              const w = sortedWorkouts[0];
+              updates.workoutDetails = JSON.stringify({
+                workout1: {
+                  type: w.activityName.toLowerCase().replace(/\s+/g, '-'),
+                  notes: [
+                    w.calories ? `${Math.round(w.calories)} calories burned` : null,
+                    w.distance ? `${(w.distance / 1000).toFixed(2)}km distance` : null,
+                    w.isOutdoor ? 'Outdoor workout' : 'Indoor workout',
+                    `Started: ${format(new Date(w.startDate), 'h:mm a')}`,
+                    `Ended: ${format(new Date(w.endDate), 'h:mm a')}`,
+                  ].filter(Boolean).join(' • '),
+                  syncedFromHealth: true,
+                  activityName: w.activityName,
+                  calories: w.calories ? Math.round(w.calories) : undefined,
+                  distance: w.distance ? (w.distance / 1000).toFixed(2) : undefined,
+                  isOutdoor: w.isOutdoor,
+                  startTime: w.startDate,
+                  endTime: w.endDate,
+                }
+              });
+            }
             
             if (workout1Minutes !== todayLog.workout1Minutes) {
               updates.workout1Minutes = workout1Minutes;
               updates.workout1Completed = workout1Minutes >= workoutGoalMinutes;
             }
           } else if (challenge.trackWorkout2) {
-            // Only tracking workout2 - assign all workout time to workout2
-            const workout2Minutes = Math.round(totalMinutes);
+            // Only tracking workout2
+            const workout2Minutes = sortedWorkouts.length >= 1 ? Math.round(sortedWorkouts[0].duration) : 0;
             
             console.log("🏋️ syncHealthData: Workout2 only", {
-              totalMinutes,
               workout2Minutes,
               currentWorkout2Minutes: todayLog.workout2Minutes,
             });
+            
+            if (workout2Minutes > 0 && sortedWorkouts.length >= 1) {
+              const w = sortedWorkouts[0];
+              updates.workoutDetails = JSON.stringify({
+                workout2: {
+                  type: w.activityName.toLowerCase().replace(/\s+/g, '-'),
+                  notes: [
+                    w.calories ? `${Math.round(w.calories)} calories burned` : null,
+                    w.distance ? `${(w.distance / 1000).toFixed(2)}km distance` : null,
+                    w.isOutdoor ? 'Outdoor workout' : 'Indoor workout',
+                    `Started: ${format(new Date(w.startDate), 'h:mm a')}`,
+                    `Ended: ${format(new Date(w.endDate), 'h:mm a')}`,
+                  ].filter(Boolean).join(' • '),
+                  syncedFromHealth: true,
+                  activityName: w.activityName,
+                  calories: w.calories ? Math.round(w.calories) : undefined,
+                  distance: w.distance ? (w.distance / 1000).toFixed(2) : undefined,
+                  isOutdoor: w.isOutdoor,
+                  startTime: w.startDate,
+                  endTime: w.endDate,
+                }
+              });
+            }
             
             if (workout2Minutes !== todayLog.workout2Minutes) {
               updates.workout2Minutes = workout2Minutes;
@@ -926,6 +1007,69 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         set({ todayLog: updated });
         
         console.log("syncHealthData: Successfully synced health data to Appwrite");
+        
+        // Create activity logs for workouts if they were updated
+        if (challenge.$id && (updates.workout1Minutes !== undefined || updates.workout2Minutes !== undefined)) {
+          const today = new Date().toISOString().split("T")[0];
+          
+          // Check if we already have activity logs for today's workouts
+          const existingWorkout1Logs = await getActivityLogsForDate(challenge.$id, today, 'workout1');
+          const existingWorkout2Logs = await getActivityLogsForDate(challenge.$id, today, 'workout2');
+          
+          try {
+            // Parse workout details to get activity names
+            const workoutDetails = updates.workoutDetails ? JSON.parse(updates.workoutDetails) : 
+                                   (todayLog.workoutDetails ? JSON.parse(todayLog.workoutDetails) : {});
+            
+            // Create or update workout1 activity log
+            if (updates.workout1Minutes !== undefined && updates.workout1Minutes > 0) {
+              const w1Details = workoutDetails.workout1;
+              const workout1LogData = {
+                userId: challenge.userId,
+                challengeId: challenge.$id,
+                type: 'workout1' as const,
+                title: `${w1Details?.activityName || 'Workout'} (Workout 1)`,
+                description: `${updates.workout1Minutes} min${w1Details?.notes ? ` - ${w1Details.notes}` : ''}`,
+                value: updates.workout1Minutes,
+                unit: 'min',
+                date: today,
+              };
+              
+              if (existingWorkout1Logs.length > 0) {
+                await updateActivityLog(existingWorkout1Logs[0].$id!, workout1LogData);
+              } else {
+                await createActivityLog(workout1LogData);
+              }
+            }
+            
+            // Create or update workout2 activity log
+            if (updates.workout2Minutes !== undefined && updates.workout2Minutes > 0) {
+              const w2Details = workoutDetails.workout2;
+              const workout2LogData = {
+                userId: challenge.userId,
+                challengeId: challenge.$id,
+                type: 'workout2' as const,
+                title: `${w2Details?.activityName || 'Workout'} (Workout 2)`,
+                description: `${updates.workout2Minutes} min${w2Details?.notes ? ` - ${w2Details.notes}` : ''}`,
+                value: updates.workout2Minutes,
+                unit: 'min',
+                date: today,
+              };
+              
+              if (existingWorkout2Logs.length > 0) {
+                await updateActivityLog(existingWorkout2Logs[0].$id!, workout2LogData);
+              } else {
+                await createActivityLog(workout2LogData);
+              }
+            }
+            
+            // Refresh activity logs
+            const refreshedActivityLogs = await getActivityLogsForChallenge(challenge.$id);
+            set({ activityLogs: refreshedActivityLogs });
+          } catch (error) {
+            console.error("Failed to create workout activity logs:", error);
+          }
+        }
         
         // Check for notification triggers
         const notificationStore = useNotificationStore.getState();
