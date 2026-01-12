@@ -1,5 +1,5 @@
 import { BadgeCelebration } from "@/components/BadgeCelebration";
-import { captureMessage, initSentry, logger } from "@/lib/sentry";
+import { initSentry, logger } from "@/lib/sentry";
 import { useHealthStore } from "@/store/useHealthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
@@ -15,16 +15,16 @@ import './globals.css';
 // Initialize Sentry before app renders
 initSentry();
 
-// Send a test message to verify Sentry is working (only in non-dev builds)
-if (!__DEV__) {
-  captureMessage("App started successfully", "info");
-  // Also test logger.info to ensure it works
-  logger.info("Logger test on startup", { 
-    platform: Platform.OS,
-    buildProfile: process.env.EXPO_PUBLIC_BUILD_PROFILE,
-    timestamp: new Date().toISOString()
-  });
-}
+// App startup events disabled to reduce Sentry noise
+// if (!__DEV__) {
+//   captureMessage("App started successfully", "info");
+//   // Also test logger.info to ensure it works
+//   logger.info("Logger test on startup", { 
+//     platform: Platform.OS,
+//     buildProfile: process.env.EXPO_PUBLIC_BUILD_PROFILE,
+//     timestamp: new Date().toISOString()
+//   });
+// }
 
 export default function RootLayout() {
   const [fontsLoaded, error] = useFonts({
@@ -69,10 +69,10 @@ export default function RootLayout() {
 
     return () => {
       if (notificationListener.current) {
-        Notifications.removeNotificationSubscription(notificationListener.current);
+        notificationListener.current.remove();
       }
       if (responseListener.current) {
-        Notifications.removeNotificationSubscription(responseListener.current);
+        responseListener.current.remove();
       }
     };
   }, []);

@@ -1,5 +1,7 @@
+import { getCycleLog } from "@/lib/cycleHealth";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
+import { useSessionStore } from "@/store/useSessionStore";
 import type { DailyLog } from "@/types/type";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -35,8 +37,6 @@ export default function DailyLogScreen() {
     isLoading: healthLoading,
     initialize: initHealth,
     fetchTodayData,
-    getOutdoorWorkoutMinutes,
-    getTotalWorkoutMinutes,
   } = useHealthStore();
 
   // Check if cycle was logged today
@@ -44,8 +44,7 @@ export default function DailyLogScreen() {
     const checkCycleLog = async () => {
       if ((challenge as any)?.trackCycle && todayLog) {
         try {
-          const { getCycleLog } = await import("@/lib/appwrite");
-          const { user } = await import("@/store/useSessionStore").then(m => m.useSessionStore.getState());
+          const { user } = useSessionStore.getState();
           if (user?.id) {
             const today = new Date().toISOString().split("T")[0];
             const cycleLog = await getCycleLog(user.id, today);
@@ -134,15 +133,12 @@ export default function DailyLogScreen() {
   const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
   const currentDay = Math.min(Math.max(daysPassed, 1), challenge.totalDays);
 
-  // Get workout minutes from Health
-  const outdoorMinutes = getOutdoorWorkoutMinutes();
-  const totalMinutes = getTotalWorkoutMinutes();
-
   // Build task list based on challenge settings
   const tasks: TaskItem[] = [];
 
   if (challenge.trackWorkout1) {
-    const meetsGoal = outdoorMinutes >= challenge.workoutMinutes;
+    const currentMinutes = todayLog.workout1Minutes ?? 0;
+    const meetsGoal = currentMinutes >= challenge.workoutMinutes;
     tasks.push({
       key: "workout1Completed",
       label: "Workout 1",
@@ -151,7 +147,7 @@ export default function DailyLogScreen() {
       route: "/log-workout?workout=1",
       isHealthTracked: Platform.OS === "ios",
       healthData: isAuthorized ? {
-        current: outdoorMinutes,
+        current: currentMinutes,
         goal: challenge.workoutMinutes,
         unit: "min",
         autoComplete: meetsGoal,
@@ -161,7 +157,8 @@ export default function DailyLogScreen() {
   
   if (challenge.trackWorkout2) {
     // Workout 2
-    const meetsGoal = totalMinutes >= challenge.workoutMinutes * 2;
+    const currentMinutes = todayLog.workout2Minutes ?? 0;
+    const meetsGoal = currentMinutes >= challenge.workoutMinutes;
     tasks.push({
       key: "workout2Completed",
       label: "Workout 2",
@@ -170,7 +167,7 @@ export default function DailyLogScreen() {
       route: "/log-workout?workout=2",
       isHealthTracked: Platform.OS === "ios",
       healthData: isAuthorized ? {
-        current: Math.max(0, totalMinutes - challenge.workoutMinutes),
+        current: currentMinutes,
         goal: challenge.workoutMinutes,
         unit: "min",
         autoComplete: meetsGoal,
