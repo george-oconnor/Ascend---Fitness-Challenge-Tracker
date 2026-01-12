@@ -5,7 +5,7 @@ import { useSessionStore } from "@/store/useSessionStore";
 import type { DailyLog } from "@/types/type";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
@@ -27,6 +27,7 @@ type TaskItem = {
 export default function DailyLogScreen() {
   const [connectingHealth, setConnectingHealth] = useState(false);
   const [cycleLoggedToday, setCycleLoggedToday] = useState(false);
+  const lastSyncedRef = useRef<{ steps: number; outdoorMinutes: number; totalMinutes: number } | null>(null);
   const { challenge, todayLog, toggleTask, updateProgress } = useChallengeStore();
   const { 
     steps, 
@@ -37,6 +38,8 @@ export default function DailyLogScreen() {
     isLoading: healthLoading,
     initialize: initHealth,
     fetchTodayData,
+    getOutdoorWorkoutMinutes,
+    getTotalWorkoutMinutes,
   } = useHealthStore();
 
   // Check if cycle was logged today
@@ -77,9 +80,17 @@ export default function DailyLogScreen() {
 
   // Sync health data to daily log when it changes
   useEffect(() => {
-    if (isAuthorized && todayLog && challenge) {
+    if (isAuthorized && todayLog && challenge && getOutdoorWorkoutMinutes && getTotalWorkoutMinutes) {
       const outdoorMinutes = getOutdoorWorkoutMinutes();
       const totalMinutes = getTotalWorkoutMinutes();
+
+      // Check if values have actually changed since last sync
+      if (lastSyncedRef.current &&
+          lastSyncedRef.current.steps === steps &&
+          lastSyncedRef.current.outdoorMinutes === outdoorMinutes &&
+          lastSyncedRef.current.totalMinutes === totalMinutes) {
+        return; // No changes, skip update
+      }
 
       const progressUpdate: Partial<DailyLog> = {};
 
@@ -106,10 +117,15 @@ export default function DailyLogScreen() {
 
       // Only update if there are changes
       if (Object.keys(progressUpdate).length > 0) {
+        // Update ref before calling updateProgress to prevent re-triggering
+        lastSyncedRef.current = { steps, outdoorMinutes, totalMinutes };
         updateProgress(progressUpdate);
+      } else {
+        // Still update ref even if no progress update to prevent checking again
+        lastSyncedRef.current = { steps, outdoorMinutes, totalMinutes };
       }
     }
-  }, [steps, workouts, isAuthorized, todayLog, challenge]);
+  }, [steps, isAuthorized, todayLog?.$id, challenge?.$id, getOutdoorWorkoutMinutes, getTotalWorkoutMinutes, updateProgress]);
 
   if (!challenge || !todayLog) {
     return (
