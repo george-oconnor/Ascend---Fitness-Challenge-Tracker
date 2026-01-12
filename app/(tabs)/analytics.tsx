@@ -89,6 +89,9 @@ export default function AnalyticsScreen() {
   const handleResyncHealthData = async () => {
     if (!selectedDate || !selectedDayLog?.$id || !challenge?.$id || resyncing) return;
     
+    const logId = selectedDayLog.$id;
+    const challengeId = challenge.$id;
+    
     // First close the day modal and show resync modal
     setShowDayModal(false);
     
@@ -106,23 +109,17 @@ export default function AnalyticsScreen() {
       
       try {
         addLog('🔄 Starting health data resync...');
-        await resyncHealthDataForDate(selectedDate!, selectedDayLog!.$id, addLog);
+        await resyncHealthDataForDate(selectedDate, logId, addLog);
         addLog('✅ Resync complete!');
         
         // Refresh to show updated data
         addLog('📥 Refreshing logs...');
-        await fetchAllLogs(challenge!.$id);
-        await fetchActivityLogs(challenge!.$id);
+        await fetchAllLogs(challengeId);
+        await fetchActivityLogs(challengeId);
         addLog('✅ Logs refreshed!');
         
-        // Update the selected day log with fresh data
-        const updatedLogs = useChallengeStore.getState().allLogs;
-        const dateStr = format(selectedDate!, 'yyyy-MM-dd');
-        const updatedLog = updatedLogs.find(log => log.date === dateStr);
-        if (updatedLog) {
-          setSelectedDayLog(updatedLog);
-          addLog('🔄 Display updated with fresh data');
-        }
+        // selectedDayLog will automatically update via useMemo when allLogs changes
+        addLog('🔄 Display will update automatically');
         
         addLog('👆 Tap Close when ready');
       } catch (error) {
@@ -1060,16 +1057,16 @@ export default function AnalyticsScreen() {
                         
                         {/* Workout Stats */}
                         <View className="flex-row flex-wrap gap-2 mt-2">
-                          {workout?.calories && (
+                          {workout?.calories && Number(workout.calories) > 0 && (
                             <View className="flex-row items-center bg-red-50 px-3 py-1.5 rounded-full">
-                              <Feather name="flame" size={14} color="#EF4444" />
-                              <Text className="text-sm text-red-600 ml-1">{workout.calories} cal</Text>
+                              <Feather name="zap" size={14} color="#EF4444" />
+                              <Text className="text-sm text-red-600 ml-1">{Math.round(Number(workout.calories))} cal</Text>
                             </View>
                           )}
-                          {workout?.distance && (
+                          {workout?.distance && Number(workout.distance) >= 0.1 && (
                             <View className="flex-row items-center bg-blue-50 px-3 py-1.5 rounded-full">
                               <Feather name="map-pin" size={14} color="#3B82F6" />
-                              <Text className="text-sm text-blue-600 ml-1">{workout.distance}km</Text>
+                              <Text className="text-sm text-blue-600 ml-1">{Number(workout.distance).toFixed(2)}km</Text>
                             </View>
                           )}
                           {workout?.isOutdoor !== undefined && (
