@@ -334,18 +334,18 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           const totalMinutes = sortedWorkouts.reduce((sum, w) => sum + w.duration, 0);
 
           if (challenge.trackWorkout1 && challenge.trackWorkout2) {
-            // Tracking both - assign workouts chronologically to slots
+            // Tracking both - assign workouts 1:1 to slots
             let workout1Minutes = 0;
             let workout2Minutes = 0;
             
-            // Assign first workout(s) to workout1 until goal is met or exceeded
-            for (const workout of sortedWorkouts) {
-              if (workout1Minutes === 0 || (workout1Minutes < workoutGoalMinutes && workout2Minutes === 0)) {
-                workout1Minutes += workout.duration;
-              } else {
-                workout2Minutes += workout.duration;
-              }
+            // Simple 1:1 assignment: first workout → slot 1, second workout → slot 2
+            if (sortedWorkouts.length >= 1) {
+              workout1Minutes = Math.round(sortedWorkouts[0].duration);
             }
+            if (sortedWorkouts.length >= 2) {
+              workout2Minutes = Math.round(sortedWorkouts[1].duration);
+            }
+            // If only 1 workout exists, workout2Minutes stays 0 (clears any incorrect assignment)
             
             // Round the minutes
             workout1Minutes = Math.round(workout1Minutes);
@@ -360,25 +360,43 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             updates.workout2Completed = workout2Minutes >= workoutGoalMinutes;
             
             // Create activity logs
-            if (workout1Minutes > 0) {
+            if (workout1Minutes > 0 && sortedWorkouts.length >= 1) {
+              const workout1Data = sortedWorkouts[0];
+              const workout1Details = [
+                `${workout1Data.activityName}: ${workout1Minutes} minutes`,
+                workout1Data.calories ? `${workout1Data.calories} calories` : null,
+                workout1Data.distance ? `${(workout1Data.distance / 1000).toFixed(2)}km distance` : null,
+                `${workout1Data.isOutdoor ? 'Outdoor' : 'Indoor'} workout`,
+                `Started: ${format(new Date(workout1Data.startDate), 'h:mm a')}`
+              ].filter(Boolean).join(' • ');
+              
               activityLogsToCreate.push({
                 userId: challenge.userId,
                 challengeId: challenge.$id,
                 type: 'workout',
-                title: 'Workout 1 (Resync)',
-                description: `Outdoor workout: ${workout1Minutes} minutes`,
+                title: `${workout1Data.activityName} (Workout 1)`,
+                description: workout1Details,
                 value: workout1Minutes,
                 unit: 'min',
                 date: dateStr,
               });
             }
-            if (workout2Minutes > 0) {
+            if (workout2Minutes > 0 && sortedWorkouts.length >= 2) {
+              const workout2Data = sortedWorkouts[1];
+              const workout2Details = [
+                `${workout2Data.activityName}: ${workout2Minutes} minutes`,
+                workout2Data.calories ? `${workout2Data.calories} calories` : null,
+                workout2Data.distance ? `${(workout2Data.distance / 1000).toFixed(2)}km distance` : null,
+                `${workout2Data.isOutdoor ? 'Outdoor' : 'Indoor'} workout`,
+                `Started: ${format(new Date(workout2Data.startDate), 'h:mm a')}`
+              ].filter(Boolean).join(' • ');
+              
               activityLogsToCreate.push({
                 userId: challenge.userId,
                 challengeId: challenge.$id,
                 type: 'workout',
-                title: 'Workout 2 (Resync)',
-                description: `Indoor workout: ${workout2Minutes} minutes`,
+                title: `${workout2Data.activityName} (Workout 2)`,
+                description: workout2Details,
                 value: workout2Minutes,
                 unit: 'min',
                 date: dateStr,
@@ -393,13 +411,22 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             updates.workout1Minutes = workout1Minutes;
             updates.workout1Completed = workout1Minutes >= workoutGoalMinutes;
             
-            if (workout1Minutes > 0) {
+            if (workout1Minutes > 0 && sortedWorkouts.length >= 1) {
+              const workoutData = sortedWorkouts[0]; // Use the first (and likely only) workout
+              const workoutDetails = [
+                `${workoutData.activityName}: ${workout1Minutes} minutes`,
+                workoutData.calories ? `${workoutData.calories} calories` : null,
+                workoutData.distance ? `${(workoutData.distance / 1000).toFixed(2)}km distance` : null,
+                `${workoutData.isOutdoor ? 'Outdoor' : 'Indoor'} workout`,
+                `Started: ${format(new Date(workoutData.startDate), 'h:mm a')}`
+              ].filter(Boolean).join(' • ');
+              
               activityLogsToCreate.push({
                 userId: challenge.userId,
                 challengeId: challenge.$id,
                 type: 'workout',
-                title: 'Workout (Resync)',
-                description: `Total workout time: ${workout1Minutes} minutes`,
+                title: `${workoutData.activityName} (Resync)`,
+                description: workoutDetails,
                 value: workout1Minutes,
                 unit: 'min',
                 date: dateStr,
@@ -414,13 +441,22 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             updates.workout2Minutes = workout2Minutes;
             updates.workout2Completed = workout2Minutes >= workoutGoalMinutes;
             
-            if (workout2Minutes > 0) {
+            if (workout2Minutes > 0 && sortedWorkouts.length >= 1) {
+              const workoutData = sortedWorkouts[0]; // Use the first (and likely only) workout
+              const workoutDetails = [
+                `${workoutData.activityName}: ${workout2Minutes} minutes`,
+                workoutData.calories ? `${workoutData.calories} calories` : null,
+                workoutData.distance ? `${(workoutData.distance / 1000).toFixed(2)}km distance` : null,
+                `${workoutData.isOutdoor ? 'Outdoor' : 'Indoor'} workout`,
+                `Started: ${format(new Date(workoutData.startDate), 'h:mm a')}`
+              ].filter(Boolean).join(' • ');
+              
               activityLogsToCreate.push({
                 userId: challenge.userId,
                 challengeId: challenge.$id,
                 type: 'workout',
-                title: 'Workout (Resync)',
-                description: `Total workout time: ${workout2Minutes} minutes`,
+                title: `${workoutData.activityName} (Resync)`,
+                description: workoutDetails,
                 value: workout2Minutes,
                 unit: 'min',
                 date: dateStr,
@@ -459,8 +495,16 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         log(`📝 Creating ${activityLogsToCreate.length} activity log(s)...`);
         for (const activityLog of activityLogsToCreate) {
           await createActivityLog(activityLog);
+          log(`✅ Created: ${activityLog.title}`);
         }
-        log(`✅ Activity logs created`);
+        log(`✅ All activity logs created`);
+        
+        // Refresh activity logs to show new ones
+        const refreshedActivityLogs = await getActivityLogsForChallenge(challenge.$id);
+        set({ activityLogs: refreshedActivityLogs });
+        log(`🔄 Activity logs refreshed`);
+      } else {
+        log(`ℹ️ No activity logs to create`);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to re-sync health data";
