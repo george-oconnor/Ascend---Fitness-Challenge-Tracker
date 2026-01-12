@@ -2,10 +2,13 @@ import {
     createActivityLog,
     createChallenge,
     createDailyLog,
+    deleteActivityLog,
     getActivityLogsForChallenge,
+    getActivityLogsForDate,
     getChallenge,
     getDailyLog,
     getDailyLogsForChallenge,
+    updateActivityLog,
     updateChallenge,
     updateDailyLog,
 } from "@/lib/appwrite";
@@ -319,152 +322,380 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
 
       const updates: Partial<DailyLog> = {};
       const activityLogsToCreate: Array<Omit<ActivityLog, "$id">> = [];
+      const activityLogsToUpdate: Array<{ id: string; data: Partial<ActivityLog> }> = [];
+      const activityLogsToDelete: string[] = [];
       const dateStr = format(date, 'yyyy-MM-dd');
       
+      // Fetch existing workout activity logs for this date
+      const existingWorkout1Logs = await getActivityLogsForDate(challenge.$id, dateStr, 'workout1');
+      const existingWorkout2Logs = await getActivityLogsForDate(challenge.$id, dateStr, 'workout2');
+      
+      log(`📋 Found ${existingWorkout1Logs.length} existing workout1 log(s), ${existingWorkout2Logs.length} existing workout2 log(s)`);
+      
+      // Sync workout data
       if (challenge.trackWorkout1 || challenge.trackWorkout2) {
         const workoutGoalMinutes = challenge.workoutMinutes || 45;
+        
+        // Sort workouts by start time (earliest first)
+        const sortedWorkouts = [...workouts].sort(
+          (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
+        );
 
-        if (workouts.length > 0) {
-          // Sort workouts by start time (earliest first)
-          const sortedWorkouts = [...workouts].sort(
-            (a, b) => new Date(a.startDate).getTime() - new Date(b.startDate).getTime()
-          );
-
-          // Calculate total minutes
-          const totalMinutes = sortedWorkouts.reduce((sum, w) => sum + w.duration, 0);
-
-          if (challenge.trackWorkout1 && challenge.trackWorkout2) {
-            // Tracking both - assign workouts 1:1 to slots
-            let workout1Minutes = 0;
-            let workout2Minutes = 0;
+        if (challenge.trackWorkout1 && challenge.trackWorkout2) {
+          // Tracking both workouts - 1:1 assignment
+          let workout1Minutes = 0;
+          let workout2Minutes = 0;
+          
+          // Simple 1:1 assignment: first workout → slot 1, second workout → slot 2
+          if (sortedWorkouts.length >= 1) {
+            workout1Minutes = Math.round(sortedWorkouts[0].duration);
+          }
+          if (sortedWorkouts.length >= 2) {
+            workout2Minutes = Math.round(sortedWorkouts[1].duration);
+          }
+          // If only 1 workout exists, workout2Minutes stays 0 (clears any incorrect assignment)
+          
+          log(`💪 Workout 1: ${workout1Minutes} min ${workout1Minutes >= workoutGoalMinutes ? '✅' : '❌'}`);
+          log(`💪 Workout 2: ${workout2Minutes} min ${workout2Minutes >= workoutGoalMinutes ? '✅' : '❌'}`);
+          
+          // Always update both - this ensures incorrect values get cleared
+          updates.workout1Minutes = workout1Minutes;
+          updates.workout1Completed = workout1Minutes >= workoutGoalMinutes;
+          updates.workout2Minutes = workout2Minutes;
+          updates.workout2Completed = workout2Minutes >= workoutGoalMinutes;
+          
+          // Build workoutDetails JSON with all Apple Health data
+          const workoutDetailsObj: Record<string, any> = {};
+          
+          if (workout1Minutes > 0 && sortedWorkouts.length >= 1) {
+            const w1 = sortedWorkouts[0];
+            const notesArr = [
+              w1.calories ? `${Math.round(w1.calories)} calories burned` : null,
+              w1.distance ? `${(w1.distance / 1000).toFixed(2)}km distance` : null,
+              w1.isOutdoor ? 'Outdoor workout' : 'Indoor workout',
+              `Started: ${format(new Date(w1.startDate), 'h:mm a')}`,
+              `Ended: ${format(new Date(w1.endDate), 'h:mm a')}`,
+            ].filter(Boolean).join(' • ');
             
-            // Simple 1:1 assignment: first workout → slot 1, second workout → slot 2
-            if (sortedWorkouts.length >= 1) {
-              workout1Minutes = Math.round(sortedWorkouts[0].duration);
+            workoutDetailsObj.workout1 = {
+              type: w1.activityName.toLowerCase().replace(/\s+/g, '-'),
+              notes: notesArr,
+              syncedFromHealth: true,
+              activityName: w1.activityName,
+              calories: w1.calories ? Math.round(w1.calories) : undefined,
+              distance: w1.distance ? (w1.distance / 1000).toFixed(2) : undefined,
+              isOutdoor: w1.isOutdoor,
+              startTime: w1.startDate,
+              endTime: w1.endDate,
+            };
+            
+            // Manage workout1 activity log
+            const workout1LogData = {
+              userId: challenge.userId,
+              challengeId: challenge.$id,
+              type: 'workout1' as const,
+              title: `${w1.activityName} (Workout 1)`,
+              description: `${workout1Minutes} min - ${notesArr}`,
+              value: workout1Minutes,
+              unit: 'min',
+              date: dateStr,
+            };
+            
+            if (existingWorkout1Logs.length > 0) {
+              // Update existing log
+              activityLogsToUpdate.push({ id: existingWorkout1Logs[0].$id!, data: workout1LogData });
+            } else {
+              // Create new log
+              activityLogsToCreate.push(workout1LogData);
             }
-            if (sortedWorkouts.length >= 2) {
-              workout2Minutes = Math.round(sortedWorkouts[1].duration);
-            }
-            // If only 1 workout exists, workout2Minutes stays 0 (clears any incorrect assignment)
-            
-            // Round the minutes
-            workout1Minutes = Math.round(workout1Minutes);
-            workout2Minutes = Math.round(workout2Minutes);
-            
-            log(`💪 Workout 1: ${workout1Minutes} min ${workout1Minutes >= workoutGoalMinutes ? '✅' : '❌'}`);
-            log(`💪 Workout 2: ${workout2Minutes} min ${workout2Minutes >= workoutGoalMinutes ? '✅' : '❌'}`);
-            
-            updates.workout1Minutes = workout1Minutes;
-            updates.workout1Completed = workout1Minutes >= workoutGoalMinutes;
-            updates.workout2Minutes = workout2Minutes;
-            updates.workout2Completed = workout2Minutes >= workoutGoalMinutes;
-            
-            // Create activity logs
-            if (workout1Minutes > 0 && sortedWorkouts.length >= 1) {
-              const workout1Data = sortedWorkouts[0];
-              const workout1Details = [
-                `${workout1Data.activityName}: ${workout1Minutes} minutes`,
-                workout1Data.calories ? `${workout1Data.calories} calories` : null,
-                workout1Data.distance ? `${(workout1Data.distance / 1000).toFixed(2)}km distance` : null,
-                `${workout1Data.isOutdoor ? 'Outdoor' : 'Indoor'} workout`,
-                `Started: ${format(new Date(workout1Data.startDate), 'h:mm a')}`
-              ].filter(Boolean).join(' • ');
-              
-              activityLogsToCreate.push({
-                userId: challenge.userId,
-                challengeId: challenge.$id,
-                type: 'workout',
-                title: `${workout1Data.activityName} (Workout 1)`,
-                description: workout1Details,
-                value: workout1Minutes,
-                unit: 'min',
-                date: dateStr,
-              });
-            }
-            if (workout2Minutes > 0 && sortedWorkouts.length >= 2) {
-              const workout2Data = sortedWorkouts[1];
-              const workout2Details = [
-                `${workout2Data.activityName}: ${workout2Minutes} minutes`,
-                workout2Data.calories ? `${workout2Data.calories} calories` : null,
-                workout2Data.distance ? `${(workout2Data.distance / 1000).toFixed(2)}km distance` : null,
-                `${workout2Data.isOutdoor ? 'Outdoor' : 'Indoor'} workout`,
-                `Started: ${format(new Date(workout2Data.startDate), 'h:mm a')}`
-              ].filter(Boolean).join(' • ');
-              
-              activityLogsToCreate.push({
-                userId: challenge.userId,
-                challengeId: challenge.$id,
-                type: 'workout',
-                title: `${workout2Data.activityName} (Workout 2)`,
-                description: workout2Details,
-                value: workout2Minutes,
-                unit: 'min',
-                date: dateStr,
-              });
-            }
-          } else if (challenge.trackWorkout1) {
-            // Only tracking workout1 - assign all workout time to workout1
-            const workout1Minutes = Math.round(totalMinutes);
-            
-            log(`💪 Workout 1: ${workout1Minutes} min ${workout1Minutes >= workoutGoalMinutes ? '✅' : '❌'}`);
-            
-            updates.workout1Minutes = workout1Minutes;
-            updates.workout1Completed = workout1Minutes >= workoutGoalMinutes;
-            
-            if (workout1Minutes > 0 && sortedWorkouts.length >= 1) {
-              const workoutData = sortedWorkouts[0]; // Use the first (and likely only) workout
-              const workoutDetails = [
-                `${workoutData.activityName}: ${workout1Minutes} minutes`,
-                workoutData.calories ? `${workoutData.calories} calories` : null,
-                workoutData.distance ? `${(workoutData.distance / 1000).toFixed(2)}km distance` : null,
-                `${workoutData.isOutdoor ? 'Outdoor' : 'Indoor'} workout`,
-                `Started: ${format(new Date(workoutData.startDate), 'h:mm a')}`
-              ].filter(Boolean).join(' • ');
-              
-              activityLogsToCreate.push({
-                userId: challenge.userId,
-                challengeId: challenge.$id,
-                type: 'workout',
-                title: `${workoutData.activityName} (Resync)`,
-                description: workoutDetails,
-                value: workout1Minutes,
-                unit: 'min',
-                date: dateStr,
-              });
-            }
-          } else if (challenge.trackWorkout2) {
-            // Only tracking workout2 - assign all workout time to workout2
-            const workout2Minutes = Math.round(totalMinutes);
-            
-            log(`💪 Workout 2: ${workout2Minutes} min ${workout2Minutes >= workoutGoalMinutes ? '✅' : '❌'}`);
-            
-            updates.workout2Minutes = workout2Minutes;
-            updates.workout2Completed = workout2Minutes >= workoutGoalMinutes;
-            
-            if (workout2Minutes > 0 && sortedWorkouts.length >= 1) {
-              const workoutData = sortedWorkouts[0]; // Use the first (and likely only) workout
-              const workoutDetails = [
-                `${workoutData.activityName}: ${workout2Minutes} minutes`,
-                workoutData.calories ? `${workoutData.calories} calories` : null,
-                workoutData.distance ? `${(workoutData.distance / 1000).toFixed(2)}km distance` : null,
-                `${workoutData.isOutdoor ? 'Outdoor' : 'Indoor'} workout`,
-                `Started: ${format(new Date(workoutData.startDate), 'h:mm a')}`
-              ].filter(Boolean).join(' • ');
-              
-              activityLogsToCreate.push({
-                userId: challenge.userId,
-                challengeId: challenge.$id,
-                type: 'workout',
-                title: `${workoutData.activityName} (Resync)`,
-                description: workoutDetails,
-                value: workout2Minutes,
-                unit: 'min',
-                date: dateStr,
-              });
+          } else {
+            // No workout 1 - delete existing activity log if any
+            for (const existingLog of existingWorkout1Logs) {
+              if (existingLog.$id) {
+                activityLogsToDelete.push(existingLog.$id);
+              }
             }
           }
-        } else {
+          
+          if (workout2Minutes > 0 && sortedWorkouts.length >= 2) {
+            const w2 = sortedWorkouts[1];
+            const notesArr = [
+              w2.calories ? `${Math.round(w2.calories)} calories burned` : null,
+              w2.distance ? `${(w2.distance / 1000).toFixed(2)}km distance` : null,
+              w2.isOutdoor ? 'Outdoor workout' : 'Indoor workout',
+              `Started: ${format(new Date(w2.startDate), 'h:mm a')}`,
+              `Ended: ${format(new Date(w2.endDate), 'h:mm a')}`,
+            ].filter(Boolean).join(' • ');
+            
+            workoutDetailsObj.workout2 = {
+              type: w2.activityName.toLowerCase().replace(/\s+/g, '-'),
+              notes: notesArr,
+              syncedFromHealth: true,
+              activityName: w2.activityName,
+              calories: w2.calories ? Math.round(w2.calories) : undefined,
+              distance: w2.distance ? (w2.distance / 1000).toFixed(2) : undefined,
+              isOutdoor: w2.isOutdoor,
+              startTime: w2.startDate,
+              endTime: w2.endDate,
+            };
+            
+            // Manage workout2 activity log
+            const workout2LogData = {
+              userId: challenge.userId,
+              challengeId: challenge.$id,
+              type: 'workout2' as const,
+              title: `${w2.activityName} (Workout 2)`,
+              description: `${workout2Minutes} min - ${notesArr}`,
+              value: workout2Minutes,
+              unit: 'min',
+              date: dateStr,
+            };
+            
+            if (existingWorkout2Logs.length > 0) {
+              // Update existing log
+              activityLogsToUpdate.push({ id: existingWorkout2Logs[0].$id!, data: workout2LogData });
+            } else {
+              // Create new log
+              activityLogsToCreate.push(workout2LogData);
+            }
+          } else {
+            // No workout 2 - delete existing activity log if any
+            for (const existingLog of existingWorkout2Logs) {
+              if (existingLog.$id) {
+                activityLogsToDelete.push(existingLog.$id);
+              }
+            }
+          }
+          
+          // Update workoutDetails in the daily log
+          updates.workoutDetails = JSON.stringify(workoutDetailsObj);
+          
+        } else if (challenge.trackWorkout1) {
+          // Only tracking workout1
+          const workout1Minutes = sortedWorkouts.length >= 1 ? Math.round(sortedWorkouts[0].duration) : 0;
+          
+          log(`💪 Workout 1: ${workout1Minutes} min ${workout1Minutes >= workoutGoalMinutes ? '✅' : '❌'}`);
+          
+          updates.workout1Minutes = workout1Minutes;
+          updates.workout1Completed = workout1Minutes >= workoutGoalMinutes;
+          
+          if (workout1Minutes > 0 && sortedWorkouts.length >= 1) {
+            const w = sortedWorkouts[0];
+            const notesArr = [
+              w.calories ? `${Math.round(w.calories)} calories burned` : null,
+              w.distance ? `${(w.distance / 1000).toFixed(2)}km distance` : null,
+              w.isOutdoor ? 'Outdoor workout' : 'Indoor workout',
+              `Started: ${format(new Date(w.startDate), 'h:mm a')}`,
+              `Ended: ${format(new Date(w.endDate), 'h:mm a')}`,
+            ].filter(Boolean).join(' • ');
+            
+            updates.workoutDetails = JSON.stringify({
+              workout1: {
+                type: w.activityName.toLowerCase().replace(/\s+/g, '-'),
+                notes: notesArr,
+                syncedFromHealth: true,
+                activityName: w.activityName,
+                calories: w.calories ? Math.round(w.calories) : undefined,
+                distance: w.distance ? (w.distance / 1000).toFixed(2) : undefined,
+                isOutdoor: w.isOutdoor,
+                startTime: w.startDate,
+                endTime: w.endDate,
+              }
+            });
+            
+            // Manage workout1 activity log
+            const workout1LogData = {
+              userId: challenge.userId,
+              challengeId: challenge.$id,
+              type: 'workout1' as const,
+              title: `${w.activityName} (Workout 1)`,
+              description: `${workout1Minutes} min - ${notesArr}`,
+              value: workout1Minutes,
+              unit: 'min',
+              date: dateStr,
+            };
+            
+            if (existingWorkout1Logs.length > 0) {
+              activityLogsToUpdate.push({ id: existingWorkout1Logs[0].$id!, data: workout1LogData });
+            } else {
+              activityLogsToCreate.push(workout1LogData);
+            }
+          } else {
+            // No workout - delete existing activity log if any
+            for (const existingLog of existingWorkout1Logs) {
+              if (existingLog.$id) {
+                activityLogsToDelete.push(existingLog.$id);
+              }
+            }
+          }
+          
+        } else if (challenge.trackWorkout2) {
+          // Only tracking workout2
+          const workout2Minutes = sortedWorkouts.length >= 1 ? Math.round(sortedWorkouts[0].duration) : 0;
+          
+          log(`💪 Workout 2: ${workout2Minutes} min ${workout2Minutes >= workoutGoalMinutes ? '✅' : '❌'}`);
+          
+          updates.workout2Minutes = workout2Minutes;
+          updates.workout2Completed = workout2Minutes >= workoutGoalMinutes;
+          
+          if (workout2Minutes > 0 && sortedWorkouts.length >= 1) {
+            const w = sortedWorkouts[0];
+            const notesArr = [
+              w.calories ? `${Math.round(w.calories)} calories burned` : null,
+              w.distance ? `${(w.distance / 1000).toFixed(2)}km distance` : null,
+              w.isOutdoor ? 'Outdoor workout' : 'Indoor workout',
+              `Started: ${format(new Date(w.startDate), 'h:mm a')}`,
+              `Ended: ${format(new Date(w.endDate), 'h:mm a')}`,
+            ].filter(Boolean).join(' • ');
+            
+            updates.workoutDetails = JSON.stringify({
+              workout2: {
+                type: w.activityName.toLowerCase().replace(/\s+/g, '-'),
+                notes: notesArr,
+                syncedFromHealth: true,
+                activityName: w.activityName,
+                calories: w.calories ? Math.round(w.calories) : undefined,
+                distance: w.distance ? (w.distance / 1000).toFixed(2) : undefined,
+                isOutdoor: w.isOutdoor,
+                startTime: w.startDate,
+                endTime: w.endDate,
+              }
+            });
+            
+            // Manage workout2 activity log
+            const workout2LogData = {
+              userId: challenge.userId,
+              challengeId: challenge.$id,
+              type: 'workout2' as const,
+              title: `${w.activityName} (Workout 2)`,
+              description: `${workout2Minutes} min - ${notesArr}`,
+              value: workout2Minutes,
+              unit: 'min',
+              date: dateStr,
+            };
+            
+            if (existingWorkout2Logs.length > 0) {
+              activityLogsToUpdate.push({ id: existingWorkout2Logs[0].$id!, data: workout2LogData });
+            } else {
+              activityLogsToCreate.push(workout2LogData);
+            }
+          } else {
+            // No workout - delete existing activity log if any
+            for (const existingLog of existingWorkout2Logs) {
+              if (existingLog.$id) {
+                activityLogsToDelete.push(existingLog.$id);
+              }
+            }
+          }
+        }
+        
+        if (workouts.length === 0) {
           log("⚠️ No workouts found for this date");
+        }
+      }
+
+      // Sync water data
+      if ((challenge as any).trackWater) {
+        try {
+          log("💧 Fetching water data...");
+          const { healthSyncService } = await import("@/lib/healthSync");
+          const waterData = await healthSyncService.getWaterForDate(date);
+          if (waterData.totalLiters > 0) {
+            const waterGoal = (challenge as any).waterGoalLiters || 3.7;
+            const waterGoalMet = waterData.totalLiters >= waterGoal;
+            
+            log(`💧 Water: ${waterData.totalLiters.toFixed(2)}L ${waterGoalMet ? '✅' : '❌'}`);
+            
+            updates.waterLiters = waterData.totalLiters;
+            updates.waterCompleted = waterGoalMet;
+            
+            activityLogsToCreate.push({
+              userId: challenge.userId,
+              challengeId: challenge.$id,
+              type: 'water',
+              title: 'Water Intake (Resync)',
+              description: `${waterData.totalLiters.toFixed(2)}L from Apple Health`,
+              value: waterData.totalLiters,
+              unit: 'L',
+              date: dateStr,
+            });
+          } else {
+            log("💧 No water data found");
+          }
+        } catch (error) {
+          log("💧 Water sync skipped: " + (error instanceof Error ? error.message : 'Unknown error'));
+        }
+      }
+
+      // Sync sleep data
+      if ((challenge as any).trackSleep) {
+        try {
+          log("😴 Fetching sleep data...");
+          const { healthSyncService } = await import("@/lib/healthSync");
+          const sleepData = await healthSyncService.getSleepForDate(date);
+          if (sleepData.asleepMinutes > 0) {
+            const sleepGoalMinutes = ((challenge as any).sleepGoalHours || 8) * 60;
+            const sleepGoalMet = sleepData.asleepMinutes >= sleepGoalMinutes;
+            const sleepHours = Math.floor(sleepData.asleepMinutes / 60);
+            const sleepMins = sleepData.asleepMinutes % 60;
+            
+            log(`😴 Sleep: ${sleepHours}h ${sleepMins}m ${sleepGoalMet ? '✅' : '❌'}`);
+            
+            updates.sleepMinutes = sleepData.asleepMinutes;
+            updates.sleepLogged = sleepGoalMet;
+            if (sleepData.sleepStart && sleepData.wakeTime) {
+              updates.sleepStartTime = sleepData.sleepStart.toISOString();
+              updates.sleepEndTime = sleepData.wakeTime.toISOString();
+            }
+            
+            activityLogsToCreate.push({
+              userId: challenge.userId,
+              challengeId: challenge.$id,
+              type: 'sleep',
+              title: 'Sleep (Resync)',
+              description: `${sleepHours}h ${sleepMins}m from Apple Health`,
+              value: sleepData.asleepMinutes,
+              unit: 'min',
+              date: dateStr,
+            });
+          } else {
+            log("😴 No sleep data found");
+          }
+        } catch (error) {
+          log("😴 Sleep sync skipped: " + (error instanceof Error ? error.message : 'Unknown error'));
+        }
+      }
+
+      // Sync steps data
+      if ((challenge as any).trackSteps) {
+        try {
+          log("👟 Fetching steps data...");
+          const { healthSyncService } = await import("@/lib/healthSync");
+          const stepsData = await healthSyncService.getStepsForDate(date);
+          if (stepsData.count > 0) {
+            const stepsGoal = (challenge as any).stepsGoal || 10000;
+            const stepsGoalMet = stepsData.count >= stepsGoal;
+            
+            log(`👟 Steps: ${stepsData.count.toLocaleString()} ${stepsGoalMet ? '✅' : '❌'}`);
+            
+            updates.steps = stepsData.count;
+            updates.stepsCompleted = stepsGoalMet;
+            
+            activityLogsToCreate.push({
+              userId: challenge.userId,
+              challengeId: challenge.$id,
+              type: 'steps',
+              title: 'Steps (Resync)',
+              description: `${stepsData.count.toLocaleString()} steps from Apple Health`,
+              value: stepsData.count,
+              unit: 'steps',
+              date: dateStr,
+            });
+          } else {
+            log("👟 No steps data found");
+          }
+        } catch (error) {
+          log("👟 Steps sync skipped: " + (error instanceof Error ? error.message : 'Unknown error'));
         }
       }
 
@@ -498,13 +729,39 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           log(`✅ Created: ${activityLog.title}`);
         }
         log(`✅ All activity logs created`);
-        
-        // Refresh activity logs to show new ones
+      }
+      
+      // Update existing activity logs
+      if (activityLogsToUpdate.length > 0) {
+        log(`📝 Updating ${activityLogsToUpdate.length} activity log(s)...`);
+        for (const { id, data } of activityLogsToUpdate) {
+          await updateActivityLog(id, data);
+          log(`✅ Updated: ${data.title}`);
+        }
+        log(`✅ All activity logs updated`);
+      }
+      
+      // Delete removed activity logs
+      if (activityLogsToDelete.length > 0) {
+        log(`🗑️ Deleting ${activityLogsToDelete.length} activity log(s)...`);
+        for (const logId of activityLogsToDelete) {
+          try {
+            await deleteActivityLog(logId);
+            log(`✅ Deleted activity log`);
+          } catch (err) {
+            log(`⚠️ Failed to delete activity log: ${err instanceof Error ? err.message : 'Unknown error'}`);
+          }
+        }
+        log(`✅ Activity logs cleanup complete`);
+      }
+      
+      // Refresh activity logs if any changes were made
+      if (activityLogsToCreate.length > 0 || activityLogsToUpdate.length > 0 || activityLogsToDelete.length > 0) {
         const refreshedActivityLogs = await getActivityLogsForChallenge(challenge.$id);
         set({ activityLogs: refreshedActivityLogs });
         log(`🔄 Activity logs refreshed`);
       } else {
-        log(`ℹ️ No activity logs to create`);
+        log(`ℹ️ No activity log changes needed`);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to re-sync health data";
