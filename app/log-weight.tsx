@@ -182,6 +182,17 @@ export default function LogWeightScreen() {
         currentWeight: weight,
         weightLogged: true,
       });
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      await logActivity({
+        type: "weight",
+        title: "Weight Logged",
+        description: `⚖️ Current weight: ${weight.toFixed(1)}kg`,
+        value: weight,
+        unit: "kg",
+      });
+
       router.back();
     } catch (err) {
       console.error("Failed to save weight:", err);

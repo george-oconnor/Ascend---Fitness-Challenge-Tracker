@@ -35,6 +35,17 @@ export default function LogPhotoScreen() {
       await updateProgress({
         progressPhotoCompleted: photoTaken,
       });
+
+      // Log activity to feed if photo was taken
+      if (photoTaken) {
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "photo",
+          title: "Progress Photo Taken",
+          description: "📸 Progress photo captured!",
+        });
+      }
+
       router.back();
     } catch (err) {
       console.error("Failed to save photo status:", err);

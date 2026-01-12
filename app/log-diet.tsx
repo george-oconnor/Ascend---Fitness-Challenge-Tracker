@@ -298,6 +298,16 @@ export default function LogDietScreen() {
           console.log("HealthKit calorie sync skipped:", healthError);
         }
       }
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      await logActivity({
+        type: "diet",
+        title: "Diet Logged",
+        description: `${mealsLogged} meal${mealsLogged !== 1 ? 's' : ''} logged${trackCalories ? ` - ${totalCalories} calories` : ""}${dietCompleted ? " ✓ Diet followed!" : ""}`,
+        value: totalCalories,
+        unit: trackCalories ? "calories" : undefined,
+      });
       
       router.back();
     } catch (err) {

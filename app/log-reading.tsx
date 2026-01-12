@@ -90,6 +90,16 @@ export default function LogReadingScreen() {
         readingCompleted: pages >= goal || finishedBook,
         finishedBook: finishedBook,
       });
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      await logActivity({
+        type: "reading",
+        title: "Reading Logged",
+        description: pages + " pages" + (finishedBook ? " - Book finished! 📚" : ""),
+        value: pages,
+        unit: "pages",
+      });
       router.back();
     } catch (err) {
       console.error("Failed to save reading:", err);
@@ -188,14 +198,18 @@ export default function LogReadingScreen() {
         {/* Finished a Book Checkbox */}
         <Pressable
           onPress={() => setFinishedBook(!finishedBook)}
-          className={`flex-row items-center justify-between p-4 rounded-2xl mb-6 ${
-            finishedBook ? "bg-purple-100" : "bg-white"
-          } shadow-sm`}
+          className={
+            "flex-row items-center justify-between p-4 rounded-2xl mb-6 shadow-sm " +
+            (finishedBook ? "bg-purple-100" : "bg-white")
+          }
         >
           <View className="flex-row items-center flex-1">
-            <View className={`h-12 w-12 rounded-full items-center justify-center ${
-              finishedBook ? "bg-purple-500" : "bg-gray-100"
-            }`}>
+            <View 
+              className={
+                "h-12 w-12 rounded-full items-center justify-center " +
+                (finishedBook ? "bg-purple-500" : "bg-gray-100")
+              }
+            >
               <Feather 
                 name={finishedBook ? "check" : "book"} 
                 size={24} 
@@ -203,23 +217,32 @@ export default function LogReadingScreen() {
               />
             </View>
             <View className="ml-3 flex-1">
-              <Text className={`text-base font-semibold ${
-                finishedBook ? "text-purple-800" : "text-gray-800"
-              }`}>
+              <Text 
+                className={
+                  "text-base font-semibold " +
+                  (finishedBook ? "text-purple-800" : "text-gray-800")
+                }
+              >
                 Finished a book today
               </Text>
-              <Text className={`text-xs ${
-                finishedBook ? "text-purple-600" : "text-gray-500"
-              }`}>
+              <Text 
+                className={
+                  "text-xs " +
+                  (finishedBook ? "text-purple-600" : "text-gray-500")
+                }
+              >
                 {finishedBook 
                   ? "Amazing! Keep up the reading!" 
                   : "Tap to mark as complete"}
               </Text>
             </View>
           </View>
-          <View className={`h-8 w-8 rounded-full items-center justify-center ${
-            finishedBook ? "bg-purple-500" : "bg-gray-200"
-          }`}>
+          <View 
+            className={
+              "h-8 w-8 rounded-full items-center justify-center " +
+              (finishedBook ? "bg-purple-500" : "bg-gray-200")
+            }
+          >
             {finishedBook && <Feather name="check" size={16} color="white" />}
           </View>
         </Pressable>
@@ -236,7 +259,7 @@ export default function LogReadingScreen() {
               : finishedBook
                 ? "Congratulations on finishing a book!"
                 : pages < goal
-                  ? `Just ${goal - pages} more pages to hit your goal!`
+                  ? "Just " + (goal - pages) + " more pages to hit your goal!"
                   : "Bookworm status achieved! Keep it up!"}
           </Text>
         </View>
@@ -247,9 +270,10 @@ export default function LogReadingScreen() {
         <Pressable
           onPress={handleSave}
           disabled={saving}
-          className={`py-4 rounded-2xl items-center ${
-            saving ? "bg-gray-300" : "bg-purple-500"
-          }`}
+          className={
+            "py-4 rounded-2xl items-center " +
+            (saving ? "bg-gray-300" : "bg-purple-500")
+          }
         >
           <Text className="text-white font-bold text-lg">
             {saving ? "Saving..." : "Save Reading Progress"}

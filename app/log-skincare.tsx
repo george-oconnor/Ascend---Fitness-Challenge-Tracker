@@ -49,6 +49,18 @@ export default function LogSkincareScreen() {
         hasNotes: notes.trim().length > 0,
       });
 
+      // Log activity to feed
+      if (isCompleted) {
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "skincare",
+          title: "Skincare Routine Completed",
+          description: `✨ ${completedSteps.size} step${completedSteps.size !== 1 ? 's' : ''} completed`,
+          value: completedSteps.size,
+          unit: "steps",
+        });
+      }
+
       router.back();
     } catch (err) {
       console.error("Failed to save skincare log:", err);

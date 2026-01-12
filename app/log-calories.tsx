@@ -223,6 +223,16 @@ export default function LogCaloriesScreen() {
           });
         }
       }
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      await logActivity({
+        type: "calories",
+        title: "Calories Logged",
+        description: `${totalCalories} calories consumed${isUnderGoal ? " ✓ Under goal!" : ""}`,
+        value: totalCalories,
+        unit: "calories",
+      });
       
       router.back();
     } catch (err) {

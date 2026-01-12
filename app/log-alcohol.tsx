@@ -155,6 +155,25 @@ export default function LogAlcoholScreen() {
         noAlcoholCompleted: hadNoDrinks,
         alcoholDetails: totalDrinks > 0 ? serializeAlcoholDetails(drinks, notes) : undefined,
       });
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      if (hadNoDrinks) {
+        await logActivity({
+          type: "alcohol",
+          title: "No Alcohol Logged",
+          description: "✓ Stayed alcohol-free today!",
+        });
+      } else {
+        await logActivity({
+          type: "alcohol",
+          title: "Alcohol Logged",
+          description: `${totalDrinks} drink${totalDrinks !== 1 ? 's' : ''} (${totalStandardDrinks.toFixed(1)} standard drinks)`,
+          value: totalDrinks,
+          unit: "drinks",
+        });
+      }
+
       router.back();
     } catch (err) {
       console.error("Failed to save alcohol log:", err);
@@ -170,6 +189,15 @@ export default function LogAlcoholScreen() {
         noAlcoholCompleted: true,
         alcoholDetails: undefined,
       });
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      await logActivity({
+        type: "alcohol",
+        title: "No Alcohol Logged",
+        description: "✓ Stayed alcohol-free today!",
+      });
+
       router.back();
     } catch (err) {
       console.error("Failed to save:", err);

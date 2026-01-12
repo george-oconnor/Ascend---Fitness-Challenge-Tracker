@@ -148,6 +148,16 @@ export default function LogWaterScreen() {
         waterLiters: water,
         waterCompleted: water >= goal,
       });
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      await logActivity({
+        type: "water",
+        title: "Water Logged",
+        description: `${water.toFixed(1)}L of ${goal}L ${water >= goal ? "✓ Goal reached!" : ""}`,
+        value: water,
+        unit: "liters",
+      });
       
       // Sync to Apple Health
       try {

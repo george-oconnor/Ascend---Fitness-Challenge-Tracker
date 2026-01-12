@@ -114,20 +114,24 @@ export default function LogWorkoutScreen() {
 
   // Get synced workouts from Apple Health
   const isIOS = Platform.OS === "ios";
-  const syncedWorkouts = isIOS && healthAuthorized 
-    ? healthWorkouts.filter(w => isWorkout1 ? w.isOutdoor : !w.isOutdoor)
-    : [];
-  const syncedMinutes = syncedWorkouts.reduce((sum, w) => sum + w.duration, 0);
+  const syncedWorkouts = isIOS && healthAuthorized ? healthWorkouts : [];
+  
+  // Calculate synced minutes for this workout slot based on current stored value
+  // This ensures consistency with the sync logic in useChallengeStore
+  const syncedMinutes = existingMinutes > 0 && existingWorkout?.syncedFromHealth 
+    ? existingMinutes 
+    : 0;
 
   // Load synced workout details if available and no manual entry exists
   useEffect(() => {
-    if (syncedWorkouts.length > 0 && !existingWorkout?.type && existingMinutes === 0) {
+    if (syncedWorkouts.length > 0 && existingMinutes > 0 && !existingWorkout?.type) {
+      // Use the primary workout for type, but minutes come from store sync logic
       const primaryWorkout = syncedWorkouts[0];
-      setMinutes(Math.round(syncedMinutes));
+      setMinutes(existingMinutes);
       setSelectedType(primaryWorkout.activityName.toLowerCase().replace(/\s+/g, "-"));
       setNotes(`Synced from Apple Health: ${syncedWorkouts.map(w => `${w.activityName} (${w.duration}min)`).join(", ")}`);
     }
-  }, [syncedWorkouts.length]);
+  }, [syncedWorkouts.length, existingMinutes, existingWorkout?.type]);
 
   if (!challenge || !todayLog) {
     return (
@@ -197,6 +201,18 @@ export default function LogWorkoutScreen() {
           workoutDetails: JSON.stringify(updatedDetails),
         });
       }
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      const workoutType = WORKOUT_TYPES.find(t => t.id === selectedType);
+      await logActivity({
+        type: isWorkout1 ? "workout1" : "workout2",
+        title: `${isWorkout1 ? "Workout 1" : "Workout 2"} Complete`,
+        description: `${workoutType?.label || "Workout"} - ${totalMinutes} minutes${notes ? ` - ${notes}` : ""}`,
+        value: totalMinutes,
+        unit: "minutes",
+      });
+
       router.back();
     } catch (err) {
       console.error("Failed to save workout:", err);
@@ -284,7 +300,7 @@ export default function LogWorkoutScreen() {
                 Synced from Apple Health
               </Text>
               <Text className="text-xs text-purple-600 mt-0.5">
-                {syncedWorkouts.length} workout{syncedWorkouts.length !== 1 ? "s" : ""} • {Math.round(syncedMinutes)} minutes
+                {syncedWorkouts.length} workout{syncedWorkouts.length !== 1 ? "s" : ""} • {Math.round(syncedMinutes)} minutes assigned to {config.label}
               </Text>
             </View>
           </View>

@@ -429,6 +429,23 @@ export default function LogCycleScreen() {
         });
       }
 
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      let cycleDescription = "";
+      if (periodFlow !== "none") {
+        const flowLabels = { light: "Light", medium: "Medium", heavy: "Heavy" };
+        cycleDescription = `Period: ${flowLabels[periodFlow as keyof typeof flowLabels]}`;
+      } else if (symptoms.size > 0) {
+        cycleDescription = `${symptoms.size} symptom${symptoms.size !== 1 ? 's' : ''} tracked`;
+      } else {
+        cycleDescription = "Cycle data logged";
+      }
+      await logActivity({
+        type: "cycle",
+        title: "Cycle Logged",
+        description: cycleDescription,
+      });
+
       router.back();
     } catch (err) {
       console.error("Failed to save cycle data:", err);

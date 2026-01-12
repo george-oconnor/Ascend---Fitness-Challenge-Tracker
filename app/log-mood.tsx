@@ -282,6 +282,15 @@ export default function LogMoodScreen() {
           emotionCount: selectedEmotions.length,
         });
       }
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      await logActivity({
+        type: "mood",
+        title: "Mood Logged",
+        description: `${selectedOption?.emoji || "😊"} Feeling ${selectedOption?.label || "Good"}${selectedEmotions.length > 0 ? ` - ${selectedEmotions.length} emotion${selectedEmotions.length !== 1 ? 's' : ''} noted` : ""}`,
+        value: selectedMood,
+      });
       
       router.back();
     } catch (err) {

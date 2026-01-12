@@ -178,6 +178,16 @@ export default function LogSleepScreen() {
           sleepHours,
         });
       }
+
+      // Log activity to feed
+      const { logActivity } = useChallengeStore.getState();
+      await logActivity({
+        type: "sleep",
+        title: "Sleep Logged",
+        description: `🛌 ${sleepHours}h ${sleepMinutes % 60}m of sleep - ${quality}/5 quality`,
+        value: sleepMinutes,
+        unit: "minutes",
+      });
       
       router.back();
     } catch (err) {
