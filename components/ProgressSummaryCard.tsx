@@ -29,13 +29,9 @@ export default function ProgressSummaryCard() {
   const useHealthKit = Platform.OS === "ios" && healthAuthorized;
   const currentSteps = useHealthKit ? Math.round(liveSteps) : (todayLog.stepsCount ?? 0);
   
-  // Calculate workout minutes from live health data
-  const liveOutdoorMinutes = useHealthKit 
-    ? Math.round(liveWorkouts.filter(w => w.isOutdoor).reduce((sum, w) => sum + w.duration, 0))
-    : (todayLog.workout1Minutes ?? 0);
-  const liveIndoorMinutes = useHealthKit
-    ? Math.round(liveWorkouts.filter(w => !w.isOutdoor).reduce((sum, w) => sum + w.duration, 0))
-    : (todayLog.workout2Minutes ?? 0);
+  // Use stored workout minutes for consistency
+  const liveOutdoorMinutes = todayLog.workout1Minutes ?? 0;
+  const liveIndoorMinutes = todayLog.workout2Minutes ?? 0;
 
   const exerciseItems: JSX.Element[] = [];
   const nutritionItems: JSX.Element[] = [];

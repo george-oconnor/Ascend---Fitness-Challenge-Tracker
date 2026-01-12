@@ -200,18 +200,14 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
       break;
     case "workout1":
       isTracked = challenge.trackWorkout1;
-      current = useHealthKit
-        ? Math.round(liveWorkouts.filter(w => w.isOutdoor).reduce((sum, w) => sum + w.duration, 0))
-        : (todayLog.workout1Minutes ?? 0);
+      current = todayLog.workout1Minutes ?? 0;
       goal = challenge.workoutMinutes ?? 0;
       unit = "min";
       isCompleted = current >= goal;
       break;
     case "workout2":
       isTracked = challenge.trackWorkout2;
-      current = useHealthKit
-        ? Math.round(liveWorkouts.filter(w => !w.isOutdoor).reduce((sum, w) => sum + w.duration, 0))
-        : (todayLog.workout2Minutes ?? 0);
+      current = todayLog.workout2Minutes ?? 0;
       goal = challenge.workoutMinutes ?? 0;
       unit = "min";
       isCompleted = current >= goal;

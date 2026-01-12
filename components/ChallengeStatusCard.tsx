@@ -72,19 +72,15 @@ export default function ChallengeStatusCard() {
     // Workout 1
     if (challenge.trackWorkout1) {
       totalTracked++;
-      const outdoorMinutes = healthAuthorized
-        ? workouts.filter(w => w.isOutdoor).reduce((sum, w) => sum + w.duration, 0)
-        : (todayLog.workout1Minutes ?? 0);
-      if (outdoorMinutes >= challenge.workoutMinutes) completedToday++;
+      const workout1Minutes = todayLog.workout1Minutes ?? 0;
+      if (workout1Minutes >= challenge.workoutMinutes) completedToday++;
     }
 
     // Workout 2
     if (challenge.trackWorkout2) {
       totalTracked++;
-      const totalMinutes = healthAuthorized
-        ? workouts.reduce((sum, w) => sum + w.duration, 0)
-        : ((todayLog.workout1Minutes ?? 0) + (todayLog.workout2Minutes ?? 0));
-      if (totalMinutes >= challenge.workoutMinutes * 2) completedToday++;
+      const workout2Minutes = todayLog.workout2Minutes ?? 0;
+      if (workout2Minutes >= challenge.workoutMinutes) completedToday++;
     }
 
     // Diet
