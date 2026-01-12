@@ -68,14 +68,14 @@ export function initSentry() {
     debug: environment === "staging",
   });
 
-  // Send a test message on init to verify Sentry is working
-  if (environment !== "development") {
-    Sentry.addBreadcrumb({
-      category: "app.lifecycle",
-      message: `App initialized (${environment})`,
-      level: "info",
-    });
-  }
+  // App initialization breadcrumb disabled to reduce Sentry noise
+  // if (environment !== "development") {
+  //   Sentry.addBreadcrumb({
+  //     category: "app.lifecycle",
+  //     message: `App initialized (${environment})`,
+  //     level: "info",
+  //   });
+  // }
 
   console.log(`✅ Sentry initialized (${environment})`);
 }
@@ -119,18 +119,18 @@ export const logger = {
       level: "info",
     });
     
-    // In non-dev builds, also send info logs as events so we can see them in Sentry
-    if (!__DEV__) {
-      // Use withScope to isolate this message
-      Sentry.withScope((scope) => {
-        if (data) {
-          scope.setContext("log_data", data);
-        }
-        scope.setTag("log_type", "debug_info");
-        scope.setLevel("info");
-        Sentry.captureMessage(`[DEBUG] ${message}`);
-      });
-    }
+    // [DEBUG] Sentry events disabled - only keeping breadcrumbs for debugging
+    // if (!__DEV__) {
+    //   // Use withScope to isolate this message
+    //   Sentry.withScope((scope) => {
+    //     if (data) {
+    //       scope.setContext("log_data", data);
+    //     }
+    //     scope.setTag("log_type", "debug_info");
+    //     scope.setLevel("info");
+    //     Sentry.captureMessage(`[DEBUG] ${message}`);
+    //   });
+    // }
   },
   
   warn: (message: string, data?: Record<string, any>) => {
