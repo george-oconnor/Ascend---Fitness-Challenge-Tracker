@@ -89,11 +89,13 @@ export default function AnalyticsScreen() {
   const handleResyncHealthData = async () => {
     if (!selectedDate || !selectedDayLog?.$id || !challenge?.$id || resyncing) return;
     
+    console.log('🔄 Starting resync, showing modal...');
     setResyncing(true);
     setResyncLogs([]);
     setShowResyncModal(true);
     
     const addLog = (message: string) => {
+      console.log('📝 Adding log:', message);
       setResyncLogs(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
     };
     
@@ -105,7 +107,21 @@ export default function AnalyticsScreen() {
       // Refresh to show updated data
       addLog('📥 Refreshing logs...');
       await fetchAllLogs(challenge.$id);
+      await fetchActivityLogs(challenge.$id);
       addLog('✅ Logs refreshed!');
+      
+      // Update the selected day log with fresh data
+      if (selectedDate) {
+        const updatedLogs = useChallengeStore.getState().allLogs;
+        const dateStr = format(selectedDate, 'yyyy-MM-dd');
+        const updatedLog = updatedLogs.find(log => log.date === dateStr);
+        if (updatedLog) {
+          setSelectedDayLog(updatedLog);
+          addLog('🔄 Display updated with fresh data');
+        }
+      }
+      
+      addLog('👆 Tap Close when ready');
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : 'Unknown error';
       addLog(`❌ Error: ${errorMsg}`);
