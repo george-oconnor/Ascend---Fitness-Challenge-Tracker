@@ -1,10 +1,12 @@
+import { BADGES } from "@/constants/badges";
+import { getUserBadges } from "@/lib/appwrite";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useSessionStore } from "@/store/useSessionStore";
+import { BadgeId } from "@/types/type.d";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
-    ActivityIndicator,
     Pressable,
     ScrollView,
     Text,
@@ -13,9 +15,71 @@ import {
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ProfileScreen() {
-  const { user, logout } = useSessionStore();
-  const { challenge } = useChallengeStore();
-  const [loading, setLoading] = useState(false);
+  const { user } = useSessionStore();
+  const { challenge, allLogs } = useChallengeStore();
+  const [savedBadgeIds, setSavedBadgeIds] = useState<BadgeId[]>([]);
+  
+  // Load saved badges from Appwrite
+  useEffect(() => {
+    const loadBadges = async () => {
+      if (!user?.id) return;
+      const badges = await getUserBadges(user.id);
+      setSavedBadgeIds(badges.map(b => b.badgeId));
+    };
+    loadBadges();
+  }, [user?.id]);
+
+  // Calculate earned badges from logs
+  const earnedBadges = useMemo(() => {
+    if (!allLogs || !challenge) return [];
+    
+    const badges: BadgeId[] = [];
+    const completedDays = allLogs.filter(log => {
+      const workout1Done = !challenge.trackWorkout1 || log.workout1Completed;
+      const workout2Done = !challenge.trackWorkout2 || log.workout2Completed;
+      const waterDone = !challenge.trackWater || log.waterCompleted;
+      const dietDone = !challenge.trackDiet || log.dietCompleted;
+      const readingDone = !challenge.trackReading || log.readingCompleted;
+      const photoDone = !challenge.trackProgressPhoto || log.progressPhotoCompleted;
+      const alcoholDone = !challenge.trackNoAlcohol || log.noAlcoholCompleted;
+      
+      return workout1Done && workout2Done && waterDone && dietDone && readingDone && photoDone && alcoholDone;
+    }).length;
+
+    // Day milestones
+    if (completedDays >= 1) badges.push("first_day");
+    if (completedDays >= 7) badges.push("week_warrior");
+    if (completedDays >= 30) badges.push("month_master");
+    if (completedDays >= 50) badges.push("halfway_hero");
+    if (completedDays >= 75) badges.push("champion");
+
+    // Water badges
+    const waterLogs = allLogs.filter(log => log.waterCompleted);
+    if (waterLogs.length >= 7) badges.push("hydration_week");
+    if (waterLogs.length >= 30) badges.push("hydration_hero");
+
+    // Workout badges
+    const workout1Logs = allLogs.filter(log => log.workout1Completed);
+    if (workout1Logs.length >= 10) badges.push("workout_starter");
+    if (workout1Logs.length >= 50) badges.push("fitness_fanatic");
+
+    // Reading badges
+    const readingLogs = allLogs.filter(log => log.readingCompleted);
+    if (readingLogs.length >= 7) badges.push("bookworm_week");
+    if (readingLogs.some(log => log.finishedBook)) badges.push("page_turner");
+
+    // Sobriety badges
+    const alcoholLogs = allLogs.filter(log => log.noAlcoholCompleted);
+    if (alcoholLogs.length >= 7) badges.push("sober_week");
+    if (alcoholLogs.length >= 30) badges.push("clean_living");
+
+    return badges as BadgeId[];
+  }, [allLogs, challenge]);
+
+  const allEarnedBadges = useMemo(() => {
+    const combined = new Set([...savedBadgeIds, ...earnedBadges]);
+    return Array.from(combined) as BadgeId[];
+  }, [savedBadgeIds, earnedBadges]);
   
   const initials = user?.name
     ?.split(" ")
@@ -23,45 +87,19 @@ export default function ProfileScreen() {
     .join("")
     .toUpperCase() || "?";
 
-  const handleLogout = async () => {
-    setLoading(true);
-    try {
-      await logout();
-      router.replace("/auth");
-    } catch (err) {
-      console.error("Logout failed:", err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const MenuItem = ({ 
-    icon, 
-    label, 
-    onPress,
-    showChevron = true,
-    danger = false
-  }: { 
-    icon: keyof typeof Feather.glyphMap;
-    label: string;
-    onPress?: () => void;
-    showChevron?: boolean;
-    danger?: boolean;
-  }) => (
-    <Pressable 
-      onPress={onPress}
-      className="flex-row items-center bg-white px-4 py-3.5 border-b border-gray-100"
-    >
-      <View className={`h-8 w-8 items-center justify-center rounded-full mr-3 ${danger ? "bg-red-100" : "bg-gray-100"}`}>
-        <Feather name={icon} size={18} color={danger ? "#EF4444" : "#6B7280"} />
-      </View>
-      <Text className={`flex-1 text-base ${danger ? "text-red-500" : "text-gray-900"}`}>{label}</Text>
-      {showChevron && <Feather name="chevron-right" size={20} color="#9CA3AF" />}
-    </Pressable>
-  );
-
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+      {/* Header */}
+      <View className="bg-white px-5 py-4 border-b border-gray-100 flex-row items-center justify-between">
+        <Text className="text-xl font-bold text-gray-900">Profile</Text>
+        <Pressable 
+          onPress={() => router.push("/settings")}
+          className="h-8 w-8 items-center justify-center rounded-full bg-orange-100"
+        >
+          <Feather name="settings" size={20} color="#F97316" />
+        </Pressable>
+      </View>
+
       <ScrollView
         showsVerticalScrollIndicator={false}
       >
@@ -88,96 +126,45 @@ export default function ProfileScreen() {
           )}
         </View>
 
-        {/* Challenge Section */}
-        <View className="mt-4">
-          <Text className="text-xs font-semibold text-gray-400 uppercase px-5 mb-2">Challenge</Text>
-          <View className="bg-white rounded-xl overflow-hidden mx-4">
-            <MenuItem 
-              icon="settings" 
-              label="Challenge Settings" 
-              onPress={() => router.push("/challenge-setup")}
-            />
-            <MenuItem 
-              icon="calendar" 
-              label="Daily Log" 
-              onPress={() => router.push("/daily-log")}
-            />
-          </View>
-        </View>
-
-        {/* Account Section */}
-        <View className="mt-6">
-          <Text className="text-xs font-semibold text-gray-400 uppercase px-5 mb-2">Account</Text>
-          <View className="bg-white rounded-xl overflow-hidden mx-4">
-            <MenuItem 
-              icon="user" 
-              label="Edit Profile" 
-              onPress={() => {}}
-            />
-            <MenuItem 
-              icon="lock" 
-              label="Change Password" 
-              onPress={() => {}}
-            />
-            <MenuItem 
-              icon="bell" 
-              label="Notifications" 
-              onPress={() => {}}
-            />
-          </View>
-        </View>
-
-        {/* Support Section */}
-        <View className="mt-6">
-          <Text className="text-xs font-semibold text-gray-400 uppercase px-5 mb-2">Support</Text>
-          <View className="bg-white rounded-xl overflow-hidden mx-4">
-            <MenuItem 
-              icon="help-circle" 
-              label="Help & FAQ" 
-              onPress={() => {}}
-            />
-            <MenuItem 
-              icon="message-circle" 
-              label="Contact Us" 
-              onPress={() => {}}
-            />
-            <MenuItem 
-              icon="shield" 
-              label="Privacy Policy" 
-              onPress={() => {}}
-            />
-          </View>
-        </View>
-
-        {/* Logout */}
-        <View className="mt-6 mb-8">
-          <View className="bg-white rounded-xl overflow-hidden mx-4">
-            <Pressable 
-              onPress={handleLogout}
-              disabled={loading}
-              className="flex-row items-center px-4 py-3.5"
-            >
-              <View className="h-8 w-8 items-center justify-center rounded-full bg-red-100 mr-3">
-                {loading ? (
-                  <ActivityIndicator size="small" color="#EF4444" />
-                ) : (
-                  <Feather name="log-out" size={18} color="#EF4444" />
-                )}
+        {/* Milestones & Badges */}
+        <View className="m-4">
+          <View className="bg-white rounded-2xl p-4 shadow-sm">
+            <View className="flex-row items-center justify-between mb-4">
+              <Text className="text-sm font-semibold text-gray-600">Milestones</Text>
+              <Text className="text-xs text-gray-400">{allEarnedBadges.length} earned</Text>
+            </View>
+            {allEarnedBadges.length > 0 ? (
+              <View className="flex-row flex-wrap gap-3">
+                {allEarnedBadges.map((badgeId) => {
+                  const badge = BADGES[badgeId];
+                  return (
+                    <View key={badgeId} className="items-center" style={{ width: 70 }}>
+                      <View 
+                        className="h-12 w-12 rounded-full items-center justify-center mb-1"
+                        style={{ backgroundColor: badge.bgColor }}
+                      >
+                        <Feather name={badge.icon as keyof typeof Feather.glyphMap} size={20} color={badge.color} />
+                      </View>
+                      <Text className="text-xs text-gray-600 text-center" numberOfLines={2}>
+                        {badge.name}
+                      </Text>
+                    </View>
+                  );
+                })}
               </View>
-              <Text className="flex-1 text-base text-red-500">Log Out</Text>
-            </Pressable>
+            ) : (
+              <View className="items-center py-4">
+                <View className="h-12 w-12 rounded-full items-center justify-center bg-gray-100 mb-2">
+                  <Feather name="award" size={20} color="#9CA3AF" />
+                </View>
+                <Text className="text-sm text-gray-400 text-center">
+                  Complete activities to earn badges!
+                </Text>
+              </View>
+            )}
           </View>
         </View>
-
-        {/* Account Info */}
-        <View className="mb-8 items-center">
-          <Text className="text-xs text-gray-400">
-            Account ID: {user?.id ? user.id.slice(0, 8) + "..." : "N/A"}
-          </Text>
-          <Text className="text-xs text-gray-400 mt-1">
-            Version 1.0.0
-          </Text>
-        </View>
+        
       </ScrollView>
     </SafeAreaView>
   );
