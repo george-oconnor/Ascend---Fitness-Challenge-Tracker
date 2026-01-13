@@ -1,9 +1,11 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { healthService } from "@/lib/health";
 import { healthSyncService } from "@/lib/healthSync";
 import { captureException, captureMessage } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -85,10 +87,18 @@ function TrendIndicator({ current, previous }: { current: number; previous?: num
 }
 
 export default function LogWeightScreen() {
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
-  const [weight, setWeight] = useState(todayLog?.currentWeight ?? 0);
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs, fetchAllLogs } = useChallengeStore();
+  
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
+  const [weight, setWeight] = useState(targetLog?.currentWeight ?? 0);
   const [inputValue, setInputValue] = useState(
-    todayLog?.currentWeight ? todayLog.currentWeight.toFixed(1) : ""
+    targetLog?.currentWeight ? targetLog.currentWeight.toFixed(1) : ""
   );
   const [saving, setSaving] = useState(false);
   const [loadingHealth, setLoadingHealth] = useState(false);
@@ -100,7 +110,7 @@ export default function LogWeightScreen() {
       if (Platform.OS !== "ios") return;
       
       // Only load from Health if no weight has been logged today
-      if (todayLog?.currentWeight && todayLog.currentWeight > 0) return;
+      if (targetLog?.currentWeight && targetLog.currentWeight > 0) return;
       
       setLoadingHealth(true);
       try {
@@ -122,9 +132,9 @@ export default function LogWeightScreen() {
     }
     
     loadHealthWeight();
-  }, [todayLog?.currentWeight]);
+  }, [targetLog?.currentWeight]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -166,7 +176,6 @@ export default function LogWeightScreen() {
         try {
           const result = await healthSyncService.saveWeight(weight);
           if (!result) {
-            // Log warning if sync returned false (logged as info in healthSyncService on success)
             captureMessage(`Weight sync to Apple Health returned false for: ${weight}kg`, "warning");
           }
         } catch (healthError: any) {
@@ -178,20 +187,47 @@ export default function LogWeightScreen() {
         }
       }
       
-      await updateProgress({
-        currentWeight: weight,
-        weightLogged: true,
-      });
+      if (isEditingPastDay && logIdParam) {
+        await updateDailyLog(logIdParam, {
+          currentWeight: weight,
+          weightLogged: true,
+        });
+        
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, 'weight');
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: 'weight' as const,
+          title: "Weight Logged",
+          description: `⚖️ Current weight: ${weight.toFixed(1)}kg`,
+          value: weight,
+          unit: "kg",
+          date: dateStr,
+        };
+        
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
+        
+        await fetchAllLogs(challenge.$id!);
+      } else {
+        await updateProgress({
+          currentWeight: weight,
+          weightLogged: true,
+        });
 
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      await logActivity({
-        type: "weight",
-        title: "Weight Logged",
-        description: `⚖️ Current weight: ${weight.toFixed(1)}kg`,
-        value: weight,
-        unit: "kg",
-      });
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "weight",
+          title: "Weight Logged",
+          description: `⚖️ Current weight: ${weight.toFixed(1)}kg`,
+          value: weight,
+          unit: "kg",
+        });
+      }
 
       router.back();
     } catch (err) {
@@ -337,7 +373,7 @@ export default function LogWeightScreen() {
                     <Text className="text-xs text-gray-500">Target weight</Text>
                   </View>
                 </View>
-                <TrendIndicator current={weight} previous={todayLog.currentWeight} />
+                <TrendIndicator current={weight} previous={targetLog.currentWeight} />
               </View>
             </View>
           )}
@@ -371,7 +407,7 @@ export default function LogWeightScreen() {
         </Pressable>
 
         {/* Remove Weight Button - only show if weight exists */}
-        {todayLog.weightLogged && todayLog.currentWeight > 0 && (
+        {targetLog.weightLogged && targetLog.currentWeight > 0 && (
           <Pressable
             onPress={handleRemoveWeight}
             disabled={saving}

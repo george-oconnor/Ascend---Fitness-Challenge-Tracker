@@ -1,3 +1,4 @@
+import SwipeableActivityItem from "@/components/SwipeableActivityItem";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { ActivityLog, ActivityType } from "@/types/type.d";
@@ -12,7 +13,8 @@ import {
     subDays
 } from "date-fns";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { RefreshControl, ScrollView, Text, View } from "react-native";
+import { Alert, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Activity type configurations for display
@@ -40,8 +42,9 @@ type GroupedActivity = {
 
 export default function ActivityScreen() {
   const { user } = useSessionStore();
-  const { challenge, activityLogs, fetchChallenge, fetchActivityLogs } = useChallengeStore();
+  const { challenge, activityLogs, fetchChallenge, fetchActivityLogs, deleteActivityLogById } = useChallengeStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (user?.id) {
@@ -65,6 +68,42 @@ export default function ActivityScreen() {
       setRefreshing(false);
     }
   }, [challenge?.$id, fetchActivityLogs]);
+
+  const handleDeleteActivity = useCallback(async (activityId: string, activityTitle: string) => {
+    Alert.alert(
+      "Delete Activity",
+      `Are you sure you want to delete "${activityTitle}"?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteActivityLogById(activityId);
+            } catch (error) {
+              Alert.alert("Error", "Failed to delete activity. Please try again.");
+            }
+          },
+        },
+      ]
+    );
+  }, [deleteActivityLogById]);
+
+  const toggleGroupExpansion = useCallback((groupTitle: string) => {
+    setExpandedGroups((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupTitle)) {
+        newSet.delete(groupTitle);
+      } else {
+        newSet.add(groupTitle);
+      }
+      return newSet;
+    });
+  }, []);
 
 
 
@@ -114,25 +153,26 @@ export default function ActivityScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
-      {/* Header */}
-      <View className="bg-white px-5 py-4 border-b border-gray-100">
-        <Text className="text-2xl font-bold text-gray-900">Activity</Text>
-        <Text className="text-sm text-gray-500 mt-1">Your recent activity feed</Text>
-      </View>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+        {/* Header */}
+        <View className="bg-white px-5 py-4 border-b border-gray-100">
+          <Text className="text-2xl font-bold text-gray-900">Activity</Text>
+          <Text className="text-sm text-gray-500 mt-1">Your recent activity feed</Text>
+        </View>
 
-      <ScrollView 
-        className="flex-1" 
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor="#8B5CF6"
-            colors={["#8B5CF6"]}
-          />
-        }
-      >
+        <ScrollView 
+          className="flex-1" 
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor="#8B5CF6"
+              colors={["#8B5CF6"]}
+            />
+          }
+        >
 
 
         {/* Recent Activity Feed */}
@@ -149,45 +189,61 @@ export default function ActivityScreen() {
         ) : (
           <View className="p-4">
             <Text className="text-sm font-semibold text-gray-500 mb-3 ml-1">Recent Activity</Text>
-            {groupedActivities.map((group) => (
-              <View key={group.title} className="mb-6">
-                <Text className="text-xs font-medium text-gray-400 mb-2 ml-1">
-                  {group.title}
-                </Text>
-                <View className="bg-white rounded-2xl overflow-hidden shadow-sm">
-                  {group.data.slice(0, 5).map((item, index) => {
-                    const config = getActivityConfig(item.type);
-                    return (
-                      <View
-                        key={item.$id}
-                        className={`flex-row items-center p-4 ${
-                          index < Math.min(group.data.length, 5) - 1 ? "border-b border-gray-100" : ""
-                        }`}
+            {groupedActivities.map((group) => {
+              const isExpanded = expandedGroups.has(group.title);
+              const displayLimit = isExpanded ? group.data.length : 5;
+              const hasMore = group.data.length > 5;
+              const displayData = group.data.slice(0, displayLimit);
+              
+              return (
+                <View key={group.title} className="mb-6">
+                  <Text className="text-xs font-medium text-gray-400 mb-2 ml-1">
+                    {group.title}
+                  </Text>
+                  <View className="bg-white rounded-2xl overflow-hidden shadow-sm">
+                    {displayData.map((item, index) => {
+                      const config = getActivityConfig(item.type);
+                      return (
+                        <SwipeableActivityItem
+                          key={item.$id}
+                          icon={config.icon}
+                          iconColor={config.color}
+                          iconBgColor={config.bgColor}
+                          title={item.title}
+                          description={item.description}
+                          timestamp={formatActivityDate(item.$createdAt || item.date)}
+                          showBorder={index < displayData.length - 1 || hasMore}
+                          onDelete={() => handleDeleteActivity(item.$id, item.title)}
+                        />
+                      );
+                    })}
+                    {hasMore && (
+                      <Pressable
+                        onPress={() => toggleGroupExpansion(group.title)}
+                        className="py-3 px-4 bg-gray-50 active:bg-gray-100"
                       >
-                        <View
-                          className="h-10 w-10 items-center justify-center rounded-full mr-3"
-                          style={{ backgroundColor: config.bgColor }}
-                        >
-                          <Feather name={config.icon} size={20} color={config.color} />
-                        </View>
-                        <View className="flex-1">
-                          <Text className="text-base font-semibold text-gray-900">
-                            {item.title}
+                        <View className="flex-row items-center justify-center">
+                          <Feather 
+                            name={isExpanded ? "chevron-up" : "chevron-down"} 
+                            size={16} 
+                            color="#8B5CF6" 
+                          />
+                          <Text className="text-sm font-medium text-purple-600 ml-1">
+                            {isExpanded 
+                              ? "Show Less" 
+                              : `Show ${group.data.length - 5} More`}
                           </Text>
-                          <Text className="text-sm text-gray-500" numberOfLines={1}>{item.description}</Text>
                         </View>
-                        <Text className="text-xs text-gray-400">
-                          {formatActivityDate(item.$createdAt || item.date)}
-                        </Text>
-                      </View>
-                    );
-                  })}
+                      </Pressable>
+                    )}
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 }

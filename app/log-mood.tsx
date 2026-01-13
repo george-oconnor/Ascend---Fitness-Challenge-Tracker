@@ -1,8 +1,10 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { healthSyncService } from "@/lib/healthSync";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -201,33 +203,41 @@ function getRandomMessage(score: number): string {
 
 export default function LogMoodScreen() {
   const router = useRouter();
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
-  const [selectedMood, setSelectedMood] = useState<number>(todayLog?.moodScore ?? 0);
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs, fetchAllLogs } = useChallengeStore();
+  
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
+  const [selectedMood, setSelectedMood] = useState<number>(targetLog?.moodScore ?? 0);
   const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
-  const [notes, setNotes] = useState(todayLog?.moodNotes ?? "");
+  const [notes, setNotes] = useState(targetLog?.moodNotes ?? "");
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
   // Parse emotions from notes if they exist (stored as JSON prefix)
   useEffect(() => {
-    if (todayLog?.moodNotes) {
+    if (targetLog?.moodNotes) {
       try {
         // Check if notes start with emotions JSON
-        if (todayLog.moodNotes.startsWith('{"emotions":')) {
-          const parsed = JSON.parse(todayLog.moodNotes);
+        if (targetLog.moodNotes.startsWith('{"emotions":')) {
+          const parsed = JSON.parse(targetLog.moodNotes);
           setSelectedEmotions(parsed.emotions || []);
           setNotes(parsed.notes || "");
         } else {
-          setNotes(todayLog.moodNotes);
+          setNotes(targetLog.moodNotes);
         }
       } catch {
-        setNotes(todayLog.moodNotes);
+        setNotes(targetLog.moodNotes);
       }
     }
-    if (todayLog?.moodScore) {
-      setSelectedMood(todayLog.moodScore);
+    if (targetLog?.moodScore) {
+      setSelectedMood(targetLog.moodScore);
     }
-  }, [todayLog?.moodScore, todayLog?.moodNotes]);
+  }, [targetLog?.moodScore, targetLog?.moodNotes]);
 
   // Toggle emotion selection
   const toggleEmotion = (emotionId: string) => {
@@ -245,7 +255,7 @@ export default function LogMoodScreen() {
     }
   }, [selectedMood]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -267,11 +277,6 @@ export default function LogMoodScreen() {
         });
       }
       
-      await updateProgress({
-        moodScore: selectedMood,
-        moodNotes,
-      });
-      
       // Sync to Apple Health State of Mind (iOS 17+)
       try {
         await healthSyncService.saveMood(selectedMood, selectedEmotions);
@@ -282,15 +287,46 @@ export default function LogMoodScreen() {
           emotionCount: selectedEmotions.length,
         });
       }
+      
+      if (isEditingPastDay && logIdParam) {
+        await updateDailyLog(logIdParam, {
+          moodScore: selectedMood,
+          moodNotes,
+        });
+        
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, 'mood');
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: 'mood' as const,
+          title: "Mood Logged",
+          description: `${selectedOption?.emoji || "😊"} Feeling ${selectedOption?.label || "Good"}${selectedEmotions.length > 0 ? ` - ${selectedEmotions.length} emotion${selectedEmotions.length !== 1 ? 's' : ''} noted` : ""}`,
+          value: selectedMood,
+          date: dateStr,
+        };
+        
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
+        
+        await fetchAllLogs(challenge.$id!);
+      } else {
+        await updateProgress({
+          moodScore: selectedMood,
+          moodNotes,
+        });
 
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      await logActivity({
-        type: "mood",
-        title: "Mood Logged",
-        description: `${selectedOption?.emoji || "😊"} Feeling ${selectedOption?.label || "Good"}${selectedEmotions.length > 0 ? ` - ${selectedEmotions.length} emotion${selectedEmotions.length !== 1 ? 's' : ''} noted` : ""}`,
-        value: selectedMood,
-      });
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "mood",
+          title: "Mood Logged",
+          description: `${selectedOption?.emoji || "😊"} Feeling ${selectedOption?.label || "Good"}${selectedEmotions.length > 0 ? ` - ${selectedEmotions.length} emotion${selectedEmotions.length !== 1 ? 's' : ''} noted` : ""}`,
+          value: selectedMood,
+        });
+      }
       
       router.back();
     } catch (err) {

@@ -1,7 +1,9 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { logger } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -15,12 +17,20 @@ const SKINCARE_STEPS = [
 ];
 
 export default function LogSkincareScreen() {
-  const { todayLog, updateProgress } = useChallengeStore();
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs, fetchAllLogs } = useChallengeStore();
+  
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
   const [saving, setSaving] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(
     new Set()
   );
-  const [notes, setNotes] = useState(todayLog?.skincareNotes ?? "");
+  const [notes, setNotes] = useState(targetLog?.skincareNotes ?? "");
 
   const toggleStep = (step: string) => {
     const newSteps = new Set(completedSteps);
@@ -37,28 +47,57 @@ export default function LogSkincareScreen() {
     try {
       const isCompleted = completedSteps.size > 0;
       
-      await updateProgress({
-        skincareCompleted: isCompleted,
-        skincareNotes: notes.trim() || undefined,
-      });
-
       logger.info("Skincare routine logged", {
         type: "skincare",
         stepsCompleted: completedSteps.size,
         totalSteps: SKINCARE_STEPS.length,
         hasNotes: notes.trim().length > 0,
       });
-
-      // Log activity to feed
-      if (isCompleted) {
-        const { logActivity } = useChallengeStore.getState();
-        await logActivity({
-          type: "skincare",
-          title: "Skincare Routine Completed",
-          description: `✨ ${completedSteps.size} step${completedSteps.size !== 1 ? 's' : ''} completed`,
-          value: completedSteps.size,
-          unit: "steps",
+      
+      if (isEditingPastDay && logIdParam) {
+        await updateDailyLog(logIdParam, {
+          skincareCompleted: isCompleted,
+          skincareNotes: notes.trim() || undefined,
         });
+        
+        if (isCompleted) {
+          const dateStr = format(targetDate, 'yyyy-MM-dd');
+          const existingLogs = await getActivityLogsForDate(challenge!.$id!, dateStr, 'skincare');
+          const activityData = {
+            userId: challenge!.userId,
+            challengeId: challenge!.$id!,
+            type: 'skincare' as const,
+            title: "Skincare Routine Completed",
+            description: `✨ ${completedSteps.size} step${completedSteps.size !== 1 ? 's' : ''} completed`,
+            value: completedSteps.size,
+            unit: "steps",
+            date: dateStr,
+          };
+          
+          if (existingLogs.length > 0) {
+            await updateActivityLog(existingLogs[0].$id!, activityData);
+          } else {
+            await createActivityLog(activityData);
+          }
+        }
+        
+        await fetchAllLogs(challenge!.$id!);
+      } else {
+        await updateProgress({
+          skincareCompleted: isCompleted,
+          skincareNotes: notes.trim() || undefined,
+        });
+
+        if (isCompleted) {
+          const { logActivity } = useChallengeStore.getState();
+          await logActivity({
+            type: "skincare",
+            title: "Skincare Routine Completed",
+            description: `✨ ${completedSteps.size} step${completedSteps.size !== 1 ? 's' : ''} completed`,
+            value: completedSteps.size,
+            unit: "steps",
+          });
+        }
       }
 
       router.back();

@@ -6,7 +6,7 @@ import { useSessionStore } from "@/store/useSessionStore";
 import { ActivityLog, ActivityType, BadgeId, DailyLog, UserBadge } from "@/types/type.d";
 import { Feather } from "@expo/vector-icons";
 import { addDays, differenceInDays, eachDayOfInterval, format, isAfter, isBefore, parseISO, startOfWeek, subDays } from "date-fns";
-import { useLocalSearchParams } from "expo-router";
+import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -198,7 +198,7 @@ export default function AnalyticsScreen() {
   const getCompletionItems = (log: DailyLog | null) => {
     if (!log || !challenge) return [];
     
-    const items: { label: string; completed: boolean; value?: string; icon: keyof typeof Feather.glyphMap; color: string }[] = [];
+    const items: { label: string; completed: boolean; value?: string; icon: keyof typeof Feather.glyphMap; color: string; type?: string; workoutNum?: string }[] = [];
     
     if (challenge.trackSteps) {
       items.push({
@@ -206,7 +206,8 @@ export default function AnalyticsScreen() {
         completed: log.stepsCompleted || (log.stepsCount !== undefined && log.stepsCount >= (challenge.stepsGoal || 10000)),
         value: log.stepsCount ? `${log.stepsCount.toLocaleString()} steps` : undefined,
         icon: "trending-up",
-        color: "#10B981"
+        color: "#10B981",
+        type: "steps"
       });
     }
     
@@ -216,7 +217,9 @@ export default function AnalyticsScreen() {
         completed: log.workout1Completed || (log.workout1Minutes !== undefined && log.workout1Minutes >= (challenge.workoutMinutes || 45)),
         value: log.workout1Minutes ? `${log.workout1Minutes} min` : undefined,
         icon: "zap",
-        color: "#F59E0B"
+        color: "#F59E0B",
+        type: "workout",
+        workoutNum: "1"
       });
     }
     
@@ -226,7 +229,9 @@ export default function AnalyticsScreen() {
         completed: log.workout2Completed || (log.workout2Minutes !== undefined && log.workout2Minutes >= (challenge.workoutMinutes || 45)),
         value: log.workout2Minutes ? `${log.workout2Minutes} min` : undefined,
         icon: "activity",
-        color: "#8B5CF6"
+        color: "#8B5CF6",
+        type: "workout",
+        workoutNum: "2"
       });
     }
     
@@ -236,7 +241,8 @@ export default function AnalyticsScreen() {
         completed: log.waterCompleted || (log.waterLiters !== undefined && log.waterLiters >= (challenge.waterLiters || 3.7)),
         value: log.waterLiters ? `${log.waterLiters}L` : undefined,
         icon: "droplet",
-        color: "#3B82F6"
+        color: "#3B82F6",
+        type: "water"
       });
     }
     
@@ -245,7 +251,8 @@ export default function AnalyticsScreen() {
         label: "Diet",
         completed: !!log.dietCompleted,
         icon: "check-circle",
-        color: "#22C55E"
+        color: "#22C55E",
+        type: "diet"
       });
     }
     
@@ -255,7 +262,8 @@ export default function AnalyticsScreen() {
         completed: log.readingCompleted || (log.readingPages !== undefined && log.readingPages >= (challenge.readingPages || 10)),
         value: log.readingPages ? `${log.readingPages} pages` : undefined,
         icon: "book-open",
-        color: "#A855F7"
+        color: "#A855F7",
+        type: "reading"
       });
     }
     
@@ -264,7 +272,8 @@ export default function AnalyticsScreen() {
         label: "Progress Photo",
         completed: !!log.progressPhotoCompleted,
         icon: "camera",
-        color: "#EC4899"
+        color: "#EC4899",
+        type: "photo"
       });
     }
     
@@ -273,7 +282,8 @@ export default function AnalyticsScreen() {
         label: "No Alcohol",
         completed: !!log.noAlcoholCompleted,
         icon: "slash",
-        color: "#EF4444"
+        color: "#EF4444",
+        type: "alcohol"
       });
     }
     
@@ -282,7 +292,8 @@ export default function AnalyticsScreen() {
         label: "Skincare",
         completed: !!log.skincareCompleted,
         icon: "sun",
-        color: "#14B8A6"
+        color: "#14B8A6",
+        type: "skincare"
       });
     }
     
@@ -292,7 +303,8 @@ export default function AnalyticsScreen() {
         completed: true,
         value: `${log.caloriesConsumed} cal`,
         icon: "pie-chart",
-        color: "#14B8A6"
+        color: "#14B8A6",
+        type: "calories"
       });
     }
     
@@ -302,7 +314,8 @@ export default function AnalyticsScreen() {
         completed: true,
         value: `${log.currentWeight} kg`,
         icon: "trending-down",
-        color: "#6366F1"
+        color: "#6366F1",
+        type: "weight"
       });
     }
     
@@ -313,7 +326,8 @@ export default function AnalyticsScreen() {
         completed: true,
         value: moodEmojis[log.moodScore - 1] || "😐",
         icon: "smile",
-        color: "#F59E0B"
+        color: "#F59E0B",
+        type: "mood"
       });
     }
     
@@ -325,7 +339,8 @@ export default function AnalyticsScreen() {
         completed: true,
         value: `${hours}h ${mins}m`,
         icon: "moon",
-        color: "#8B5CF6"
+        color: "#8B5CF6",
+        type: "sleep"
       });
     }
     
@@ -866,48 +881,6 @@ export default function AnalyticsScreen() {
                 </View>
               </>
             )}
-
-            {/* Milestones & Badges */}
-            <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-              <View className="flex-row items-center justify-between mb-4">
-                <Text className="text-sm font-semibold text-gray-600">Milestones</Text>
-                <Text className="text-xs text-gray-400">{allEarnedBadges.length} earned</Text>
-              </View>
-              {allEarnedBadges.length > 0 ? (
-                <View className="flex-row flex-wrap gap-3">
-                  {allEarnedBadges.slice(0, 8).map((badgeId) => {
-                    const badge = BADGES[badgeId];
-                    return (
-                      <View key={badgeId} className="items-center" style={{ width: 70 }}>
-                        <View 
-                          className="h-12 w-12 rounded-full items-center justify-center mb-1"
-                          style={{ backgroundColor: badge.bgColor }}
-                        >
-                          <Feather name={badge.icon as keyof typeof Feather.glyphMap} size={20} color={badge.color} />
-                        </View>
-                        <Text className="text-xs text-gray-600 text-center" numberOfLines={2}>
-                          {badge.name}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              ) : (
-                <View className="items-center py-4">
-                  <View className="h-12 w-12 rounded-full items-center justify-center bg-gray-100 mb-2">
-                    <Feather name="award" size={20} color="#9CA3AF" />
-                  </View>
-                  <Text className="text-sm text-gray-400 text-center">
-                    Complete activities to earn badges!
-                  </Text>
-                </View>
-              )}
-              {allEarnedBadges.length > 8 && (
-                <Text className="text-xs text-purple-500 text-center mt-3">
-                  +{allEarnedBadges.length - 8} more badges earned
-                </Text>
-              )}
-            </View>
           </View>
         )}
       </ScrollView>
@@ -934,72 +907,97 @@ export default function AnalyticsScreen() {
             </View>
             <Pressable 
               onPress={() => setShowDayModal(false)}
-              className="h-8 w-8 items-center justify-center rounded-full bg-gray-100"
+              className="h-8 w-8 items-center justify-center rounded-full bg-orange-100"
             >
-              <Feather name="x" size={20} color="#6B7280" />
+              <Feather name="x" size={20} color="#F97316" />
             </Pressable>
           </View>
 
           <ScrollView className="flex-1 p-4">
-            {/* Re-sync from Apple Health button (iOS only) */}
-            {Platform.OS === "ios" && selectedDayLog && (
-              <Pressable
-                onPress={handleResyncHealthData}
-                disabled={resyncing}
-                className={`flex-row items-center justify-center bg-purple-50 rounded-2xl p-3 mb-4 ${
-                  resyncing ? 'opacity-50' : ''
-                }`}
-              >
-                <Feather name={resyncing ? "loader" : "refresh-cw"} size={16} color="#8B5CF6" />
-                <Text className="text-sm font-semibold text-purple-600 ml-2">
-                  {resyncing ? "Re-syncing..." : "Re-sync from Apple Health"}
-                </Text>
-              </Pressable>
-            )}
-
             {/* Completion Status */}
             <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
               <Text className="text-sm font-semibold text-gray-600 mb-4">Completions</Text>
               {getCompletionItems(selectedDayLog).length > 0 ? (
                 <View>
-                  {getCompletionItems(selectedDayLog).map((item, index) => (
-                    <View 
-                      key={item.label} 
-                      className={`flex-row items-center py-3 ${
-                        index < getCompletionItems(selectedDayLog).length - 1 ? "border-b border-gray-100" : ""
-                      }`}
-                    >
-                      <View 
-                        className="h-10 w-10 rounded-full items-center justify-center mr-3"
-                        style={{ backgroundColor: item.completed ? `${item.color}20` : "#F3F4F6" }}
-                      >
-                        <Feather 
-                          name={item.icon} 
-                          size={20} 
-                          color={item.completed ? item.color : "#9CA3AF"} 
-                        />
-                      </View>
-                      <View className="flex-1">
-                        <Text className={`font-medium ${item.completed ? "text-gray-900" : "text-gray-400"}`}>
-                          {item.label}
-                        </Text>
-                        {item.value && (
-                          <Text className="text-sm text-gray-500">{item.value}</Text>
-                        )}
-                      </View>
-                      <View 
-                        className={`h-6 w-6 rounded-full items-center justify-center ${
-                          item.completed ? "bg-green-500" : "bg-gray-200"
+                  {getCompletionItems(selectedDayLog).map((item, index) => {
+                    const handleItemPress = () => {
+                      if (!item.type || !selectedDate || !selectedDayLog?.$id) return;
+                      
+                      setShowDayModal(false);
+                      
+                      const baseParams = {
+                        date: format(selectedDate, 'yyyy-MM-dd'),
+                        logId: selectedDayLog.$id
+                      };
+                      
+                      if (item.type === 'workout' && item.workoutNum) {
+                        router.push({
+                          pathname: '/log-workout',
+                          params: { ...baseParams, workout: item.workoutNum }
+                        });
+                      } else if (item.type === 'water') {
+                        router.push({ pathname: '/log-water', params: baseParams });
+                      } else if (item.type === 'diet') {
+                        router.push({ pathname: '/log-diet', params: baseParams });
+                      } else if (item.type === 'calories') {
+                        router.push({ pathname: '/log-calories', params: baseParams });
+                      } else if (item.type === 'reading') {
+                        router.push({ pathname: '/log-reading', params: baseParams });
+                      } else if (item.type === 'alcohol') {
+                        router.push({ pathname: '/log-alcohol', params: baseParams });
+                      } else if (item.type === 'weight') {
+                        router.push({ pathname: '/log-weight', params: baseParams });
+                      } else if (item.type === 'mood') {
+                        router.push({ pathname: '/log-mood', params: baseParams });
+                      } else if (item.type === 'sleep') {
+                        router.push({ pathname: '/log-sleep', params: baseParams });
+                      } else if (item.type === 'photo') {
+                        router.push({ pathname: '/log-photo', params: baseParams });
+                      } else if (item.type === 'skincare') {
+                        router.push({ pathname: '/log-skincare', params: baseParams });
+                      }
+                    };
+                    
+                    return (
+                      <Pressable 
+                        key={item.label}
+                        onPress={handleItemPress}
+                        className={`flex-row items-center py-3 active:opacity-70 ${
+                          index < getCompletionItems(selectedDayLog).length - 1 ? "border-b border-gray-100" : ""
                         }`}
                       >
-                        <Feather 
-                          name={item.completed ? "check" : "x"} 
-                          size={14} 
-                          color={item.completed ? "white" : "#9CA3AF"} 
-                        />
-                      </View>
-                    </View>
-                  ))}
+                        <View 
+                          className="h-10 w-10 rounded-full items-center justify-center mr-3"
+                          style={{ backgroundColor: item.completed ? `${item.color}20` : "#F3F4F6" }}
+                        >
+                          <Feather 
+                            name={item.icon} 
+                            size={20} 
+                            color={item.completed ? item.color : "#9CA3AF"} 
+                          />
+                        </View>
+                        <View className="flex-1">
+                          <Text className={`font-medium ${item.completed ? "text-gray-900" : "text-gray-400"}`}>
+                            {item.label}
+                          </Text>
+                          {item.value && (
+                            <Text className="text-sm text-gray-500">{item.value}</Text>
+                          )}
+                        </View>
+                        <View 
+                          className={`h-6 w-6 rounded-full items-center justify-center ${
+                            item.completed ? "bg-green-500" : "bg-gray-200"
+                          }`}
+                        >
+                          <Feather 
+                            name={item.completed ? "check" : "x"} 
+                            size={14} 
+                            color={item.completed ? "white" : "#9CA3AF"} 
+                          />
+                        </View>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               ) : (
                 <View className="items-center py-6">
@@ -1209,6 +1207,266 @@ export default function AnalyticsScreen() {
                   );
                 })}
               </View>
+            )}
+
+            {/* Quick Actions - Log/Edit for this day */}
+            {selectedDate && selectedDayLog && challenge && (
+              <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
+                <Text className="text-sm font-semibold text-gray-600 mb-3">Log or Edit Activity</Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {challenge.trackWorkout1 && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-workout',
+                          params: { 
+                            workout: '1',
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-orange-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="zap" size={16} color="#F97316" />
+                      <Text className="text-sm font-medium text-orange-700 ml-2">Workout 1</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackWorkout2 && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-workout',
+                          params: { 
+                            workout: '2',
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-purple-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="activity" size={16} color="#8B5CF6" />
+                      <Text className="text-sm font-medium text-purple-700 ml-2">Workout 2</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackWater && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-water',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-blue-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="droplet" size={16} color="#3B82F6" />
+                      <Text className="text-sm font-medium text-blue-700 ml-2">Water</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackDiet && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-diet',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-green-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="check-circle" size={16} color="#22C55E" />
+                      <Text className="text-sm font-medium text-green-700 ml-2">Diet</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackCalories && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-calories',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-teal-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="pie-chart" size={16} color="#14B8A6" />
+                      <Text className="text-sm font-medium text-teal-700 ml-2">Calories</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackReading && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-reading',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-purple-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="book-open" size={16} color="#A855F7" />
+                      <Text className="text-sm font-medium text-purple-700 ml-2">Reading</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackNoAlcohol && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-alcohol',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-red-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="slash" size={16} color="#EF4444" />
+                      <Text className="text-sm font-medium text-red-700 ml-2">Alcohol</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackWeight && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-weight',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-indigo-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="trending-down" size={16} color="#6366F1" />
+                      <Text className="text-sm font-medium text-indigo-700 ml-2">Weight</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackMood && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-mood',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-yellow-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="smile" size={16} color="#F59E0B" />
+                      <Text className="text-sm font-medium text-yellow-700 ml-2">Mood</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackSleep && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-sleep',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-purple-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="moon" size={16} color="#8B5CF6" />
+                      <Text className="text-sm font-medium text-purple-700 ml-2">Sleep</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackProgressPhoto && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-photo',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-pink-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="camera" size={16} color="#EC4899" />
+                      <Text className="text-sm font-medium text-pink-700 ml-2">Photo</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackSkincare && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-skincare',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd'),
+                            logId: selectedDayLog.$id
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-teal-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="sun" size={16} color="#14B8A6" />
+                      <Text className="text-sm font-medium text-teal-700 ml-2">Skincare</Text>
+                    </Pressable>
+                  )}
+                  {challenge.trackCycle && (
+                    <Pressable
+                      onPress={() => {
+                        setShowDayModal(false);
+                        router.push({
+                          pathname: '/log-cycle',
+                          params: { 
+                            date: format(selectedDate, 'yyyy-MM-dd')
+                          }
+                        });
+                      }}
+                      className="flex-row items-center bg-pink-50 rounded-xl px-3 py-2 active:opacity-70"
+                    >
+                      <Feather name="heart" size={16} color="#EC4899" />
+                      <Text className="text-sm font-medium text-pink-700 ml-2">Cycle</Text>
+                    </Pressable>
+                  )}
+                </View>
+              </View>
+            )}
+
+            {/* Re-sync from Apple Health button (iOS only) */}
+            {Platform.OS === "ios" && selectedDayLog && (
+              <Pressable
+                onPress={handleResyncHealthData}
+                disabled={resyncing}
+                className={`flex-row items-center justify-center bg-purple-50 rounded-2xl p-3 mb-4 ${
+                  resyncing ? 'opacity-50' : ''
+                }`}
+              >
+                <Feather name={resyncing ? "loader" : "refresh-cw"} size={16} color="#8B5CF6" />
+                <Text className="text-sm font-semibold text-purple-600 ml-2">
+                  {resyncing ? "Re-syncing..." : "Re-sync from Apple Health"}
+                </Text>
+              </Pressable>
             )}
           </ScrollView>
         </SafeAreaView>

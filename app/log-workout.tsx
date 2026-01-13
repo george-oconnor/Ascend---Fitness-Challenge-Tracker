@@ -1,8 +1,10 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { healthService } from "@/lib/health";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
+import { format, parseISO } from "date-fns";
 import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from "react-native";
@@ -87,19 +89,26 @@ function parseWorkoutDetails(detailsString?: string): WorkoutDetailsData {
 }
 
 export default function LogWorkoutScreen() {
-  const { workout: workoutParam } = useLocalSearchParams<{ workout: string }>();
+  const { workout: workoutParam, date: dateParam, logId: logIdParam } = useLocalSearchParams<{ workout: string; date?: string; logId?: string }>();
   const workoutNumber = workoutParam === "2" ? 2 : 1;
   const isWorkout1 = workoutNumber === 1;
   
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
+  const { challenge, todayLog, updateProgress, allLogs } = useChallengeStore();
   const { workouts: healthWorkouts, isAuthorized: healthAuthorized } = useHealthStore();
   
+  // Determine which log we're editing
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
   // Parse existing workout details
-  const existingDetails = parseWorkoutDetails(todayLog?.workoutDetails);
+  const existingDetails = parseWorkoutDetails(targetLog?.workoutDetails);
   const existingWorkout = isWorkout1 ? existingDetails.workout1 : existingDetails.workout2;
   
-  // Get existing values from todayLog
-  const existingMinutes = isWorkout1 ? (todayLog?.workout1Minutes ?? 0) : (todayLog?.workout2Minutes ?? 0);
+  // Get existing values from targetLog
+  const existingMinutes = isWorkout1 ? (targetLog?.workout1Minutes ?? 0) : (targetLog?.workout2Minutes ?? 0);
   
   const [minutes, setMinutes] = useState(existingMinutes);
   const [selectedType, setSelectedType] = useState(existingWorkout?.type ?? "");
@@ -133,7 +142,7 @@ export default function LogWorkoutScreen() {
     }
   }, [syncedWorkouts.length, existingMinutes, existingWorkout?.type]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -152,35 +161,32 @@ export default function LogWorkoutScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Sync manual workout to Apple Health if enabled and this is a manual entry
-      const isManualEntry = minutes > 0 && syncedMinutes === 0;
-      if (isIOS && syncToHealth && isManualEntry && selectedType) {
-        const endDate = new Date();
-        const startDate = new Date(endDate.getTime() - minutes * 60 * 1000);
-        
-        try {
-          await healthService.saveWorkout({
-            type: selectedType,
-            startDate,
-            endDate,
-          });
-        } catch (healthError: any) {
-          console.error("Error saving workout to HealthKit:", healthError);
-          captureException(new Error(`Apple Health workout sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
-            workoutType: selectedType,
-            minutes,
-            workoutNumber: workoutNumber,
-          });
-        }
-      }
-
       // Build the new workout details, preserving the other workout's data
-      const currentDetails = parseWorkoutDetails(todayLog?.workoutDetails);
+      const currentDetails = parseWorkoutDetails(targetLog?.workoutDetails);
+      const isManualEntry = minutes > 0 && syncedMinutes === 0;
+      
+      // Get existing workout data to preserve fields like calories, distance
+      const existingWorkoutData = isWorkout1 ? currentDetails.workout1 : currentDetails.workout2;
+      
+      // Find the workout type info
+      const workoutTypeInfo = WORKOUT_TYPES.find(t => t.id === selectedType);
+      
+      // For manually logged workouts, use current time or estimate end time as now
+      const endTime = new Date();
+      const startTime = new Date(endTime.getTime() - totalMinutes * 60 * 1000);
+      
+      // Build complete workout data object, preserving existing fields
       const newWorkoutData = {
+        ...existingWorkoutData, // Preserve existing fields like calories, distance
         type: selectedType,
         notes: notes,
         syncedFromHealth: syncedMinutes > 0,
         syncedToHealth: isManualEntry && syncToHealth,
+        activityName: workoutTypeInfo?.label || selectedType.replace(/-/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+        isOutdoor: workoutTypeInfo?.isOutdoor ?? false,
+        // Include start and end times - use existing if available, otherwise calculate
+        startTime: existingWorkoutData?.startTime || startTime.toISOString(),
+        endTime: existingWorkoutData?.endTime || endTime.toISOString(),
       };
 
       const updatedDetails: WorkoutDetailsData = {
@@ -188,30 +194,81 @@ export default function LogWorkoutScreen() {
         [isWorkout1 ? "workout1" : "workout2"]: newWorkoutData,
       };
 
-      if (isWorkout1) {
-        await updateProgress({
-          workout1Minutes: totalMinutes,
-          workout1Completed: totalMinutes >= goal,
-          workoutDetails: JSON.stringify(updatedDetails),
-        });
+      const updates = {
+        [isWorkout1 ? "workout1Minutes" : "workout2Minutes"]: totalMinutes,
+        [isWorkout1 ? "workout1Completed" : "workout2Completed"]: totalMinutes >= goal,
+        workoutDetails: JSON.stringify(updatedDetails),
+      };
+
+      if (isEditingPastDay && logIdParam) {
+        // Update specific past day's log
+        await updateDailyLog(logIdParam, updates);
+        
+        // Create or update activity log
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const activityType = isWorkout1 ? 'workout1' : 'workout2';
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, activityType);
+        const workoutType = WORKOUT_TYPES.find(t => t.id === selectedType);
+        
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: activityType as const,
+          title: `${isWorkout1 ? "Workout 1" : "Workout 2"} Complete`,
+          description: `${workoutType?.label || "Workout"} - ${totalMinutes} minutes${notes ? ` - ${notes}` : ""}`,
+          value: totalMinutes,
+          unit: "minutes",
+          date: dateStr,
+        };
+        
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
+        
+        // Refresh the data
+        const { fetchAllLogs, fetchActivityLogs } = useChallengeStore.getState();
+        await Promise.all([
+          fetchAllLogs(challenge.$id!),
+          fetchActivityLogs(challenge.$id!)
+        ]);
       } else {
-        await updateProgress({
-          workout2Minutes: totalMinutes,
-          workout2Completed: totalMinutes >= goal,
-          workoutDetails: JSON.stringify(updatedDetails),
+        // Sync manual workout to Apple Health if enabled and this is a manual entry
+        if (isIOS && syncToHealth && isManualEntry && selectedType) {
+          const endDate = new Date();
+          const startDate = new Date(endDate.getTime() - minutes * 60 * 1000);
+          
+          try {
+            await healthService.saveWorkout({
+              type: selectedType,
+              startDate,
+              endDate,
+            });
+          } catch (healthError: any) {
+            console.error("Error saving workout to HealthKit:", healthError);
+            captureException(new Error(`Apple Health workout sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
+              workoutType: selectedType,
+              minutes,
+              workoutNumber: workoutNumber,
+            });
+          }
+        }
+
+        // Update today's log using the store method
+        await updateProgress(updates);
+
+        // Log activity to feed
+        const { logActivity } = useChallengeStore.getState();
+        const workoutType = WORKOUT_TYPES.find(t => t.id === selectedType);
+        await logActivity({
+          type: isWorkout1 ? "workout1" : "workout2",
+          title: `${isWorkout1 ? "Workout 1" : "Workout 2"} Complete`,
+          description: `${workoutType?.label || "Workout"} - ${totalMinutes} minutes${notes ? ` - ${notes}` : ""}`,
+          value: totalMinutes,
+          unit: "minutes",
         });
       }
-
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      const workoutType = WORKOUT_TYPES.find(t => t.id === selectedType);
-      await logActivity({
-        type: isWorkout1 ? "workout1" : "workout2",
-        title: `${isWorkout1 ? "Workout 1" : "Workout 2"} Complete`,
-        description: `${workoutType?.label || "Workout"} - ${totalMinutes} minutes${notes ? ` - ${notes}` : ""}`,
-        value: totalMinutes,
-        unit: "minutes",
-      });
 
       router.back();
     } catch (err) {
@@ -230,7 +287,7 @@ export default function LogWorkoutScreen() {
     setSaving(true);
     try {
       // Get current workout details and remove this workout's data
-      const currentDetails = parseWorkoutDetails(todayLog?.workoutDetails);
+      const currentDetails = parseWorkoutDetails(targetLog?.workoutDetails);
       const updatedDetails: WorkoutDetailsData = {
         ...currentDetails,
       };
@@ -242,19 +299,37 @@ export default function LogWorkoutScreen() {
         delete updatedDetails.workout2;
       }
 
-      // Reset workout data in Appwrite
-      if (isWorkout1) {
-        await updateProgress({
-          workout1Minutes: 0,
-          workout1Completed: false,
-          workoutDetails: JSON.stringify(updatedDetails),
-        });
+      const updates = {
+        [isWorkout1 ? "workout1Minutes" : "workout2Minutes"]: 0,
+        [isWorkout1 ? "workout1Completed" : "workout2Completed"]: false,
+        workoutDetails: JSON.stringify(updatedDetails),
+      };
+
+      if (isEditingPastDay && logIdParam) {
+        // Update specific past day's log
+        await updateDailyLog(logIdParam, updates);
+        
+        // Delete activity log if exists
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const activityType = isWorkout1 ? 'workout1' : 'workout2';
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, activityType);
+        
+        for (const log of existingLogs) {
+          if (log.$id) {
+            const { deleteActivityLog } = await import("@/lib/appwrite");
+            await deleteActivityLog(log.$id);
+          }
+        }
+        
+        // Refresh the data
+        const { fetchAllLogs, fetchActivityLogs } = useChallengeStore.getState();
+        await Promise.all([
+          fetchAllLogs(challenge.$id!),
+          fetchActivityLogs(challenge.$id!)
+        ]);
       } else {
-        await updateProgress({
-          workout2Minutes: 0,
-          workout2Completed: false,
-          workoutDetails: JSON.stringify(updatedDetails),
-        });
+        // Reset today's workout data in Appwrite
+        await updateProgress(updates);
       }
 
       router.back();
@@ -272,7 +347,12 @@ export default function LogWorkoutScreen() {
         <Pressable onPress={() => router.back()} className="p-2 -ml-2">
           <Feather name="arrow-left" size={24} color="#181C2E" />
         </Pressable>
-        <Text className="text-lg font-bold text-gray-900">Log {config.label}</Text>
+        <View className="flex-1 items-center">
+          <Text className="text-lg font-bold text-gray-900">Log {config.label}</Text>
+          {isEditingPastDay && (
+            <Text className="text-xs text-gray-500">{format(targetDate, 'MMM d, yyyy')}</Text>
+          )}
+        </View>
         <View className="w-10" />
       </View>
 

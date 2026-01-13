@@ -1,6 +1,8 @@
+import { updateDailyLog } from "@/lib/appwrite";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -96,21 +98,30 @@ function DrinkCounter({
 
 export default function LogAlcoholScreen() {
   const router = useRouter();
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs, fetchAllLogs } = useChallengeStore();
+  
+  // Determine which log we're editing
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
   const [drinks, setDrinks] = useState<DrinkEntry[]>([]);
   const [notes, setNotes] = useState("");
   const [saving, setSaving] = useState(false);
 
   // Load existing data
   useEffect(() => {
-    if (todayLog?.alcoholDetails) {
-      const parsed = parseAlcoholDetails(todayLog.alcoholDetails);
+    if (targetLog?.alcoholDetails) {
+      const parsed = parseAlcoholDetails(targetLog.alcoholDetails);
       setDrinks(parsed.drinks);
       setNotes(parsed.notes);
     }
-  }, [todayLog?.alcoholDetails]);
+  }, [targetLog?.alcoholDetails]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -151,27 +162,61 @@ export default function LogAlcoholScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateProgress({
-        noAlcoholCompleted: hadNoDrinks,
-        alcoholDetails: totalDrinks > 0 ? serializeAlcoholDetails(drinks, notes) : undefined,
-      });
-
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      if (hadNoDrinks) {
-        await logActivity({
-          type: "alcohol",
-          title: "No Alcohol Logged",
-          description: "✓ Stayed alcohol-free today!",
+      if (isEditingPastDay && logIdParam) {
+        // Update specific past day's log
+        console.log("Saving past day alcohol log:", { hadNoDrinks, totalDrinks });
+        await updateDailyLog(logIdParam, {
+          noAlcoholCompleted: hadNoDrinks,
+          alcoholDetails: totalDrinks > 0 ? serializeAlcoholDetails(drinks, notes) : "",
         });
+        
+        console.log("Successfully saved past day log");
+        
+        // Log activity to feed for past day
+        const { logActivity } = useChallengeStore.getState();
+        if (hadNoDrinks) {
+          await logActivity({
+            type: "alcohol",
+            title: "No Alcohol Logged",
+            description: `✓ Stayed alcohol-free on ${format(targetDate, 'MMM d')}!`,
+            date: format(targetDate, 'yyyy-MM-dd'),
+          });
+        } else {
+          await logActivity({
+            type: "alcohol",
+            title: "Alcohol Logged",
+            description: `${totalDrinks} drink${totalDrinks !== 1 ? 's' : ''} (${totalStandardDrinks.toFixed(1)} standard drinks) on ${format(targetDate, 'MMM d')}`,
+            value: totalDrinks,
+            unit: "drinks",
+            date: format(targetDate, 'yyyy-MM-dd'),
+          });
+        }
+        
+        await fetchAllLogs();
       } else {
-        await logActivity({
-          type: "alcohol",
-          title: "Alcohol Logged",
-          description: `${totalDrinks} drink${totalDrinks !== 1 ? 's' : ''} (${totalStandardDrinks.toFixed(1)} standard drinks)`,
-          value: totalDrinks,
-          unit: "drinks",
+        // Update today's log
+        await updateProgress({
+          noAlcoholCompleted: hadNoDrinks,
+          alcoholDetails: totalDrinks > 0 ? serializeAlcoholDetails(drinks, notes) : "",
         });
+
+        // Log activity to feed
+        const { logActivity } = useChallengeStore.getState();
+        if (hadNoDrinks) {
+          await logActivity({
+            type: "alcohol",
+            title: "No Alcohol Logged",
+            description: "✓ Stayed alcohol-free today!",
+          });
+        } else {
+          await logActivity({
+            type: "alcohol",
+            title: "Alcohol Logged",
+            description: `${totalDrinks} drink${totalDrinks !== 1 ? 's' : ''} (${totalStandardDrinks.toFixed(1)} standard drinks)`,
+            value: totalDrinks,
+            unit: "drinks",
+          });
+        }
       }
 
       router.back();
@@ -183,24 +228,57 @@ export default function LogAlcoholScreen() {
   };
 
   const handleMarkSober = async () => {
+    console.log("=== handleMarkSober called ===");
+    console.log("isEditingPastDay:", isEditingPastDay);
+    console.log("logIdParam:", logIdParam);
+    console.log("targetLog:", targetLog);
+    
     setSaving(true);
     try {
-      await updateProgress({
-        noAlcoholCompleted: true,
-        alcoholDetails: undefined,
-      });
+      // Clear all drinks and notes
+      setDrinks([]);
+      setNotes("");
+      
+      if (isEditingPastDay && logIdParam) {
+        console.log("Updating past day log:", logIdParam, "to sober");
+        await updateDailyLog(logIdParam, {
+          noAlcoholCompleted: true,
+          alcoholDetails: "", // Use empty string to clear the field in Appwrite
+        });
+        
+        console.log("Successfully updated past day log");
+        
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "alcohol",
+          title: "No Alcohol Logged",
+          description: `✓ Stayed alcohol-free on ${format(targetDate, 'MMM d')}!`,
+          date: format(targetDate, 'yyyy-MM-dd'),
+        });
+        
+        await fetchAllLogs();
+        console.log("Fetched all logs after update");
+      } else {
+        console.log("Updating today's log");
+        await updateProgress({
+          noAlcoholCompleted: true,
+          alcoholDetails: "", // Use empty string to clear the field
+        });
 
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      await logActivity({
-        type: "alcohol",
-        title: "No Alcohol Logged",
-        description: "✓ Stayed alcohol-free today!",
-      });
+        // Log activity to feed
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "alcohol",
+          title: "No Alcohol Logged",
+          description: "✓ Stayed alcohol-free today!",
+        });
+      }
 
+      console.log("About to navigate back");
       router.back();
     } catch (err) {
-      console.error("Failed to save:", err);
+      console.error("Failed to save alcohol update:", err);
+      console.error("Error details:", JSON.stringify(err, null, 2));
     } finally {
       setSaving(false);
     }

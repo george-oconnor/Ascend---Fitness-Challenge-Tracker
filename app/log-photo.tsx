@@ -1,24 +1,34 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LogPhotoScreen() {
   const router = useRouter();
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs, fetchAllLogs } = useChallengeStore();
+  
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
   const [photoTaken, setPhotoTaken] = useState(false);
   const [saving, setSaving] = useState(false);
 
   // Load existing data
   useEffect(() => {
-    if (todayLog?.progressPhotoCompleted !== undefined) {
-      setPhotoTaken(todayLog.progressPhotoCompleted);
+    if (targetLog?.progressPhotoCompleted !== undefined) {
+      setPhotoTaken(targetLog.progressPhotoCompleted);
     }
-  }, [todayLog?.progressPhotoCompleted]);
+  }, [targetLog?.progressPhotoCompleted]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -32,18 +42,44 @@ export default function LogPhotoScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateProgress({
-        progressPhotoCompleted: photoTaken,
-      });
-
-      // Log activity to feed if photo was taken
-      if (photoTaken) {
-        const { logActivity } = useChallengeStore.getState();
-        await logActivity({
-          type: "photo",
-          title: "Progress Photo Taken",
-          description: "📸 Progress photo captured!",
+      if (isEditingPastDay && logIdParam) {
+        await updateDailyLog(logIdParam, {
+          progressPhotoCompleted: photoTaken,
         });
+        
+        if (photoTaken) {
+          const dateStr = format(targetDate, 'yyyy-MM-dd');
+          const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, 'photo');
+          const activityData = {
+            userId: challenge.userId,
+            challengeId: challenge.$id!,
+            type: 'photo' as const,
+            title: "Progress Photo Taken",
+            description: "📸 Progress photo captured!",
+            date: dateStr,
+          };
+          
+          if (existingLogs.length > 0) {
+            await updateActivityLog(existingLogs[0].$id!, activityData);
+          } else {
+            await createActivityLog(activityData);
+          }
+        }
+        
+        await fetchAllLogs(challenge.$id!);
+      } else {
+        await updateProgress({
+          progressPhotoCompleted: photoTaken,
+        });
+
+        if (photoTaken) {
+          const { logActivity } = useChallengeStore.getState();
+          await logActivity({
+            type: "photo",
+            title: "Progress Photo Taken",
+            description: "📸 Progress photo captured!",
+          });
+        }
       }
 
       router.back();

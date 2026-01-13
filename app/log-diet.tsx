@@ -1,7 +1,9 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { healthSyncService } from "@/lib/healthSync";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -206,15 +208,24 @@ function DietProgressRing({ mealsLogged, totalMeals }: { mealsLogged: number; to
 }
 
 export default function LogDietScreen() {
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
-  const [meals, setMeals] = useState<MealData>(() => parseMeals(todayLog?.meals));
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs } = useChallengeStore();
+  
+  // Determine which log we're editing
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
+  const [meals, setMeals] = useState<MealData>(() => parseMeals(targetLog?.meals));
   const [expandedMeal, setExpandedMeal] = useState<MealType | null>("breakfast");
   const [saving, setSaving] = useState(false);
-  const [dietCompleted, setDietCompleted] = useState(todayLog?.dietCompleted ?? false);
+  const [dietCompleted, setDietCompleted] = useState(targetLog?.dietCompleted ?? false);
   const [mealCalories, setMealCalories] = useState<MealCalories>(() => {
     try {
-      if (todayLog?.calorieDetails) {
-        const parsed = JSON.parse(todayLog.calorieDetails);
+      if (targetLog?.calorieDetails) {
+        const parsed = JSON.parse(targetLog.calorieDetails);
         return {
           breakfast: parsed.breakfast || 0,
           lunch: parsed.lunch || 0,
@@ -228,17 +239,17 @@ export default function LogDietScreen() {
 
   const trackCalories = challenge?.trackCalories ?? false;
 
-  // Update meals when todayLog changes
+  // Update meals when targetLog changes
   useEffect(() => {
-    if (todayLog?.meals) {
-      setMeals(parseMeals(todayLog.meals));
+    if (targetLog?.meals) {
+      setMeals(parseMeals(targetLog.meals));
     }
-    setDietCompleted(todayLog?.dietCompleted ?? false);
+    setDietCompleted(targetLog?.dietCompleted ?? false);
     
     // Update calories if tracking
-    if (todayLog?.calorieDetails) {
+    if (targetLog?.calorieDetails) {
       try {
-        const parsed = JSON.parse(todayLog.calorieDetails);
+        const parsed = JSON.parse(targetLog.calorieDetails);
         setMealCalories({
           breakfast: parsed.breakfast || 0,
           lunch: parsed.lunch || 0,
@@ -247,9 +258,9 @@ export default function LogDietScreen() {
         });
       } catch {}
     }
-  }, [todayLog?.meals, todayLog?.dietCompleted, todayLog?.calorieDetails]);
+  }, [targetLog?.meals, targetLog?.dietCompleted, targetLog?.calorieDetails]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -287,52 +298,87 @@ export default function LogDietScreen() {
         updates.calorieDetails = JSON.stringify(mealCalories);
       }
       
-      await updateProgress(updates);
-      
-      // Sync calories to Apple Health using new service
-      if (trackCalories && totalCalories > 0) {
-        try {
-          // Save total daily calories
-          await healthSyncService.saveCalories(totalCalories, new Date(), "Daily Total");
-        } catch (healthError) {
-          console.log("HealthKit calorie sync skipped:", healthError);
-        }
-      }
-
-      // Log activity to feed - create individual logs for each meal
-      const { logActivity } = useChallengeStore.getState();
-      const previousMeals = parseMeals(todayLog?.meals);
-      
-      // Check which meals are new and create activity logs for them
-      const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snacks"];
-      for (const mealType of mealTypes) {
-        const currentMeal = meals[mealType].trim();
-        const previousMeal = previousMeals[mealType].trim();
+      if (isEditingPastDay && logIdParam) {
+        // Update specific past day's log
+        await updateDailyLog(logIdParam, updates);
         
-        // If this meal has content and wasn't previously logged (or was updated)
-        if (currentMeal && currentMeal !== previousMeal) {
-          const mealLabel = MEAL_CONFIG[mealType].label;
-          const mealCalorieValue = trackCalories ? mealCalories[mealType] : undefined;
+        // Create or update activity log
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, 'diet');
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: 'diet' as const,
+          title: dietCompleted ? "Diet Followed" : "Meals Logged",
+          description: dietCompleted 
+            ? "✓ Stuck to diet plan!" 
+            : `${mealsLogged} meal${mealsLogged !== 1 ? 's' : ''} logged${trackCalories ? ` - ${totalCalories} cal` : ''}`,
+          value: trackCalories ? totalCalories : undefined,
+          unit: trackCalories ? "calories" : undefined,
+          date: dateStr,
+        };
+        
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
+        
+        // Refresh the data
+        const { fetchAllLogs, fetchActivityLogs } = useChallengeStore.getState();
+        await Promise.all([
+          fetchAllLogs(challenge.$id!),
+          fetchActivityLogs(challenge.$id!)
+        ]);
+      } else {
+        // Update today's log using the store method
+        await updateProgress(updates);
+        
+        // Sync calories to Apple Health using new service
+        if (trackCalories && totalCalories > 0) {
+          try {
+            // Save total daily calories
+            await healthSyncService.saveCalories(totalCalories, new Date(), "Daily Total");
+          } catch (healthError) {
+            console.log("HealthKit calorie sync skipped:", healthError);
+          }
+        }
+
+        // Log activity to feed - create individual logs for each meal
+        const { logActivity } = useChallengeStore.getState();
+        const previousMeals = parseMeals(todayLog?.meals);
+        
+        // Check which meals are new and create activity logs for them
+        const mealTypes: MealType[] = ["breakfast", "lunch", "dinner", "snacks"];
+        for (const mealType of mealTypes) {
+          const currentMeal = meals[mealType].trim();
+          const previousMeal = previousMeals[mealType].trim();
           
+          // If this meal has content and wasn't previously logged (or was updated)
+          if (currentMeal && currentMeal !== previousMeal) {
+            const mealLabel = MEAL_CONFIG[mealType].label;
+            const mealCalorieValue = trackCalories ? mealCalories[mealType] : undefined;
+            
+            await logActivity({
+              type: "diet",
+              title: `${mealLabel} Logged`,
+              description: trackCalories && mealCalorieValue 
+                ? `${currentMeal.substring(0, 50)}${currentMeal.length > 50 ? '...' : ''} - ${mealCalorieValue} cal`
+                : currentMeal.substring(0, 100) + (currentMeal.length > 100 ? '...' : ''),
+              value: mealCalorieValue,
+              unit: trackCalories && mealCalorieValue ? "calories" : undefined,
+            });
+          }
+        }
+        
+        // If diet compliance was just marked as complete, log that separately
+        if (dietCompleted && !todayLog?.dietCompleted) {
           await logActivity({
             type: "diet",
-            title: `${mealLabel} Logged`,
-            description: trackCalories && mealCalorieValue 
-              ? `${currentMeal.substring(0, 50)}${currentMeal.length > 50 ? '...' : ''} - ${mealCalorieValue} cal`
-              : currentMeal.substring(0, 100) + (currentMeal.length > 100 ? '...' : ''),
-            value: mealCalorieValue,
-            unit: trackCalories && mealCalorieValue ? "calories" : undefined,
+            title: "Diet Followed",
+            description: "✓ Stuck to diet plan today!",
           });
         }
-      }
-      
-      // If diet compliance was just marked as complete, log that separately
-      if (dietCompleted && !todayLog?.dietCompleted) {
-        await logActivity({
-          type: "diet",
-          title: "Diet Followed",
-          description: "✓ Stuck to diet plan today!",
-        });
       }
       
       router.back();
@@ -350,7 +396,12 @@ export default function LogDietScreen() {
         <Pressable onPress={() => router.back()} className="p-2 -ml-2">
           <Feather name="arrow-left" size={24} color="#181C2E" />
         </Pressable>
-        <Text className="text-lg font-bold text-gray-900">Log Diet</Text>
+        <View className="flex-1 items-center">
+          <Text className="text-lg font-bold text-gray-900">Log Diet</Text>
+          {isEditingPastDay && (
+            <Text className="text-xs text-gray-500">{format(targetDate, 'MMM d, yyyy')}</Text>
+          )}
+        </View>
         <View className="w-10" />
       </View>
 

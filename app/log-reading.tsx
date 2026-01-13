@@ -1,6 +1,8 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
-import { router } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { router, useLocalSearchParams } from "expo-router";
 import { useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -49,13 +51,21 @@ function ReadingProgress({ current, goal }: { current: number; goal: number }) {
 }
 
 export default function LogReadingScreen() {
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
-  const [pages, setPages] = useState(todayLog?.readingPages ?? 0);
-  const [inputValue, setInputValue] = useState((todayLog?.readingPages ?? 0).toString());
-  const [finishedBook, setFinishedBook] = useState(todayLog?.finishedBook ?? false);
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs, fetchAllLogs } = useChallengeStore();
+  
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
+  const [pages, setPages] = useState(targetLog?.readingPages ?? 0);
+  const [inputValue, setInputValue] = useState((targetLog?.readingPages ?? 0).toString());
+  const [finishedBook, setFinishedBook] = useState(targetLog?.finishedBook ?? false);
   const [saving, setSaving] = useState(false);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -85,21 +95,49 @@ export default function LogReadingScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateProgress({
-        readingPages: pages,
-        readingCompleted: pages >= goal || finishedBook,
-        finishedBook: finishedBook,
-      });
+      if (isEditingPastDay && logIdParam) {
+        await updateDailyLog(logIdParam, {
+          readingPages: pages,
+          readingCompleted: pages >= goal || finishedBook,
+          finishedBook: finishedBook,
+        });
+        
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, 'reading');
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: 'reading' as const,
+          title: "Reading Logged",
+          description: pages + " pages" + (finishedBook ? " - Book finished! 📚" : ""),
+          value: pages,
+          unit: "pages",
+          date: dateStr,
+        };
+        
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
+        
+        await fetchAllLogs(challenge.$id!);
+      } else {
+        await updateProgress({
+          readingPages: pages,
+          readingCompleted: pages >= goal || finishedBook,
+          finishedBook: finishedBook,
+        });
 
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      await logActivity({
-        type: "reading",
-        title: "Reading Logged",
-        description: pages + " pages" + (finishedBook ? " - Book finished! 📚" : ""),
-        value: pages,
-        unit: "pages",
-      });
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "reading",
+          title: "Reading Logged",
+          description: pages + " pages" + (finishedBook ? " - Book finished! 📚" : ""),
+          value: pages,
+          unit: "pages",
+        });
+      }
       router.back();
     } catch (err) {
       console.error("Failed to save reading:", err);

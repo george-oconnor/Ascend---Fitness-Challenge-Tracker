@@ -1,9 +1,11 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { healthSyncService, HKCategoryValueSleepAnalysis } from "@/lib/healthSync";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
-import { router } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -83,15 +85,22 @@ function SleepProgress({
 }
 
 export default function LogSleepScreen() {
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs, fetchAllLogs } = useChallengeStore();
+  
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
 
   const [bedtime, setBedtime] = useState<Date | null>(
-    todayLog?.sleepStartTime ? new Date(todayLog.sleepStartTime) : null
+    targetLog?.sleepStartTime ? new Date(targetLog.sleepStartTime) : null
   );
   const [wakeTime, setWakeTime] = useState<Date | null>(
-    todayLog?.sleepEndTime ? new Date(todayLog.sleepEndTime) : null
+    targetLog?.sleepEndTime ? new Date(targetLog.sleepEndTime) : null
   );
-  const [quality, setQuality] = useState(todayLog?.sleepQuality ?? 3);
+  const [quality, setQuality] = useState(targetLog?.sleepQuality ?? 3);
   const [saving, setSaving] = useState(false);
   const [loadingHealth, setLoadingHealth] = useState(true);
   
@@ -122,11 +131,11 @@ export default function LogSleepScreen() {
     const loadHealthKitSleep = async () => {
       setLoadingHealth(true);
       try {
-        const healthSleep = await healthSyncService.getSleepForDate(new Date());
+        const healthSleep = await healthSyncService.getSleepForDate(targetDate);
         
         if (healthSleep && healthSleep.totalMinutes > 0) {
           // Pre-fill from HealthKit if no app data
-          if (!todayLog?.sleepLogged) {
+          if (!targetLog?.sleepLogged) {
             if (healthSleep.startTime) setBedtime(healthSleep.startTime);
             if (healthSleep.endTime) setWakeTime(healthSleep.endTime);
           }
@@ -139,9 +148,9 @@ export default function LogSleepScreen() {
     };
     
     loadHealthKitSleep();
-  }, [todayLog?.sleepLogged]);
+  }, [targetLog?.sleepLogged]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -156,14 +165,6 @@ export default function LogSleepScreen() {
     
     setSaving(true);
     try {
-      await updateProgress({
-        sleepLogged: true,
-        sleepMinutes,
-        sleepStartTime: bedtime.toISOString(),
-        sleepEndTime: wakeTime.toISOString(),
-        sleepQuality: quality,
-      });
-      
       // Sync to Apple Health
       try {
         await healthSyncService.saveSleep(
@@ -178,16 +179,54 @@ export default function LogSleepScreen() {
           sleepHours,
         });
       }
+      
+      if (isEditingPastDay && logIdParam) {
+        await updateDailyLog(logIdParam, {
+          sleepLogged: true,
+          sleepMinutes,
+          sleepStartTime: bedtime.toISOString(),
+          sleepEndTime: wakeTime.toISOString(),
+          sleepQuality: quality,
+        });
+        
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, 'sleep');
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: 'sleep' as const,
+          title: "Sleep Logged",
+          description: `🛌 ${sleepHours}h ${sleepMinutes % 60}m of sleep - ${quality}/5 quality`,
+          value: sleepMinutes,
+          unit: "minutes",
+          date: dateStr,
+        };
+        
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
+        
+        await fetchAllLogs(challenge.$id!);
+      } else {
+        await updateProgress({
+          sleepLogged: true,
+          sleepMinutes,
+          sleepStartTime: bedtime.toISOString(),
+          sleepEndTime: wakeTime.toISOString(),
+          sleepQuality: quality,
+        });
 
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      await logActivity({
-        type: "sleep",
-        title: "Sleep Logged",
-        description: `🛌 ${sleepHours}h ${sleepMinutes % 60}m of sleep - ${quality}/5 quality`,
-        value: sleepMinutes,
-        unit: "minutes",
-      });
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "sleep",
+          title: "Sleep Logged",
+          description: `🛌 ${sleepHours}h ${sleepMinutes % 60}m of sleep - ${quality}/5 quality`,
+          value: sleepMinutes,
+          unit: "minutes",
+        });
+      }
       
       router.back();
     } catch (err) {

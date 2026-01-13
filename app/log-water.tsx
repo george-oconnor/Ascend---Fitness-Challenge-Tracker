@@ -1,9 +1,11 @@
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
 import { healthSyncService } from "@/lib/healthSync";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import Slider from "@react-native-community/slider";
-import { router } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { router, useLocalSearchParams } from "expo-router";
 import { useEffect, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -102,8 +104,17 @@ function WaterSlider({
 }
 
 export default function LogWaterScreen() {
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
-  const [water, setWater] = useState(todayLog?.waterLiters ?? 0);
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs } = useChallengeStore();
+  
+  // Determine which log we're editing
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
+  const [water, setWater] = useState(targetLog?.waterLiters ?? 0);
   const [saving, setSaving] = useState(false);
   const [healthKitWater, setHealthKitWater] = useState<number | null>(null);
 
@@ -111,11 +122,11 @@ export default function LogWaterScreen() {
   useEffect(() => {
     const loadHealthKitWater = async () => {
       try {
-        const hkWater = await healthSyncService.getWaterIntakeForDate(new Date());
+        const hkWater = await healthSyncService.getWaterIntakeForDate(targetDate);
         if (hkWater !== null) {
           setHealthKitWater(hkWater);
           // If no app data but HealthKit has data, pre-fill
-          if (!todayLog?.waterLiters && hkWater > 0) {
+          if (!targetLog?.waterLiters && hkWater > 0) {
             setWater(hkWater);
           }
         }
@@ -124,9 +135,9 @@ export default function LogWaterScreen() {
       }
     };
     loadHealthKitWater();
-  }, [todayLog?.waterLiters]);
+  }, [targetLog?.waterLiters]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -144,20 +155,56 @@ export default function LogWaterScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateProgress({
-        waterLiters: water,
-        waterCompleted: water >= goal,
-      });
+      if (isEditingPastDay && logIdParam) {
+        // Update specific past day's log
+        await updateDailyLog(logIdParam, {
+          waterLiters: water,
+          waterCompleted: water >= goal,
+        });
+        
+        // Update or create activity log
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, 'water');
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: 'water' as const,
+          title: "Water Logged",
+          description: `${water.toFixed(1)}L of ${goal}L ${water >= goal ? "✓ Goal reached!" : ""}`,
+          value: water,
+          unit: "liters",
+          date: dateStr,
+        };
+        
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
+        
+        // Refresh the data
+        const { fetchAllLogs, fetchActivityLogs } = useChallengeStore.getState();
+        await Promise.all([
+          fetchAllLogs(challenge.$id!),
+          fetchActivityLogs(challenge.$id!)
+        ]);
+      } else {
+        // Update today's log using the store method
+        await updateProgress({
+          waterLiters: water,
+          waterCompleted: water >= goal,
+        });
 
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      await logActivity({
-        type: "water",
-        title: "Water Logged",
-        description: `${water.toFixed(1)}L of ${goal}L ${water >= goal ? "✓ Goal reached!" : ""}`,
-        value: water,
-        unit: "liters",
-      });
+        // Log activity to feed
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "water",
+          title: "Water Logged",
+          description: `${water.toFixed(1)}L of ${goal}L ${water >= goal ? "✓ Goal reached!" : ""}`,
+          value: water,
+          unit: "liters",
+        });
+      }
       
       // Sync to Apple Health
       try {
@@ -189,7 +236,12 @@ export default function LogWaterScreen() {
         <Pressable onPress={() => router.back()} className="p-2 -ml-2">
           <Feather name="arrow-left" size={24} color="#181C2E" />
         </Pressable>
-        <Text className="text-lg font-bold text-gray-900">Log Water</Text>
+        <View className="flex-1 items-center">
+          <Text className="text-lg font-bold text-gray-900">Log Water</Text>
+          {isEditingPastDay && (
+            <Text className="text-xs text-gray-500">{format(targetDate, 'MMM d, yyyy')}</Text>
+          )}
+        </View>
         <View className="w-10" />
       </View>
 

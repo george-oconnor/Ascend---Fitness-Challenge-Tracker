@@ -1,8 +1,10 @@
+import { updateDailyLog } from "@/lib/appwrite";
 import { healthService } from "@/lib/health";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { format, parseISO } from "date-fns";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -152,7 +154,16 @@ const MEAL_CONFIG: Record<keyof MealCalories, { icon: keyof typeof Feather.glyph
 
 export default function LogCaloriesScreen() {
   const router = useRouter();
-  const { challenge, todayLog, updateProgress } = useChallengeStore();
+  const { date: dateParam, logId: logIdParam } = useLocalSearchParams<{ date?: string; logId?: string }>();
+  const { challenge, todayLog, updateProgress, allLogs, fetchAllLogs } = useChallengeStore();
+  
+  // Determine which log we're editing
+  const isEditingPastDay = !!dateParam && !!logIdParam;
+  const targetLog = isEditingPastDay 
+    ? allLogs?.find(log => log.$id === logIdParam) 
+    : todayLog;
+  const targetDate = dateParam ? parseISO(dateParam) : new Date();
+  
   const [mealCalories, setMealCalories] = useState<MealCalories>({
     breakfast: 0,
     lunch: 0,
@@ -163,7 +174,7 @@ export default function LogCaloriesScreen() {
 
   // Load existing calorie data
   useEffect(() => {
-    if (todayLog?.calorieDetails) {
+    if (targetLog?.calorieDetails) {
       try {
         const parsed = JSON.parse(todayLog.calorieDetails);
         setMealCalories({
@@ -174,19 +185,19 @@ export default function LogCaloriesScreen() {
         });
       } catch {
         // If no detailed data, use total
-        if (todayLog.caloriesConsumed) {
+        if (targetLog.caloriesConsumed) {
           setMealCalories({
             breakfast: 0,
             lunch: 0,
             dinner: 0,
-            snacks: todayLog.caloriesConsumed,
+            snacks: targetLog.caloriesConsumed,
           });
         }
       }
     }
-  }, [todayLog?.calorieDetails, todayLog?.caloriesConsumed]);
+  }, [targetLog?.calorieDetails, targetLog?.caloriesConsumed]);
 
-  if (!challenge || !todayLog) {
+  if (!challenge || !targetLog) {
     return (
       <SafeAreaView className="flex-1 bg-gray-50 items-center justify-center">
         <Text className="text-gray-500">Loading...</Text>
@@ -206,33 +217,55 @@ export default function LogCaloriesScreen() {
   const handleSave = async () => {
     setSaving(true);
     try {
-      await updateProgress({
-        caloriesConsumed: totalCalories,
-        calorieDetails: JSON.stringify(mealCalories),
-      });
-      
-      // Sync to Apple Health
-      if (healthService.isAvailable()) {
-        try {
-          await healthService.saveMealCalories(mealCalories);
-        } catch (healthError: any) {
-          console.error("Error saving calories to HealthKit:", healthError);
-          const totalCalories = mealCalories.breakfast + mealCalories.lunch + mealCalories.dinner + mealCalories.snacks;
-          captureException(new Error(`Apple Health calories sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
-            totalCalories,
-          });
+      if (isEditingPastDay && logIdParam) {
+        // Update specific past day's log
+        await updateDailyLog(logIdParam, {
+          caloriesConsumed: totalCalories,
+          calorieDetails: JSON.stringify(mealCalories),
+        });
+        
+        // Log activity to feed for past day
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "calories",
+          title: "Calories Logged",
+          description: `${totalCalories} calories consumed on ${format(targetDate, 'MMM d')}`,
+          value: totalCalories,
+          unit: "cal",
+          date: format(targetDate, 'yyyy-MM-dd'),
+        });
+        
+        await fetchAllLogs();
+      } else {
+        // Update today's log
+        await updateProgress({
+          caloriesConsumed: totalCalories,
+          calorieDetails: JSON.stringify(mealCalories),
+        });
+        
+        // Sync to Apple Health
+        if (healthService.isAvailable()) {
+          try {
+            await healthService.saveMealCalories(mealCalories);
+          } catch (healthError: any) {
+            console.error("Error saving calories to HealthKit:", healthError);
+            const totalCalories = mealCalories.breakfast + mealCalories.lunch + mealCalories.dinner + mealCalories.snacks;
+            captureException(new Error(`Apple Health calories sync failed: ${healthError?.message || JSON.stringify(healthError)}`), {
+              totalCalories,
+            });
+          }
         }
-      }
 
-      // Log activity to feed
-      const { logActivity } = useChallengeStore.getState();
-      await logActivity({
-        type: "calories",
-        title: "Calories Logged",
-        description: `${totalCalories} calories consumed${isUnderGoal ? " ✓ Under goal!" : ""}`,
-        value: totalCalories,
-        unit: "calories",
-      });
+        // Log activity to feed
+        const { logActivity } = useChallengeStore.getState();
+        await logActivity({
+          type: "calories",
+          title: "Calories Logged",
+          description: `${totalCalories} calories consumed${isUnderGoal ? " ✓ Under goal!" : ""}`,
+          value: totalCalories,
+          unit: "calories",
+        });
+      }
       
       router.back();
     } catch (err) {
