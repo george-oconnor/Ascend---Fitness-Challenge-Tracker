@@ -318,6 +318,7 @@ export default function LogSleepScreen() {
                   onChange={(event, date) => {
                     if (date) setBedtime(date);
                   }}
+                  textColor="#000000"
                   style={{ height: 180 }}
                 />
               </View>
@@ -363,6 +364,7 @@ export default function LogSleepScreen() {
                   onChange={(event, date) => {
                     if (date) setWakeTime(date);
                   }}
+                  textColor="#000000"
                   style={{ height: 180 }}
                 />
               </View>
