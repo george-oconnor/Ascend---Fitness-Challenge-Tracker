@@ -1,3 +1,4 @@
+import SwipeableGraphCard from "@/components/SwipeableGraphCard";
 import { BADGES } from "@/constants/badges";
 import { createUserBadge, getUserBadges } from "@/lib/appwrite";
 import { useChallengeStore } from "@/store/useChallengeStore";
@@ -881,6 +882,9 @@ export default function AnalyticsScreen() {
                 </View>
               </>
             )}
+
+            {/* Swipeable Graph Card */}
+            <SwipeableGraphCard />
           </View>
         )}
       </ScrollView>
