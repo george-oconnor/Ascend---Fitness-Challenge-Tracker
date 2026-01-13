@@ -77,7 +77,6 @@ export async function createUserProfile(authId: string, email: string, firstName
       email,
       firstName,
       lastName,
-      createdAt: new Date().toISOString(),
     }
   );
   return doc as unknown as UserProfile;
@@ -292,7 +291,7 @@ export async function getActivityLogs(userId: string, limit: number = 50): Promi
       COLLECTIONS.ACTIVITY_LOGS,
       [
         Query.equal("userId", userId),
-        Query.orderDesc("createdAt"),
+        Query.orderDesc("$createdAt"),
         Query.limit(limit)
       ]
     );
