@@ -47,31 +47,32 @@ export default function ProfileScreen() {
     }).length;
 
     // Day milestones
-    if (completedDays >= 1) badges.push("first_day");
-    if (completedDays >= 7) badges.push("week_warrior");
-    if (completedDays >= 30) badges.push("month_master");
-    if (completedDays >= 50) badges.push("halfway_hero");
-    if (completedDays >= 75) badges.push("champion");
+    if (completedDays >= 1) badges.push("day_1");
+    if (completedDays >= 7) badges.push("week_1");
+    if (completedDays >= 25) badges.push("day_25");
+    if (completedDays >= 50) badges.push("day_50");
+    if (completedDays >= 75) badges.push("day_75");
 
     // Water badges
     const waterLogs = allLogs.filter(log => log.waterCompleted);
-    if (waterLogs.length >= 7) badges.push("hydration_week");
-    if (waterLogs.length >= 30) badges.push("hydration_hero");
+    if (waterLogs.length >= 7) badges.push("hydration_7");
+    if (waterLogs.length >= 30) badges.push("hydration_30");
 
     // Workout badges
     const workout1Logs = allLogs.filter(log => log.workout1Completed);
-    if (workout1Logs.length >= 10) badges.push("workout_starter");
-    if (workout1Logs.length >= 50) badges.push("fitness_fanatic");
+    if (workout1Logs.length >= 10) badges.push("workout_10");
+    if (workout1Logs.length >= 50) badges.push("workout_50");
 
     // Reading badges
     const readingLogs = allLogs.filter(log => log.readingCompleted);
-    if (readingLogs.length >= 7) badges.push("bookworm_week");
-    if (readingLogs.some(log => log.finishedBook)) badges.push("page_turner");
+    const totalPages = allLogs.reduce((sum, log) => sum + (log.readingPages || 0), 0);
+    if (totalPages >= 100) badges.push("pages_100");
+    if (allLogs.some(log => log.finishedBook)) badges.push("book_finished");
 
-    // Sobriety badges
-    const alcoholLogs = allLogs.filter(log => log.noAlcoholCompleted);
-    if (alcoholLogs.length >= 7) badges.push("sober_week");
-    if (alcoholLogs.length >= 30) badges.push("clean_living");
+    // Photo badges
+    const photoLogs = allLogs.filter(log => log.progressPhotoCompleted);
+    if (photoLogs.length >= 7) badges.push("photo_7");
+    if (photoLogs.length >= 30) badges.push("photo_30");
 
     return badges as BadgeId[];
   }, [allLogs, challenge]);
@@ -88,13 +89,13 @@ export default function ProfileScreen() {
     .toUpperCase() || "?";
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-purple-50" edges={["top"]}>
       {/* Header */}
-      <View className="bg-white px-5 py-4 border-b border-gray-100 flex-row items-center justify-between">
+      <View className="bg-white px-5 py-4 border-b border-purple-100 flex-row items-center justify-between">
         <Text className="text-xl font-bold text-gray-900">Profile</Text>
         <Pressable 
           onPress={() => router.push("/settings")}
-          className="h-8 w-8 items-center justify-center rounded-full bg-orange-100"
+          className="h-10 w-10 items-center justify-center rounded-full bg-orange-100"
         >
           <Feather name="settings" size={20} color="#F97316" />
         </Pressable>
@@ -104,7 +105,7 @@ export default function ProfileScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* Profile Header */}
-        <View className="bg-white px-5 py-6 items-center border-b border-gray-100">
+        <View className="bg-white px-5 py-6 items-center border-b border-purple-100">
           <View className="h-24 w-24 items-center justify-center rounded-full bg-purple-500 mb-3">
             <Text className="text-4xl font-bold text-white">
               {initials}
@@ -128,15 +129,16 @@ export default function ProfileScreen() {
 
         {/* Milestones & Badges */}
         <View className="m-4">
-          <View className="bg-white rounded-2xl p-4 shadow-sm">
+          <View className="bg-white rounded-2xl p-4 shadow-sm border border-purple-100">
             <View className="flex-row items-center justify-between mb-4">
-              <Text className="text-sm font-semibold text-gray-600">Milestones</Text>
+              <Text className="text-sm font-semibold text-purple-700">Milestones</Text>
               <Text className="text-xs text-gray-400">{allEarnedBadges.length} earned</Text>
             </View>
             {allEarnedBadges.length > 0 ? (
               <View className="flex-row flex-wrap gap-3">
                 {allEarnedBadges.map((badgeId) => {
                   const badge = BADGES[badgeId];
+                  if (!badge) return null; // Skip unknown badges
                   return (
                     <View key={badgeId} className="items-center" style={{ width: 70 }}>
                       <View 
@@ -150,7 +152,7 @@ export default function ProfileScreen() {
                       </Text>
                     </View>
                   );
-                })}
+                }).filter(Boolean)}
               </View>
             ) : (
               <View className="items-center py-4">
