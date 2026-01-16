@@ -1,7 +1,6 @@
-import { getCycleLog } from "@/lib/cycleHealth";
+import { useTodayCycleLog } from "@/hooks/useCycleLog";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
-import { useSessionStore } from "@/store/useSessionStore";
 import type { DailyLog } from "@/types/type";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -27,9 +26,9 @@ type TaskItem = {
 
 export default function DailyLogScreen() {
   const [connectingHealth, setConnectingHealth] = useState(false);
-  const [cycleLoggedToday, setCycleLoggedToday] = useState(false);
   const lastSyncedRef = useRef<{ steps: number; outdoorMinutes: number; totalMinutes: number } | null>(null);
   const { challenge, todayLog, toggleTask, updateProgress } = useChallengeStore();
+  const { hasLoggedToday: cycleLoggedToday } = useTodayCycleLog();
   const { 
     steps, 
     workouts, 
@@ -42,25 +41,6 @@ export default function DailyLogScreen() {
     getOutdoorWorkoutMinutes,
     getTotalWorkoutMinutes,
   } = useHealthStore();
-
-  // Check if cycle was logged today
-  useEffect(() => {
-    const checkCycleLog = async () => {
-      if ((challenge as any)?.trackCycle && todayLog) {
-        try {
-          const { user } = useSessionStore.getState();
-          if (user?.id) {
-            const today = new Date().toISOString().split("T")[0];
-            const cycleLog = await getCycleLog(user.id, today);
-            setCycleLoggedToday(!!cycleLog);
-          }
-        } catch (error) {
-          console.log("Failed to check cycle log:", error);
-        }
-      }
-    };
-    checkCycleLog();
-  }, [challenge, todayLog]);
 
   // Initialize health and fetch data (only if native module is available)
   useEffect(() => {
