@@ -53,12 +53,12 @@ export default function SettingsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-orange-50" edges={["top"]}>
       {/* Header */}
-      <View className="bg-white px-5 py-4 border-b border-gray-100 flex-row items-center">
+      <View className="bg-white px-5 py-4 border-b border-orange-100 flex-row items-center">
         <Pressable 
           onPress={() => router.back()}
-          className="h-8 w-8 items-center justify-center rounded-full bg-orange-100 mr-3"
+          className="h-10 w-10 items-center justify-center rounded-full bg-orange-100 mr-3"
         >
           <Feather name="arrow-left" size={20} color="#F97316" />
         </Pressable>
