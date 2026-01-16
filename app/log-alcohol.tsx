@@ -192,7 +192,7 @@ export default function LogAlcoholScreen() {
           });
         }
         
-        await fetchAllLogs();
+        await fetchAllLogs(challenge.$id!);
       } else {
         // Update today's log
         await updateProgress({
@@ -256,7 +256,7 @@ export default function LogAlcoholScreen() {
           date: format(targetDate, 'yyyy-MM-dd'),
         });
         
-        await fetchAllLogs();
+        await fetchAllLogs(challenge.$id!);
         console.log("Fetched all logs after update");
       } else {
         console.log("Updating today's log");
@@ -285,11 +285,11 @@ export default function LogAlcoholScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-red-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-red-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-red-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#EF4444" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">Log Alcohol</Text>
         <View style={{ width: 40 }} />
@@ -341,8 +341,8 @@ export default function LogAlcoholScreen() {
             )}
 
             {/* Drink Selection */}
-            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-              <Text className="text-sm font-semibold text-gray-700 mb-3 ml-1">
+            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-red-100">
+              <Text className="text-sm font-semibold text-red-700 mb-3 ml-1">
                 Log Drinks (if any)
               </Text>
               {DRINK_TYPES.map((drink) => (
@@ -358,8 +358,8 @@ export default function LogAlcoholScreen() {
 
             {/* Notes Section */}
             {totalDrinks > 0 && (
-              <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-                <Text className="text-sm font-semibold text-gray-700 mb-3">
+              <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-red-100">
+                <Text className="text-sm font-semibold text-red-700 mb-3">
                   Notes (Optional)
                 </Text>
                 <TextInput
