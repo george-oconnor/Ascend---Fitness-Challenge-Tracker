@@ -63,6 +63,7 @@ export type DailyLog = {
   notes?: string;
   // Sleep tracking
   sleepLogged?: boolean;
+  sleepCompleted?: boolean;
   sleepMinutes?: number;
   sleepStartTime?: string;
   sleepEndTime?: string;
