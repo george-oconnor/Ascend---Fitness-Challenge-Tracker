@@ -230,16 +230,16 @@ export default function LogWaterScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-cyan-50 to-white">
+    <SafeAreaView className="flex-1 bg-cyan-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-cyan-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-cyan-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#06B6D4" />
         </Pressable>
         <View className="flex-1 items-center">
           <Text className="text-lg font-bold text-gray-900">Log Water</Text>
           {isEditingPastDay && (
-            <Text className="text-xs text-gray-500">{format(targetDate, 'MMM d, yyyy')}</Text>
+            <Text className="text-xs text-cyan-600">{format(targetDate, 'MMM d, yyyy')}</Text>
           )}
         </View>
         <View className="w-10" />
@@ -258,8 +258,8 @@ export default function LogWaterScreen() {
         </View>
 
         {/* Quick Add Buttons */}
-        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6">
-          <Text className="text-sm font-semibold text-gray-600 mb-3">Quick Add</Text>
+        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6 border border-cyan-100">
+          <Text className="text-sm font-semibold text-cyan-700 mb-3">Quick Add</Text>
           <View className="flex-row gap-2">
             <Pressable
               onPress={() => handleQuickAdd(0.25)}
@@ -293,8 +293,8 @@ export default function LogWaterScreen() {
         </View>
 
         {/* Water Slider */}
-        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6">
-          <Text className="text-sm font-semibold text-gray-600 mb-3">Set amount</Text>
+        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6 border border-cyan-100">
+          <Text className="text-sm font-semibold text-cyan-700 mb-3">Set amount</Text>
           <WaterSlider value={water} goal={goal} onChange={setWater} />
         </View>
 
