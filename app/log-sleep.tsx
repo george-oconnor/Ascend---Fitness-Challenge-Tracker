@@ -113,11 +113,23 @@ export default function LogSleepScreen() {
   // Calculate sleep duration in minutes (only if both times are set)
   const calculateDuration = (): number => {
     if (!bedtime || !wakeTime) return 0;
-    let duration = wakeTime.getTime() - bedtime.getTime();
-    // If negative (wake time before bedtime), add 24 hours
+    
+    // Create copies to work with
+    const bed = new Date(bedtime);
+    const wake = new Date(wakeTime);
+    
+    // If bedtime is after wake time (e.g., 11 PM vs 7 AM), assume bedtime was previous day
+    if (bed > wake) {
+      bed.setDate(bed.getDate() - 1);
+    }
+    
+    let duration = wake.getTime() - bed.getTime();
+    
+    // If still negative or unreasonably long (>18 hours), add 24 hours
     if (duration < 0) {
       duration += 24 * 60 * 60 * 1000;
     }
+    
     return Math.round(duration / (1000 * 60));
   };
 
@@ -163,6 +175,19 @@ export default function LogSleepScreen() {
       return; // Can't save without both times
     }
     
+    // Check if values have actually changed
+    const hasChanged = 
+      targetLog?.sleepMinutes !== sleepMinutes ||
+      targetLog?.sleepStartTime !== bedtime.toISOString() ||
+      targetLog?.sleepEndTime !== wakeTime.toISOString() ||
+      targetLog?.sleepQuality !== quality;
+    
+    if (!hasChanged) {
+      // No changes, just go back
+      router.back();
+      return;
+    }
+    
     setSaving(true);
     try {
       // Sync to Apple Health
@@ -183,6 +208,7 @@ export default function LogSleepScreen() {
       if (isEditingPastDay && logIdParam) {
         await updateDailyLog(logIdParam, {
           sleepLogged: true,
+          sleepCompleted: isGoalMet,
           sleepMinutes,
           sleepStartTime: bedtime.toISOString(),
           sleepEndTime: wakeTime.toISOString(),
@@ -196,7 +222,7 @@ export default function LogSleepScreen() {
           challengeId: challenge.$id!,
           type: 'sleep' as const,
           title: "Sleep Logged",
-          description: `🛌 ${sleepHours}h ${sleepMinutes % 60}m of sleep - ${quality}/5 quality`,
+          description: `🛌 ${Math.floor(sleepMinutes / 60)}h ${sleepMinutes % 60}m of sleep - ${quality}/5 quality`,
           value: sleepMinutes,
           unit: "minutes",
           date: dateStr,
@@ -212,20 +238,32 @@ export default function LogSleepScreen() {
       } else {
         await updateProgress({
           sleepLogged: true,
+          sleepCompleted: isGoalMet,
           sleepMinutes,
           sleepStartTime: bedtime.toISOString(),
           sleepEndTime: wakeTime.toISOString(),
           sleepQuality: quality,
         });
 
-        const { logActivity } = useChallengeStore.getState();
-        await logActivity({
-          type: "sleep",
+        // Only log activity if values changed (check again for today's log)
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, 'sleep');
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: 'sleep' as const,
           title: "Sleep Logged",
-          description: `🛌 ${sleepHours}h ${sleepMinutes % 60}m of sleep - ${quality}/5 quality`,
+          description: `🛌 ${Math.floor(sleepMinutes / 60)}h ${sleepMinutes % 60}m of sleep - ${quality}/5 quality`,
           value: sleepMinutes,
           unit: "minutes",
-        });
+          date: dateStr,
+        };
+        
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
       }
       
       router.back();
@@ -237,11 +275,11 @@ export default function LogSleepScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-purple-50 to-white">
+    <SafeAreaView className="flex-1 bg-purple-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-purple-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-purple-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#8B5CF6" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">Log Sleep</Text>
         <View className="w-10" />
@@ -272,9 +310,32 @@ export default function LogSleepScreen() {
             )}
           </View>
 
+          {/* Sleep Quality */}
+          <View className="bg-white rounded-2xl p-4 shadow-sm mb-4 border border-purple-100">
+            <Text className="text-sm font-semibold text-purple-700 mb-4">How did you sleep?</Text>
+            <View className="flex-row justify-between">
+              {SLEEP_QUALITY.map((item) => (
+                <Pressable
+                  key={item.value}
+                  onPress={() => setQuality(item.value)}
+                  className={`items-center p-3 rounded-xl flex-1 mx-1 ${
+                    quality === item.value ? "bg-purple-100" : "bg-gray-50"
+                  }`}
+                >
+                  <Text className="text-2xl mb-1">{item.emoji}</Text>
+                  <Text className={`text-xs ${
+                    quality === item.value ? "text-purple-700 font-semibold" : "text-gray-500"
+                  }`}>
+                    {item.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
           {/* Bedtime & Wake Time */}
-          <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-            <Text className="text-sm font-semibold text-gray-600 mb-4">Sleep Times</Text>
+          <View className="bg-white rounded-2xl p-4 shadow-sm mb-4 border border-purple-100">
+            <Text className="text-sm font-semibold text-purple-700 mb-4">Sleep Times</Text>
             
             {/* Bedtime */}
             <Pressable 
@@ -283,7 +344,7 @@ export default function LogSleepScreen() {
                 setShowBedtimePicker(!showBedtimePicker);
                 // Set default time if none selected
                 if (!bedtime) {
-                  const d = new Date();
+                  const d = new Date(targetDate);
                   d.setDate(d.getDate() - 1);
                   d.setHours(22, 30, 0, 0);
                   setBedtime(d);
@@ -308,7 +369,7 @@ export default function LogSleepScreen() {
               <View className="py-4 border-b border-gray-100">
                 <DateTimePicker
                   value={bedtime ?? (() => {
-                    const d = new Date();
+                    const d = new Date(targetDate);
                     d.setDate(d.getDate() - 1);
                     d.setHours(22, 30, 0, 0);
                     return d;
@@ -316,7 +377,21 @@ export default function LogSleepScreen() {
                   mode="time"
                   display="spinner"
                   onChange={(event, date) => {
-                    if (date) setBedtime(date);
+                    if (date) {
+                      // Normalize to target date, adjusting for typical bedtime
+                      const normalizedBedtime = new Date(targetDate);
+                      const hours = date.getHours();
+                      const minutes = date.getMinutes();
+                      
+                      // If bedtime is in evening/night (after 6 PM), set to previous day
+                      // Otherwise (early morning hours), keep on target date
+                      if (hours >= 18) {
+                        normalizedBedtime.setDate(normalizedBedtime.getDate() - 1);
+                      }
+                      
+                      normalizedBedtime.setHours(hours, minutes, 0, 0);
+                      setBedtime(normalizedBedtime);
+                    }
                   }}
                   textColor="#000000"
                   style={{ height: 180 }}
@@ -331,7 +406,7 @@ export default function LogSleepScreen() {
                 setShowWakeTimePicker(!showWakeTimePicker);
                 // Set default time if none selected
                 if (!wakeTime) {
-                  const d = new Date();
+                  const d = new Date(targetDate);
                   d.setHours(7, 0, 0, 0);
                   setWakeTime(d);
                 }
@@ -355,14 +430,19 @@ export default function LogSleepScreen() {
               <View className="py-4">
                 <DateTimePicker
                   value={wakeTime ?? (() => {
-                    const d = new Date();
+                    const d = new Date(targetDate);
                     d.setHours(7, 0, 0, 0);
                     return d;
                   })()}
                   mode="time"
                   display="spinner"
                   onChange={(event, date) => {
-                    if (date) setWakeTime(date);
+                    if (date) {
+                      // Normalize to target date
+                      const normalizedWakeTime = new Date(targetDate);
+                      normalizedWakeTime.setHours(date.getHours(), date.getMinutes(), 0, 0);
+                      setWakeTime(normalizedWakeTime);
+                    }
                   }}
                   textColor="#000000"
                   style={{ height: 180 }}
@@ -375,7 +455,7 @@ export default function LogSleepScreen() {
           {showBedtimePicker && Platform.OS !== "ios" && (
             <DateTimePicker
               value={bedtime ?? (() => {
-                const d = new Date();
+                const d = new Date(targetDate);
                 d.setDate(d.getDate() - 1);
                 d.setHours(22, 30, 0, 0);
                 return d;
@@ -384,7 +464,20 @@ export default function LogSleepScreen() {
               display="default"
               onChange={(event, date) => {
                 setShowBedtimePicker(false);
-                if (date) setBedtime(date);
+                if (date) {
+                  // Normalize to target date, adjusting for typical bedtime
+                  const normalizedBedtime = new Date(targetDate);
+                  const hours = date.getHours();
+                  const minutes = date.getMinutes();
+                  
+                  // If bedtime is in evening/night (after 6 PM), set to previous day
+                  if (hours >= 18) {
+                    normalizedBedtime.setDate(normalizedBedtime.getDate() - 1);
+                  }
+                  
+                  normalizedBedtime.setHours(hours, minutes, 0, 0);
+                  setBedtime(normalizedBedtime);
+                }
               }}
             />
           )}
@@ -392,7 +485,7 @@ export default function LogSleepScreen() {
           {showWakeTimePicker && Platform.OS !== "ios" && (
             <DateTimePicker
               value={wakeTime ?? (() => {
-                const d = new Date();
+                const d = new Date(targetDate);
                 d.setHours(7, 0, 0, 0);
                 return d;
               })()}
@@ -400,33 +493,15 @@ export default function LogSleepScreen() {
               display="default"
               onChange={(event, date) => {
                 setShowWakeTimePicker(false);
-                if (date) setWakeTime(date);
+                if (date) {
+                  // Normalize to target date
+                  const normalizedWakeTime = new Date(targetDate);
+                  normalizedWakeTime.setHours(date.getHours(), date.getMinutes(), 0, 0);
+                  setWakeTime(normalizedWakeTime);
+                }
               }}
             />
           )}
-
-          {/* Sleep Quality */}
-          <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-            <Text className="text-sm font-semibold text-gray-600 mb-4">How did you sleep?</Text>
-            <View className="flex-row justify-between">
-              {SLEEP_QUALITY.map((item) => (
-                <Pressable
-                  key={item.value}
-                  onPress={() => setQuality(item.value)}
-                  className={`items-center p-3 rounded-xl flex-1 mx-1 ${
-                    quality === item.value ? "bg-purple-100" : "bg-gray-50"
-                  }`}
-                >
-                  <Text className="text-2xl mb-1">{item.emoji}</Text>
-                  <Text className={`text-xs ${
-                    quality === item.value ? "text-purple-700 font-semibold" : "text-gray-500"
-                  }`}>
-                    {item.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
 
           {/* Sleep Stats */}
           <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
