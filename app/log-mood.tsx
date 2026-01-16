@@ -151,16 +151,16 @@ function EmotionChip({
     <Pressable
       onPress={onToggle}
       className={`rounded-full px-3 py-2 mr-2 mb-2 flex-row items-center ${
-        isSelected ? "bg-amber-100 border border-amber-400" : "bg-gray-100 border border-transparent"
+        isSelected ? "bg-amber-100 border border-amber-400" : "bg-gray-50 border border-transparent"
       }`}
     >
       <Feather 
         name={emotion.icon} 
         size={16} 
-        color={isSelected ? "#B45309" : "#6B7280"} 
+        color={isSelected ? "#B45309" : "#9CA3AF"} 
         style={{ marginRight: 4 }}
       />
-      <Text className={`text-sm ${isSelected ? "font-semibold text-amber-700" : "text-gray-600"}`}>
+      <Text className={`text-sm ${isSelected ? "font-semibold text-amber-700" : "text-gray-500"}`}>
         {emotion.label}
       </Text>
     </Pressable>
@@ -337,11 +337,11 @@ export default function LogMoodScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-amber-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-amber-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-amber-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#F59E0B" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">How are you feeling?</Text>
         <View style={{ width: 40 }} />
@@ -358,7 +358,7 @@ export default function LogMoodScreen() {
         >
           <View className="p-4">
             {/* Mood Header */}
-            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm flex-row items-center">
+            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm flex-row items-center border border-amber-100">
               <View className="bg-amber-100 h-16 w-16 rounded-full items-center justify-center mr-4">
                 <Feather name={selectedOption?.icon || "help-circle"} size={28} color={selectedOption?.color || "#9CA3AF"} />
               </View>
@@ -373,8 +373,8 @@ export default function LogMoodScreen() {
             </View>
 
             {/* Mood Selection */}
-            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-              <Text className="text-sm font-semibold text-gray-700 mb-3 ml-1">
+            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-amber-100">
+              <Text className="text-sm font-semibold text-amber-700 mb-3 ml-1">
                 Select Your Mood
               </Text>
               <View>
@@ -391,8 +391,8 @@ export default function LogMoodScreen() {
 
             {/* Secondary Emotions */}
             {selectedMood > 0 && (
-              <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-                <Text className="text-sm font-semibold text-gray-700 mb-3 ml-1">
+              <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-amber-100">
+                <Text className="text-sm font-semibold text-amber-700 mb-3 ml-1">
                   What else are you feeling? (Optional)
                 </Text>
                 <View className="flex-row flex-wrap">
@@ -428,8 +428,8 @@ export default function LogMoodScreen() {
             )}
 
             {/* Notes Section */}
-            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-              <Text className="text-sm font-semibold text-gray-700 mb-3">
+            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-amber-100">
+              <Text className="text-sm font-semibold text-amber-700 mb-3">
                 Add Notes (Optional)
               </Text>
               <TextInput
