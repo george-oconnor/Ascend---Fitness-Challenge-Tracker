@@ -21,6 +21,7 @@ type TaskItem = {
     goal: number;
     unit: string;
     autoComplete?: boolean;
+    color?: string; // Progress bar color when incomplete
   };
 };
 
@@ -167,6 +168,7 @@ export default function DailyLogScreen() {
         goal: challenge.workoutMinutes,
         unit: "min",
         autoComplete: meetsGoal,
+        color: "#F97316", // Orange for workout 1
       } : undefined,
     });
   }
@@ -187,6 +189,7 @@ export default function DailyLogScreen() {
         goal: challenge.workoutMinutes,
         unit: "min",
         autoComplete: meetsGoal,
+        color: "#EF4444", // Red for workout 2
       } : undefined,
     });
   }
@@ -202,13 +205,25 @@ export default function DailyLogScreen() {
   }
 
   if (challenge.trackWater) {
+    const waterGoal = challenge.waterLiters;
+    const waterCurrent = todayLog.waterLiters ?? 0;
+    const meetsGoal = waterCurrent >= waterGoal;
     tasks.push({
       key: "waterCompleted",
       label: "Drink Water",
-      description: `Drank ${challenge.waterLiters}L of water`,
+      description: waterCurrent > 0 
+        ? `${waterCurrent}L / ${waterGoal}L logged`
+        : `Goal: ${waterGoal}L`,
       icon: "droplet",
       route: "/log-water",
       isHealthTracked: Platform.OS === "ios",
+      healthData: waterCurrent > 0 ? {
+        current: waterCurrent,
+        goal: waterGoal,
+        unit: "L",
+        autoComplete: meetsGoal,
+        color: "#06B6D4", // Cyan for water
+      } : undefined,
     });
   }
 
@@ -304,6 +319,7 @@ export default function DailyLogScreen() {
         goal: (challenge as any).sleepGoalHours ?? 8,
         unit: "h",
         autoComplete: meetsGoal,
+        color: "#A855F7", // Purple for sleep
       } : undefined,
     });
   }
@@ -371,7 +387,8 @@ export default function DailyLogScreen() {
       return todayLog.weightLogged === true || (todayLog.currentWeight ?? 0) > 0;
     }
     if (task.key === "sleepLogged") {
-      return todayLog.sleepLogged === true;
+      const sleepGoalMinutes = ((challenge as any).sleepGoalHours ?? 8) * 60;
+      return todayLog.sleepCompleted === true || (todayLog.sleepMinutes ?? 0) >= sleepGoalMinutes;
     }
     return todayLog[task.key] as boolean;
   };
@@ -398,18 +415,18 @@ export default function DailyLogScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-blue-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-blue-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-blue-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#3B82F6" />
         </Pressable>
         <View className="items-center">
-          <Text className="text-xs text-gray-500">Day {currentDay} of {challenge.totalDays}</Text>
+          <Text className="text-xs text-blue-600">Day {currentDay} of {challenge.totalDays}</Text>
           <Text className="text-lg font-bold text-gray-900">Today's Log</Text>
         </View>
-        <Pressable onPress={fetchTodayData} className="p-2 -mr-2">
-          <Feather name="refresh-cw" size={20} color="#6B7280" />
+        <Pressable onPress={fetchTodayData} className="p-2 -mr-2 bg-blue-100 rounded-full">
+          <Feather name="refresh-cw" size={20} color="#3B82F6" />
         </Pressable>
       </View>
 
@@ -459,13 +476,13 @@ export default function DailyLogScreen() {
           {/* Status Banner */}
           <View
             className={`rounded-2xl p-4 mb-4 ${
-              allComplete ? "bg-green-100" : "bg-gray-100"
+              allComplete ? "bg-green-100" : "bg-orange-100"
             }`}
           >
             <View className="flex-row items-center">
               <View
                 className={`h-12 w-12 items-center justify-center rounded-full ${
-                  allComplete ? "bg-green-500" : "bg-gray-300"
+                  allComplete ? "bg-green-500" : "bg-orange-500"
                 }`}
               >
                 <Feather
@@ -477,14 +494,14 @@ export default function DailyLogScreen() {
               <View className="ml-4">
                 <Text
                   className={`text-lg font-bold ${
-                    allComplete ? "text-green-800" : "text-gray-700"
+                    allComplete ? "text-green-800" : "text-orange-800"
                   }`}
                 >
                   {allComplete ? "Day Complete!" : `${completedCount}/${tasks.length} Tasks Done`}
                 </Text>
                 <Text
                   className={`text-sm ${
-                    allComplete ? "text-green-600" : "text-gray-500"
+                    allComplete ? "text-green-600" : "text-orange-600"
                   }`}
                 >
                   {allComplete
@@ -561,9 +578,10 @@ export default function DailyLogScreen() {
                         <View className="flex-row items-center">
                           <View className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                             <View
-                              className={`h-full rounded-full ${isCompleted ? "bg-green-500" : "bg-green-300"}`}
+                              className="h-full rounded-full"
                               style={{ 
-                                width: `${Math.min(100, (task.healthData.current / task.healthData.goal) * 100)}%` 
+                                width: `${Math.min(100, (task.healthData.current / task.healthData.goal) * 100)}%`,
+                                backgroundColor: isCompleted ? "#22C55E" : (task.healthData.color || "#10B981")
                               }}
                             />
                           </View>
