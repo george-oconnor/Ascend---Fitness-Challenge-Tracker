@@ -3,12 +3,75 @@ import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Pressable, Text, View } from "react-native";
+import { useEffect, useRef } from "react";
+import { Animated, Pressable, Text, View } from "react-native";
+
+// Celebration sparkle component
+function CelebrationSparkles() {
+  const sparkle1 = useRef(new Animated.Value(0)).current;
+  const sparkle2 = useRef(new Animated.Value(0)).current;
+  const sparkle3 = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const animate = (value: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(value, { toValue: 1, duration: 600, useNativeDriver: true }),
+          Animated.timing(value, { toValue: 0, duration: 600, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    animate(sparkle1, 0);
+    animate(sparkle2, 200);
+    animate(sparkle3, 400);
+  }, []);
+
+  const sparkleStyle = (anim: Animated.Value, left: number, top: number) => ({
+    position: 'absolute' as const,
+    left,
+    top,
+    opacity: anim,
+    transform: [{ scale: anim.interpolate({ inputRange: [0, 1], outputRange: [0.5, 1.2] }) }],
+  });
+
+  return (
+    <>
+      <Animated.View style={sparkleStyle(sparkle1, -8, -8)}>
+        <Text style={{ fontSize: 16 }}>✨</Text>
+      </Animated.View>
+      <Animated.View style={sparkleStyle(sparkle2, 50, -12)}>
+        <Text style={{ fontSize: 14 }}>⭐</Text>
+      </Animated.View>
+      <Animated.View style={sparkleStyle(sparkle3, 100, -6)}>
+        <Text style={{ fontSize: 12 }}>✨</Text>
+      </Animated.View>
+    </>
+  );
+}
 
 export default function ChallengeStatusCard() {
   const { challenge, todayLog, isLoading } = useChallengeStore();
   const { steps, workouts, isAuthorized: healthAuthorized } = useHealthStore();
   const { hasLoggedToday: cycleLoggedToday } = useTodayCycleLog();
+  
+  // Press animation
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.98,
+      useNativeDriver: true,
+    }).start();
+  };
+  
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      useNativeDriver: true,
+    }).start();
+  };
 
   if (isLoading) {
     return (
@@ -137,7 +200,9 @@ export default function ChallengeStatusCard() {
     // Sleep
     if ((challenge as any).trackSleep) {
       totalTracked++;
-      if (todayLog.sleepLogged) completedToday++;
+      const sleepGoalMinutes = ((challenge as any).sleepGoalHours ?? 8) * 60;
+      const sleepMet = todayLog.sleepCompleted === true || (todayLog.sleepMinutes ?? 0) >= sleepGoalMinutes;
+      if (sleepMet) completedToday++;
     }
 
     // Cycle
@@ -210,57 +275,92 @@ export default function ChallengeStatusCard() {
     );
   }
 
+  const isComplete = completedToday === totalTracked;
+
   return (
-    <Pressable
-      onPress={() => router.push("/daily-log")}
-      className="bg-white rounded-2xl p-6 mb-4 shadow-sm"
-    >
-      {/* Header */}
-      <View className="flex-row items-center justify-between mb-4">
-        <View>
-          <Text className="text-xs text-gray-500 uppercase tracking-wide">{challenge.totalDays} Hard Challenge</Text>
-          <Text className="text-xl font-bold text-gray-900">Day {currentDay} of {challenge.totalDays}</Text>
-        </View>
-        <Pressable
-          onPress={(e) => {
-            e.stopPropagation();
-            router.push("/challenge-setup?edit=true");
-          }}
-          className="p-2"
-        >
-          <Feather name="edit-2" size={18} color="#9CA3AF" />
-        </Pressable>
-      </View>
-
-      {/* Progress bar */}
-      <View className="mb-2">
-        <View className="h-3 bg-gray-100 rounded-full overflow-hidden">
-          <View
-            className="h-full bg-primary rounded-full"
-            style={{ width: `${progressPercent}%` }}
-          />
-        </View>
-        <Text className="text-xs text-gray-500 mt-1 text-right">
-          {Math.round(progressPercent)}% complete
-        </Text>
-      </View>
-
-      {/* Today's activities */}
-      <View className="flex-row items-center justify-between mt-3 bg-gray-50 rounded-xl p-3">
-        <View className="flex-row items-center">
-          <View className={`h-8 w-8 rounded-full items-center justify-center ${
-            completedToday === totalTracked ? "bg-green-500" : "bg-purple-500"
-          }`}>
-            <Feather name={completedToday === totalTracked ? "check" : "clock"} size={16} color="white" />
+    <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      <Pressable
+        onPress={() => router.push("/daily-log")}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        className="rounded-2xl p-6 mb-4 bg-white"
+        style={{ 
+          borderWidth: 1,
+          borderColor: isComplete ? '#BBF7D0' : '#E5E7EB',
+        }}
+      >
+        {/* Celebration sparkles when complete */}
+        {isComplete && <CelebrationSparkles />}
+        
+        {/* Header */}
+        <View className="flex-row items-center justify-between mb-4">
+          <View>
+            <Text className="text-xs uppercase tracking-wide text-gray-500">{challenge.totalDays} Hard Challenge</Text>
+            <Text className="text-xl font-bold text-gray-900">Day {currentDay} of {challenge.totalDays}</Text>
           </View>
-          <Text className="text-sm font-semibold text-gray-700 ml-2">Today's Activities</Text>
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation();
+              router.push("/challenge-setup?edit=true");
+            }}
+            className="p-2"
+          >
+            <Feather name="edit-2" size={18} color="#9CA3AF" />
+          </Pressable>
         </View>
-        <Text className={`text-base font-bold ${
-          completedToday === totalTracked ? "text-green-600" : "text-purple-600"
-        }`}>
-          {completedToday} / {totalTracked}
-        </Text>
-      </View>
-    </Pressable>
+
+        {/* Progress bar - gradient effect */}
+        <View className="mb-2">
+          <View className="h-3 rounded-full overflow-hidden bg-gray-100">
+            <View
+              className="h-full rounded-full"
+              style={{ 
+                width: `${progressPercent}%`, 
+                backgroundColor: isComplete ? '#22C55E' : '#3B82F6',
+              }}
+            />
+          </View>
+          <View className="flex-row justify-between mt-1">
+            <Text className="text-xs text-gray-500">
+              {currentDay} days completed
+            </Text>
+            <Text className="text-xs" style={{ color: isComplete ? '#16A34A' : '#3B82F6' }}>
+              {Math.round(progressPercent)}%
+            </Text>
+          </View>
+        </View>
+
+        {/* Today's activities */}
+        <View 
+          className="flex-row items-center justify-between mt-3 rounded-xl p-3" 
+          style={{ backgroundColor: isComplete ? '#DCFCE7' : '#F3F4F6' }}
+        >
+          <View className="flex-row items-center">
+            <View 
+              className="h-8 w-8 rounded-full items-center justify-center"
+              style={{ backgroundColor: isComplete ? '#22C55E' : '#3B82F6' }}
+            >
+              <Feather 
+                name={isComplete ? "check" : "clock"} 
+                size={16} 
+                color="white" 
+              />
+            </View>
+            <View className="ml-2">
+              <Text className="text-sm font-semibold" style={{ color: isComplete ? '#15803D' : '#374151' }}>
+                {isComplete ? "All Done! 🎉" : "Today's Progress"}
+              </Text>
+            </View>
+          </View>
+          <View className="flex-row items-center">
+            <Text className="text-lg font-bold" style={{ color: isComplete ? '#16A34A' : '#3B82F6' }}>
+              {completedToday}
+            </Text>
+            <Text className="text-sm text-gray-400 mx-1">/</Text>
+            <Text className="text-sm text-gray-500">{totalTracked}</Text>
+          </View>
+        </View>
+      </Pressable>
+    </Animated.View>
   );
 }
