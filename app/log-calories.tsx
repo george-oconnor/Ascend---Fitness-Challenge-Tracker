@@ -235,7 +235,7 @@ export default function LogCaloriesScreen() {
           date: format(targetDate, 'yyyy-MM-dd'),
         });
         
-        await fetchAllLogs();
+        await fetchAllLogs(challenge.$id!);
       } else {
         // Update today's log
         await updateProgress({
@@ -276,11 +276,11 @@ export default function LogCaloriesScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-orange-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-orange-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-orange-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#F97316" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">Log Calories</Text>
         <View style={{ width: 40 }} />
@@ -297,7 +297,7 @@ export default function LogCaloriesScreen() {
         >
           <View className="p-4">
             {/* Calorie Summary Card */}
-            <View className="bg-white rounded-2xl p-5 mb-4 shadow-sm">
+            <View className="bg-white rounded-2xl p-5 mb-4 shadow-sm border border-orange-100">
               <View className="flex-row items-center justify-between">
                 <View className="flex-1">
                   <Text className="text-sm text-gray-500 mb-1">Today's Calories</Text>
@@ -319,8 +319,8 @@ export default function LogCaloriesScreen() {
             </View>
 
             {/* Meal Breakdown */}
-            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-              <Text className="text-sm font-semibold text-gray-700 mb-3 ml-1">
+            <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-orange-100">
+              <Text className="text-sm font-semibold text-orange-700 mb-3 ml-1">
                 Log by Meal
               </Text>
               {(Object.keys(MEAL_CONFIG) as (keyof MealCalories)[]).map((meal) => (
