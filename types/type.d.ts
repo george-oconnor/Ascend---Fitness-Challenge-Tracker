@@ -3,6 +3,7 @@ export type Challenge = {
   $id?: string;
   userId: string;
   startDate: string;
+  endDate?: string; // Optional end date (alternative to totalDays)
   totalDays: number;
   trackSteps: boolean;
   stepsGoal: number;
