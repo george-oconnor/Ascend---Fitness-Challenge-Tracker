@@ -95,11 +95,11 @@ export default function LogPhotoScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-pink-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-pink-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-pink-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#EC4899" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">Progress Photo</Text>
         <View style={{ width: 40 }} />
@@ -143,8 +143,8 @@ export default function LogPhotoScreen() {
         </Pressable>
 
         {/* Tips */}
-        <View className="bg-gray-50 rounded-xl p-4">
-          <Text className="text-sm font-semibold text-gray-800 mb-3">💡 Tips for Best Results</Text>
+        <View className="bg-white rounded-xl p-4 border border-pink-100">
+          <Text className="text-sm font-semibold text-pink-700 mb-3">💡 Tips for Best Results</Text>
           <View className="space-y-2">
             <View className="flex-row items-start">
               <Text className="text-gray-600 mr-2">•</Text>
