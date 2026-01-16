@@ -6,8 +6,8 @@ import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 import { router, useLocalSearchParams } from "expo-router";
-import { useEffect, useState } from "react";
-import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Platform, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Scale visualization
@@ -16,22 +16,57 @@ function ScaleDisplay({ weight, goal }: { weight: number; goal: number }) {
   const isAtGoal = Math.abs(diff) < 0.5;
   const isAboveGoal = diff > 0;
   
+  // Animation for scale ticks - true infinite scroll
+  const tickOffset = useRef(new Animated.Value(0)).current;
+  const baseWeight = useRef(weight).current; // Store initial weight
+  
+  // If starting from 0, need more ticks to handle scrolling to 120kg
+  const tickCount = baseWeight < 5 ? 200 : 80;
+  const startOffset = baseWeight < 5 ? -50 : -200;
+  
+  useEffect(() => {
+    // Simple offset based on weight change from initial - no modulo = no jump
+    const offset = (weight - baseWeight) * 10;
+    
+    Animated.spring(tickOffset, {
+      toValue: -offset,
+      useNativeDriver: true,
+      tension: 80,
+      friction: 10,
+    }).start();
+  }, [weight]);
+  
+  // Render ticks based on starting weight
+  const renderTicks = () => {
+    const ticks = [];
+    for (let i = 0; i < tickCount; i++) {
+      ticks.push(
+        <View 
+          key={i} 
+          className={`w-0.5 h-3 mx-1 ${i % 9 === 4 ? 'bg-indigo-400 h-4' : 'bg-gray-300'}`} 
+        />
+      );
+    }
+    return ticks;
+  };
+  
   return (
     <View className="items-center">
       {/* Scale platform */}
       <View className="bg-gray-200 h-4 w-48 rounded-full mb-2" />
       
       {/* Scale body */}
-      <View className="bg-gray-100 w-56 h-28 rounded-3xl items-center justify-center relative overflow-hidden">
-        {/* Decorative lines */}
-        <View className="absolute top-2 left-0 right-0 flex-row justify-center">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <View 
-              key={i} 
-              className={`w-0.5 h-3 mx-1 ${i === 4 ? 'bg-indigo-500 h-4' : 'bg-gray-300'}`} 
-            />
-          ))}
-        </View>
+      <View className="bg-gray-50 w-56 h-28 rounded-3xl items-center justify-center relative overflow-hidden">
+        {/* Decorative lines - animated */}
+        <Animated.View 
+          className="absolute top-2 flex-row"
+          style={{
+            transform: [{ translateX: tickOffset }],
+            left: startOffset, // Adjust based on starting weight
+          }}
+        >
+          {renderTicks()}
+        </Animated.View>
         
         <Text className="text-5xl font-bold text-gray-800">{weight.toFixed(1)}</Text>
         <Text className="text-sm text-gray-500 mt-1">kg</Text>
@@ -258,11 +293,11 @@ export default function LogWeightScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-indigo-50 to-white">
+    <SafeAreaView className="flex-1 bg-indigo-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-indigo-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-indigo-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#6366F1" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">Log Weight</Text>
         <View className="w-10" />
@@ -296,17 +331,17 @@ export default function LogWeightScreen() {
           </View>
 
           {/* Weight Input */}
-          <View className="bg-white rounded-2xl p-6 shadow-sm mb-6">
-            <Text className="text-sm font-semibold text-gray-600 mb-4 text-center">
+          <View className="bg-white rounded-2xl p-6 shadow-sm mb-6 border border-indigo-100">
+            <Text className="text-sm font-semibold text-indigo-700 mb-4 text-center">
               Enter Today's Weight
             </Text>
             
             <View className="flex-row items-center justify-center mb-4">
               <Pressable
                 onPress={() => handleQuickAdjust(-0.1)}
-                className="bg-gray-100 h-14 w-14 rounded-full items-center justify-center"
+                className="bg-indigo-100 h-14 w-14 rounded-full items-center justify-center"
               >
-                <Feather name="minus" size={24} color="#6B7280" />
+                <Feather name="minus" size={24} color="#6366F1" />
               </Pressable>
               
               <View className="mx-4 items-center">
@@ -316,7 +351,7 @@ export default function LogWeightScreen() {
                   keyboardType="decimal-pad"
                   placeholder="0.0"
                   placeholderTextColor="#9CA3AF"
-                  className="text-5xl font-bold text-gray-800 w-32 text-center"
+                  className="text-5xl font-bold text-gray-800 w-32 text-center h-16"
                   maxLength={5}
                 />
                 <Text className="text-lg text-gray-400 mt-1">kg</Text>
@@ -331,30 +366,30 @@ export default function LogWeightScreen() {
             </View>
 
             {/* Fine adjustment buttons */}
-            <View className="flex-row justify-center space-x-2">
+            <View className="flex-row justify-center gap-3">
               <Pressable
                 onPress={() => handleQuickAdjust(-1)}
-                className="bg-gray-50 px-4 py-2 rounded-lg"
+                className="bg-indigo-50 px-4 py-2 rounded-lg"
               >
-                <Text className="text-sm text-gray-600 font-medium">-1 kg</Text>
+                <Text className="text-sm text-indigo-600 font-medium">-1 kg</Text>
               </Pressable>
               <Pressable
                 onPress={() => handleQuickAdjust(-0.5)}
-                className="bg-gray-50 px-4 py-2 rounded-lg"
+                className="bg-indigo-50 px-4 py-2 rounded-lg"
               >
-                <Text className="text-sm text-gray-600 font-medium">-0.5 kg</Text>
+                <Text className="text-sm text-indigo-600 font-medium">-0.5 kg</Text>
               </Pressable>
               <Pressable
                 onPress={() => handleQuickAdjust(0.5)}
-                className="bg-gray-50 px-4 py-2 rounded-lg"
+                className="bg-indigo-50 px-4 py-2 rounded-lg"
               >
-                <Text className="text-sm text-gray-600 font-medium">+0.5 kg</Text>
+                <Text className="text-sm text-indigo-600 font-medium">+0.5 kg</Text>
               </Pressable>
               <Pressable
                 onPress={() => handleQuickAdjust(1)}
-                className="bg-gray-50 px-4 py-2 rounded-lg"
+                className="bg-indigo-50 px-4 py-2 rounded-lg"
               >
-                <Text className="text-sm text-gray-600 font-medium">+1 kg</Text>
+                <Text className="text-sm text-indigo-600 font-medium">+1 kg</Text>
               </Pressable>
             </View>
           </View>
