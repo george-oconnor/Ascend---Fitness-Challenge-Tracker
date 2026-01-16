@@ -341,11 +341,11 @@ export default function LogWorkoutScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className={`flex-1 ${isWorkout1 ? "bg-orange-50" : "bg-purple-50"}`}>
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className={`flex-row items-center justify-between px-4 py-4 border-b bg-white ${isWorkout1 ? "border-orange-100" : "border-purple-100"}`}>
+        <Pressable onPress={() => router.back()} className={`p-2 -ml-2 rounded-full ${isWorkout1 ? "bg-orange-100" : "bg-purple-100"}`}>
+          <Feather name="arrow-left" size={24} color={config.color} />
         </Pressable>
         <View className="flex-1 items-center">
           <Text className="text-lg font-bold text-gray-900">Log {config.label}</Text>
@@ -387,16 +387,16 @@ export default function LogWorkoutScreen() {
         )}
 
         {/* Manual Duration Input */}
-        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6">
-          <Text className="text-sm font-semibold text-gray-600 mb-3">
+        <View className={`bg-white rounded-2xl p-4 shadow-sm mb-6 border ${isWorkout1 ? "border-orange-100" : "border-purple-100"}`}>
+          <Text className={`text-sm font-semibold mb-3 ${isWorkout1 ? "text-orange-700" : "text-purple-700"}`}>
             {syncedMinutes > 0 ? "Add More Time (Manual)" : "Workout Duration"}
           </Text>
           <View className="flex-row items-center justify-center">
             <Pressable
               onPress={() => handleQuickAdd(-5)}
-              className="bg-gray-100 h-12 w-12 rounded-full items-center justify-center"
+              className={`h-12 w-12 rounded-full items-center justify-center ${isWorkout1 ? "bg-orange-100" : "bg-purple-100"}`}
             >
-              <Feather name="minus" size={20} color="#6B7280" />
+              <Feather name="minus" size={20} color={config.color} />
             </Pressable>
             <View className="mx-6 items-center">
               <Text className="text-4xl font-bold text-gray-800">{minutes}</Text>
@@ -416,9 +416,9 @@ export default function LogWorkoutScreen() {
               <Pressable
                 key={mins}
                 onPress={() => setMinutes(mins)}
-                className={`px-4 py-2 rounded-lg ${minutes === mins ? config.lightBg : "bg-gray-100"}`}
+                className={`px-4 py-2 rounded-lg ${minutes === mins ? config.lightBg : (isWorkout1 ? "bg-orange-100" : "bg-purple-100")}`}
               >
-                <Text className={`text-sm font-medium ${minutes === mins ? "text-gray-800" : "text-gray-600"}`}>
+                <Text className={`text-sm font-medium ${minutes === mins ? "text-gray-800" : (isWorkout1 ? "text-orange-700" : "text-purple-700")}`}>
                   {mins}m
                 </Text>
               </Pressable>
@@ -427,20 +427,20 @@ export default function LogWorkoutScreen() {
         </View>
 
         {/* Workout Type Selection */}
-        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6">
-          <Text className="text-sm font-semibold text-gray-600 mb-3">Workout Type</Text>
+        <View className={`bg-white rounded-2xl p-4 shadow-sm mb-6 border ${isWorkout1 ? "border-orange-100" : "border-purple-100"}`}>
+          <Text className={`text-sm font-semibold mb-3 ${isWorkout1 ? "text-orange-700" : "text-purple-700"}`}>Workout Type</Text>
           <View className="flex-row flex-wrap gap-2">
             {WORKOUT_TYPES.map((type) => (
               <Pressable
                 key={type.id}
                 onPress={() => setSelectedType(type.id)}
                 className={`flex-row items-center px-3 py-2 rounded-xl ${
-                  selectedType === type.id ? config.lightBg : "bg-gray-100"
+                  selectedType === type.id ? config.lightBg : (isWorkout1 ? "bg-orange-100" : "bg-purple-100")
                 }`}
               >
                 <Text className="mr-1">{type.emoji}</Text>
                 <Text className={`text-sm ${
-                  selectedType === type.id ? "font-semibold text-gray-800" : "text-gray-600"
+                  selectedType === type.id ? "font-semibold text-gray-800" : (isWorkout1 ? "text-orange-700" : "text-purple-700")
                 }`}>
                   {type.label}
                 </Text>
@@ -450,8 +450,8 @@ export default function LogWorkoutScreen() {
         </View>
 
         {/* Notes */}
-        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6">
-          <Text className="text-sm font-semibold text-gray-600 mb-3">Notes (Optional)</Text>
+        <View className={`bg-white rounded-2xl p-4 shadow-sm mb-6 border ${isWorkout1 ? "border-orange-100" : "border-purple-100"}`}>
+          <Text className={`text-sm font-semibold mb-3 ${isWorkout1 ? "text-orange-700" : "text-purple-700"}`}>Notes (Optional)</Text>
           <TextInput
             value={notes}
             onChangeText={setNotes}
