@@ -2,7 +2,7 @@
   "expo": {
     "name": "75 Hard",
     "slug": "75-hard",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "myapp",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "description": "75 Hard - Fitness Challenge - Built with Expo and Appwrite",
     "ios": {
-        "buildNumber": "38",
+        "buildNumber": "1",
       "supportsTablet": true,
       "bundleIdentifier": "com.georgeoc.75hardapp",
       "entitlements": {
