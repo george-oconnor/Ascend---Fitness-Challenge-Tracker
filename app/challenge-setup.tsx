@@ -168,6 +168,26 @@ export default function ChallengeSetupScreen() {
   );
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [totalDays, setTotalDays] = useState(String(challenge?.totalDays ?? 75));
+  
+  // Duration mode: 'days' or 'endDate'
+  const [durationMode, setDurationMode] = useState<'days' | 'endDate'>(
+    challenge?.endDate ? 'endDate' : 'days'
+  );
+  const [endDate, setEndDate] = useState<Date>(() => {
+    if (challenge?.endDate) {
+      return new Date(challenge.endDate);
+    }
+    // Default to start date + totalDays
+    const defaultEnd = new Date(challenge?.startDate ? new Date(challenge.startDate) : new Date());
+    defaultEnd.setDate(defaultEnd.getDate() + (challenge?.totalDays ?? 75));
+    return defaultEnd;
+  });
+  const [showEndDatePicker, setShowEndDatePicker] = useState(false);
+  
+  // Calculate total days from end date when in endDate mode
+  const calculatedTotalDays = durationMode === 'endDate' 
+    ? Math.max(1, Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)))
+    : parseInt(totalDays, 10) || 75;
 
   // Tracking toggles
   const [tracking, setTracking] = useState<Record<string, boolean>>({
@@ -213,7 +233,8 @@ export default function ChallengeSetupScreen() {
     const challengeData = {
       userId: user.id,
       startDate: startDate.toISOString().split("T")[0],
-      totalDays: parseInt(totalDays, 10) || 75,
+      endDate: durationMode === 'endDate' ? endDate.toISOString() : null,
+      totalDays: calculatedTotalDays,
       trackWorkout1: tracking.trackWorkout1,
       trackWorkout2: tracking.trackWorkout2,
       trackDiet: tracking.trackDiet,
@@ -310,18 +331,94 @@ export default function ChallengeSetupScreen() {
           {/* Duration */}
           <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-purple-100">
             <Text className="text-sm font-semibold text-purple-700 mb-3">Challenge Duration</Text>
-            <View className="flex-row items-center bg-gray-50 rounded-xl px-4 py-4">
-              <Feather name="clock" size={20} color="#6B7280" />
-              <TextInput
-                value={totalDays}
-                onChangeText={setTotalDays}
-                keyboardType="number-pad"
-                className="flex-1 ml-3"
-                style={{ fontSize: 16, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
-                placeholder="75"
-              />
-              <Text className="text-gray-500">days</Text>
+            
+            {/* Duration Mode Toggle */}
+            <View className="flex-row gap-2 mb-3">
+              <Pressable
+                onPress={() => setDurationMode('days')}
+                className={`flex-1 py-2 px-3 rounded-lg border ${
+                  durationMode === 'days' 
+                    ? "bg-purple-100 border-purple-300" 
+                    : "bg-gray-50 border-gray-200"
+                }`}
+              >
+                <Text className={`text-center text-sm ${
+                  durationMode === 'days' ? "text-purple-700 font-semibold" : "text-gray-600"
+                }`}>
+                  Number of Days
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setDurationMode('endDate')}
+                className={`flex-1 py-2 px-3 rounded-lg border ${
+                  durationMode === 'endDate' 
+                    ? "bg-purple-100 border-purple-300" 
+                    : "bg-gray-50 border-gray-200"
+                }`}
+              >
+                <Text className={`text-center text-sm ${
+                  durationMode === 'endDate' ? "text-purple-700 font-semibold" : "text-gray-600"
+                }`}>
+                  End Date
+                </Text>
+              </Pressable>
             </View>
+            
+            {durationMode === 'days' ? (
+              <View className="flex-row items-center bg-gray-50 rounded-xl px-4 py-4">
+                <Feather name="clock" size={20} color="#6B7280" />
+                <TextInput
+                  value={totalDays}
+                  onChangeText={setTotalDays}
+                  keyboardType="number-pad"
+                  className="flex-1 ml-3"
+                  style={{ fontSize: 16, color: "#111827", padding: 0, margin: 0, includeFontPadding: false }}
+                  placeholder="75"
+                />
+                <Text className="text-gray-500">days</Text>
+              </View>
+            ) : (
+              <>
+                <Pressable
+                  onPress={() => setShowEndDatePicker(true)}
+                  className="flex-row items-center justify-between bg-gray-50 rounded-xl p-4"
+                >
+                  <View className="flex-row items-center">
+                    <Feather name="flag" size={20} color="#6B7280" />
+                    <Text className="text-base text-gray-900 ml-3">
+                      {endDate.toLocaleDateString("en-US", {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                      })}
+                    </Text>
+                  </View>
+                  <Feather name="chevron-right" size={20} color="#9CA3AF" />
+                </Pressable>
+                
+                {showEndDatePicker && (
+                  <DateTimePicker
+                    value={endDate}
+                    mode="date"
+                    display={Platform.OS === "ios" ? "spinner" : "default"}
+                    minimumDate={new Date(startDate.getTime() + 24 * 60 * 60 * 1000)} // At least 1 day after start
+                    onChange={(event, date) => {
+                      setShowEndDatePicker(Platform.OS === "ios");
+                      if (date) setEndDate(date);
+                    }}
+                    textColor="#000000"
+                    themeVariant="light"
+                  />
+                )}
+                
+                <View className="mt-2 px-2">
+                  <Text className="text-xs text-gray-500">
+                    Duration: {calculatedTotalDays} days
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
 
           {/* Exercise */}
