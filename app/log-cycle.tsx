@@ -146,7 +146,7 @@ function SymptomChip({
     <Pressable
       onPress={onToggle}
       className={`flex-row items-center px-3 py-2 rounded-full ${
-        isSelected ? "bg-pink-500" : "bg-gray-100"
+        isSelected ? "bg-pink-500" : "bg-gray-50"
       }`}
     >
       <Feather 
@@ -463,11 +463,11 @@ export default function LogCycleScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-pink-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-pink-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-pink-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#EC4899" />
         </Pressable>
         <View className="flex-row items-center">
           <Text className="text-lg font-bold text-gray-900">Cycle Tracking</Text>
@@ -582,7 +582,7 @@ export default function LogCycleScreen() {
                       className={`flex-1 py-3 rounded-xl mr-2 ${
                         sexualActivity.protected === true
                           ? "bg-green-500"
-                          : "bg-gray-100"
+                          : "bg-gray-50"
                       }`}
                     >
                       <Text
@@ -602,7 +602,7 @@ export default function LogCycleScreen() {
                       className={`flex-1 py-3 rounded-xl ${
                         sexualActivity.protected === false
                           ? "bg-pink-500"
-                          : "bg-gray-100"
+                          : "bg-gray-50"
                       }`}
                     >
                       <Text
@@ -674,7 +674,7 @@ export default function LogCycleScreen() {
                       key={option.score}
                       onPress={() => setSelectedMood(option.score)}
                       className={`flex-1 mx-1 py-3 rounded-xl items-center ${
-                        selectedMood === option.score ? "bg-pink-500" : "bg-gray-100"
+                        selectedMood === option.score ? "bg-pink-500" : "bg-gray-50"
                       }`}
                     >
                       <Feather 
@@ -729,7 +729,7 @@ export default function LogCycleScreen() {
                     className={`flex-1 mx-1 py-3 rounded-xl items-center ${
                       cervicalMucus === option.value
                         ? "bg-blue-500"
-                        : "bg-gray-100"
+                        : "bg-gray-50"
                     }`}
                   >
                     <Text
@@ -752,7 +752,7 @@ export default function LogCycleScreen() {
                 <Pressable
                   onPress={() => setOvulationTest("not_taken")}
                   className={`flex-1 py-3 rounded-xl mr-2 ${
-                    ovulationTest === "not_taken" ? "bg-gray-400" : "bg-gray-100"
+                    ovulationTest === "not_taken" ? "bg-gray-400" : "bg-gray-50"
                   }`}
                 >
                   <Text
@@ -766,7 +766,7 @@ export default function LogCycleScreen() {
                 <Pressable
                   onPress={() => setOvulationTest("negative")}
                   className={`flex-1 py-3 rounded-xl mr-2 ${
-                    ovulationTest === "negative" ? "bg-pink-400" : "bg-gray-100"
+                    ovulationTest === "negative" ? "bg-pink-400" : "bg-gray-50"
                   }`}
                 >
                   <Text
@@ -780,7 +780,7 @@ export default function LogCycleScreen() {
                 <Pressable
                   onPress={() => setOvulationTest("positive")}
                   className={`flex-1 py-3 rounded-xl ${
-                    ovulationTest === "positive" ? "bg-green-500" : "bg-gray-100"
+                    ovulationTest === "positive" ? "bg-green-500" : "bg-gray-50"
                   }`}
                 >
                   <Text
