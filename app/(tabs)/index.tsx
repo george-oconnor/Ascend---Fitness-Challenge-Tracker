@@ -6,15 +6,202 @@ import { useHealthStore } from "@/store/useHealthStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useCallback, useEffect, useState } from "react";
-import { Platform, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Animated, Platform, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+
+// Animated empty state illustration
+function EmptyStateIllustration() {
+  const bounce = useRef(new Animated.Value(0)).current;
+  const float1 = useRef(new Animated.Value(0)).current;
+  const float2 = useRef(new Animated.Value(0)).current;
+  const float3 = useRef(new Animated.Value(0)).current;
+  
+  useEffect(() => {
+    // Main icon bounce
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(bounce, { toValue: -8, duration: 1000, useNativeDriver: true }),
+        Animated.timing(bounce, { toValue: 0, duration: 1000, useNativeDriver: true }),
+      ])
+    ).start();
+    
+    // Floating particles
+    const floatAnim = (anim: Animated.Value, delay: number) => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.delay(delay),
+          Animated.timing(anim, { toValue: 1, duration: 2000, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: 0, duration: 2000, useNativeDriver: true }),
+        ])
+      ).start();
+    };
+    floatAnim(float1, 0);
+    floatAnim(float2, 500);
+    floatAnim(float3, 1000);
+  }, []);
+
+  return (
+    <View className="items-center justify-center h-32 mb-2">
+      {/* Floating decorative elements */}
+      <Animated.View 
+        style={{ 
+          position: 'absolute', 
+          left: 40, 
+          top: 10,
+          opacity: float1.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] }),
+          transform: [{ translateY: float1.interpolate({ inputRange: [0, 1], outputRange: [0, -10] }) }]
+        }}
+      >
+        <Text style={{ fontSize: 20 }}>💪</Text>
+      </Animated.View>
+      <Animated.View 
+        style={{ 
+          position: 'absolute', 
+          right: 50, 
+          top: 5,
+          opacity: float2.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] }),
+          transform: [{ translateY: float2.interpolate({ inputRange: [0, 1], outputRange: [0, -8] }) }]
+        }}
+      >
+        <Text style={{ fontSize: 18 }}>📚</Text>
+      </Animated.View>
+      <Animated.View 
+        style={{ 
+          position: 'absolute', 
+          right: 70, 
+          bottom: 20,
+          opacity: float3.interpolate({ inputRange: [0, 1], outputRange: [0.3, 0.8] }),
+          transform: [{ translateY: float3.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) }]
+        }}
+      >
+        <Text style={{ fontSize: 16 }}>💧</Text>
+      </Animated.View>
+      
+      {/* Main bouncing icon */}
+      <Animated.View 
+        className="h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br"
+        style={{ 
+          backgroundColor: '#EDE9FE',
+          transform: [{ translateY: bounce }],
+          shadowColor: '#8B5CF6',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 8,
+        }}
+      >
+        <Feather name="target" size={40} color="#8B5CF6" />
+      </Animated.View>
+    </View>
+  );
+}
+
+// Section header with line
+function SectionHeader({ title, icon }: { title: string; icon?: keyof typeof Feather.glyphMap }) {
+  return (
+    <View className="flex-row items-center mb-3 mt-2">
+      {icon && (
+        <View className="h-6 w-6 rounded-full bg-gray-100 items-center justify-center mr-2">
+          <Feather name={icon} size={12} color="#6B7280" />
+        </View>
+      )}
+      <Text className="text-sm font-semibold text-gray-600">{title}</Text>
+      <View className="flex-1 h-px bg-gray-200 ml-3" />
+    </View>
+  );
+}
+
+// Mini confetti celebration overlay
+function ConfettiCelebration({ show }: { show: boolean }) {
+  const confettiPieces = useRef(
+    Array.from({ length: 30 }).map((_, i) => ({
+      id: i,
+      x: new Animated.Value(Math.random() * 350),
+      y: new Animated.Value(-20),
+      rotate: new Animated.Value(0),
+      opacity: new Animated.Value(1),
+      color: ['#8B5CF6', '#F59E0B', '#10B981', '#3B82F6', '#EC4899', '#22C55E'][Math.floor(Math.random() * 6)],
+      size: Math.random() * 8 + 4,
+    }))
+  ).current;
+  
+  const [visible, setVisible] = useState(false);
+  
+  useEffect(() => {
+    if (show) {
+      setVisible(true);
+      confettiPieces.forEach((piece, i) => {
+        piece.y.setValue(-20);
+        piece.opacity.setValue(1);
+        piece.x.setValue(Math.random() * 350);
+        
+        Animated.sequence([
+          Animated.delay(i * 30),
+          Animated.parallel([
+            Animated.timing(piece.y, {
+              toValue: 600,
+              duration: 2000 + Math.random() * 1000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(piece.x, {
+              toValue: piece.x._value + (Math.random() - 0.5) * 100,
+              duration: 2000,
+              useNativeDriver: true,
+            }),
+            Animated.timing(piece.rotate, {
+              toValue: Math.random() * 720,
+              duration: 2000,
+              useNativeDriver: true,
+            }),
+            Animated.sequence([
+              Animated.delay(1500),
+              Animated.timing(piece.opacity, {
+                toValue: 0,
+                duration: 500,
+                useNativeDriver: true,
+              }),
+            ]),
+          ]),
+        ]).start();
+      });
+      
+      setTimeout(() => setVisible(false), 3000);
+    }
+  }, [show]);
+  
+  if (!visible) return null;
+  
+  return (
+    <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, pointerEvents: 'none' }}>
+      {confettiPieces.map((piece) => (
+        <Animated.View
+          key={piece.id}
+          style={{
+            position: 'absolute',
+            width: piece.size,
+            height: piece.size,
+            backgroundColor: piece.color,
+            borderRadius: piece.size / 2,
+            transform: [
+              { translateX: piece.x },
+              { translateY: piece.y },
+              { rotate: piece.rotate.interpolate({ inputRange: [0, 360], outputRange: ['0deg', '360deg'] }) },
+            ],
+            opacity: piece.opacity,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
 
 export default function HomeScreen() {
   const { user } = useSessionStore();
   const { challenge, todayLog, fetchChallenge, fetchAllLogs, syncHealthData } = useChallengeStore();
   const { isAuthorized, fetchTodayData, steps, workouts } = useHealthStore();
   const [refreshing, setRefreshing] = useState(false);
+  const [showConfetti, setShowConfetti] = useState(false);
+  const wasCompleteRef = useRef(false);
 
   useEffect(() => {
     if (user?.id) {
@@ -57,6 +244,70 @@ export default function HomeScreen() {
     }
   }, [steps, workouts, isAuthorized, challenge?.$id, todayLog?.$id]);
 
+  // Check for all tasks complete and trigger confetti
+  useEffect(() => {
+    if (!challenge || !todayLog) return;
+    
+    // Count completed activities
+    let completedCount = 0;
+    let totalCount = 0;
+    
+    if (challenge.trackSteps) {
+      totalCount++;
+      const stepsCount = isAuthorized ? steps : (todayLog.stepsCount ?? 0);
+      if (stepsCount >= (challenge.stepsGoal ?? 0)) completedCount++;
+    }
+    if (challenge.trackWorkout1) {
+      totalCount++;
+      if ((todayLog.workout1Minutes ?? 0) >= challenge.workoutMinutes) completedCount++;
+    }
+    if (challenge.trackWorkout2) {
+      totalCount++;
+      if ((todayLog.workout2Minutes ?? 0) >= challenge.workoutMinutes) completedCount++;
+    }
+    if (challenge.trackDiet) {
+      totalCount++;
+      if (todayLog.dietCompleted) completedCount++;
+    }
+    if (challenge.trackWater) {
+      totalCount++;
+      if ((todayLog.waterLiters ?? 0) >= challenge.waterLiters) completedCount++;
+    }
+    if (challenge.trackReading) {
+      totalCount++;
+      if ((todayLog.readingPages ?? 0) >= challenge.readingPages || todayLog.readingCompleted) completedCount++;
+    }
+    if (challenge.trackProgressPhoto) {
+      totalCount++;
+      if (todayLog.progressPhotoCompleted) completedCount++;
+    }
+    if (challenge.trackNoAlcohol) {
+      totalCount++;
+      if (todayLog.noAlcoholCompleted) completedCount++;
+    }
+    if (challenge.trackWeight) {
+      totalCount++;
+      if (todayLog.weightLogged) completedCount++;
+    }
+    if (challenge.trackMood) {
+      totalCount++;
+      if ((todayLog.moodScore ?? 0) > 0) completedCount++;
+    }
+    if ((challenge as any).trackSleep) {
+      totalCount++;
+      const sleepGoalMinutes = ((challenge as any).sleepGoalHours ?? 8) * 60;
+      if (todayLog.sleepCompleted || (todayLog.sleepMinutes ?? 0) >= sleepGoalMinutes) completedCount++;
+    }
+    
+    const isAllComplete = totalCount > 0 && completedCount === totalCount;
+    
+    // Only trigger confetti when transitioning from incomplete to complete
+    if (isAllComplete && !wasCompleteRef.current) {
+      setShowConfetti(true);
+    }
+    wasCompleteRef.current = isAllComplete;
+  }, [challenge, todayLog, steps, isAuthorized]);
+
   return (
     <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
       <Header name={user?.name} />
@@ -92,7 +343,7 @@ export default function HomeScreen() {
             
             return (
               <View className="mt-2">
-                <Text className="text-sm font-semibold text-gray-600 mb-3 ml-1">Today's Progress</Text>
+                <SectionHeader title="Today's Progress" icon="check-circle" />
                 
                 {/* Check if any activities are tracked */}
                 {(() => {
@@ -115,18 +366,17 @@ export default function HomeScreen() {
                     return (
                       <Pressable
                         onPress={() => router.push("/challenge-setup")}
-                        className="bg-white rounded-2xl p-6 shadow-sm border-2 border-dashed border-gray-200"
+                        className="bg-white rounded-2xl p-6 border-2 border-dashed border-purple-200"
                       >
+                        <EmptyStateIllustration />
                         <View className="items-center">
-                          <View className="h-16 w-16 items-center justify-center rounded-full bg-purple-100 mb-4">
-                            <Feather name="plus-circle" size={32} color="#8B5CF6" />
-                          </View>
-                          <Text className="text-lg font-semibold text-gray-800 mb-2">No Activities Tracked</Text>
+                          <Text className="text-lg font-semibold text-gray-800 mb-2">Ready to Start?</Text>
                           <Text className="text-sm text-gray-500 text-center mb-4">
-                            Add some activities to track your daily progress and build healthy habits!
+                            Add activities to track your daily progress and build healthy habits!
                           </Text>
-                          <View className="bg-purple-500 px-4 py-2 rounded-full">
-                            <Text className="text-white font-semibold">Set Up Activities</Text>
+                          <View className="bg-purple-500 px-5 py-2.5 rounded-full flex-row items-center">
+                            <Feather name="plus" size={16} color="white" />
+                            <Text className="text-white font-semibold ml-1">Set Up Activities</Text>
                           </View>
                         </View>
                       </Pressable>
@@ -175,6 +425,9 @@ export default function HomeScreen() {
           })()}
         </View>
       </ScrollView>
+      
+      {/* Confetti celebration overlay */}
+      <ConfettiCelebration show={showConfetti} />
     </SafeAreaView>
   );
 }
