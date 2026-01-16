@@ -121,13 +121,13 @@ class HealthSyncService {
 
       // Request read and write permissions for quantity types
       // @kingstinct/react-native-healthkit uses { toRead, toShare } format
+      // Note: StateOfMind is handled separately via StateOfMind module
       const toRead = [
         HKQuantityTypes.DietaryWater,
         HKQuantityTypes.BodyMass,
         HKQuantityTypes.DietaryEnergyConsumed,
         HKQuantityTypes.ActiveEnergyBurned,
         HKCategoryTypes.SleepAnalysis,
-        "HKDataTypeIdentifierStateOfMind", // Mood - iOS 17+
       ];
 
       const toShare = [
@@ -135,7 +135,6 @@ class HealthSyncService {
         HKQuantityTypes.BodyMass,
         HKQuantityTypes.DietaryEnergyConsumed,
         HKCategoryTypes.SleepAnalysis,
-        "HKDataTypeIdentifierStateOfMind", // Mood - iOS 17+
       ];
 
       await requestAuthorization({ toRead, toShare });
