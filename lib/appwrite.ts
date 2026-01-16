@@ -159,6 +159,10 @@ export async function createDailyLog(log: Omit<DailyLog, "$id">): Promise<DailyL
 }
 
 export async function getDailyLog(challengeId: string, date: string): Promise<DailyLog | null> {
+  if (!challengeId || !date) {
+    console.warn("getDailyLog called with empty challengeId or date");
+    return null;
+  }
   try {
     const response = await databases.listDocuments(
       DATABASE_ID,
@@ -186,6 +190,10 @@ export async function updateDailyLog(logId: string, data: Partial<DailyLog>): Pr
 }
 
 export async function getDailyLogsForChallenge(challengeId: string): Promise<DailyLog[]> {
+  if (!challengeId) {
+    console.warn("getDailyLogsForChallenge called with empty challengeId");
+    return [];
+  }
   try {
     const response = await databases.listDocuments(
       DATABASE_ID,
@@ -303,6 +311,10 @@ export async function getActivityLogs(userId: string, limit: number = 50): Promi
 }
 
 export async function getActivityLogsForChallenge(challengeId: string, limit: number = 100): Promise<ActivityLog[]> {
+  if (!challengeId) {
+    console.warn("getActivityLogsForChallenge called with empty challengeId");
+    return [];
+  }
   try {
     const response = await databases.listDocuments(
       DATABASE_ID,
@@ -321,6 +333,10 @@ export async function getActivityLogsForChallenge(challengeId: string, limit: nu
 }
 
 export async function getActivityLogsForDate(challengeId: string, date: string, type?: ActivityType): Promise<ActivityLog[]> {
+  if (!challengeId || !date) {
+    console.warn("getActivityLogsForDate called with empty challengeId or date");
+    return [];
+  }
   try {
     const queries = [
       Query.equal("challengeId", challengeId),
