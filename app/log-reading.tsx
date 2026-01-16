@@ -147,11 +147,11 @@ export default function LogReadingScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-purple-50 to-white">
+    <SafeAreaView className="flex-1 bg-purple-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-purple-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-purple-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#A855F7" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">Log Reading</Text>
         <View className="w-10" />
@@ -180,14 +180,14 @@ export default function LogReadingScreen() {
         </View>
 
         {/* Page Input */}
-        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6">
-          <Text className="text-sm font-semibold text-gray-600 mb-3">Pages Read Today</Text>
+        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6 border border-purple-100">
+          <Text className="text-sm font-semibold text-purple-700 mb-3">Pages Read Today</Text>
           <View className="flex-row items-center justify-center">
             <Pressable
               onPress={() => handleQuickAdd(-1)}
-              className="bg-gray-100 h-12 w-12 rounded-full items-center justify-center"
+              className="bg-purple-100 h-12 w-12 rounded-full items-center justify-center"
             >
-              <Feather name="minus" size={20} color="#6B7280" />
+              <Feather name="minus" size={20} color="#A855F7" />
             </Pressable>
             <TextInput
               value={inputValue}
@@ -206,8 +206,8 @@ export default function LogReadingScreen() {
         </View>
 
         {/* Quick Add Buttons */}
-        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6">
-          <Text className="text-sm font-semibold text-gray-600 mb-3">Quick Add</Text>
+        <View className="bg-white rounded-2xl p-4 shadow-sm mb-6 border border-purple-100">
+          <Text className="text-sm font-semibold text-purple-700 mb-3">Quick Add</Text>
           <View className="flex-row justify-around">
             <Pressable
               onPress={() => handleQuickAdd(10)}
