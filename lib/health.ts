@@ -290,15 +290,11 @@ class HealthService {
       if (!initialized) return 0;
     }
 
-    const startOfDay = new Date(date);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(date);
-    endOfDay.setHours(23, 59, 59, 999);
-
+    // Use the 'date' option as per react-native-health getStepCount API
+    // The API expects a 'date' field, not 'startDate'/'endDate'
+    // If 'date' is not provided, it defaults to today - which caused the bug
     const options = {
-      startDate: startOfDay.toISOString(),
-      endDate: endOfDay.toISOString(),
+      date: date.toISOString(),
     };
 
     return new Promise((resolve) => {
