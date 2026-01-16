@@ -1,6 +1,6 @@
 import SwipeableGraphCard from "@/components/SwipeableGraphCard";
 import { BADGES } from "@/constants/badges";
-import { createUserBadge, getUserBadges } from "@/lib/appwrite";
+import { createDailyLog, createUserBadge, getUserBadges } from "@/lib/appwrite";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
@@ -9,7 +9,7 @@ import { Feather } from "@expo/vector-icons";
 import { addDays, differenceInDays, eachDayOfInterval, format, isAfter, isBefore, parseISO, startOfWeek, subDays } from "date-fns";
 import { router, useLocalSearchParams } from "expo-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 // Activity type configurations for display
@@ -41,6 +41,7 @@ export default function AnalyticsScreen() {
   const [resyncing, setResyncing] = useState(false);
   const [resyncLogs, setResyncLogs] = useState<string[]>([]);
   const [showResyncModal, setShowResyncModal] = useState(false);
+  const [creatingLog, setCreatingLog] = useState(false);
   
   // Handle date param from analytics navigation
   const { date: dateParam } = useLocalSearchParams<{ date?: string }>();
@@ -195,17 +196,17 @@ export default function AnalyticsScreen() {
     }
   };
 
-  // Completion status for day modal
+  // Completion status for day modal - works even without a log
   const getCompletionItems = (log: DailyLog | null) => {
-    if (!log || !challenge) return [];
+    if (!challenge) return [];
     
     const items: { label: string; completed: boolean; value?: string; icon: keyof typeof Feather.glyphMap; color: string; type?: string; workoutNum?: string }[] = [];
     
     if (challenge.trackSteps) {
       items.push({
         label: "Steps",
-        completed: log.stepsCompleted || (log.stepsCount !== undefined && log.stepsCount >= (challenge.stepsGoal || 10000)),
-        value: log.stepsCount ? `${log.stepsCount.toLocaleString()} steps` : undefined,
+        completed: log ? (log.stepsCompleted || (log.stepsCount !== undefined && log.stepsCount >= (challenge.stepsGoal || 10000))) : false,
+        value: log?.stepsCount ? `${log.stepsCount.toLocaleString()} steps` : undefined,
         icon: "trending-up",
         color: "#10B981",
         type: "steps"
@@ -215,8 +216,8 @@ export default function AnalyticsScreen() {
     if (challenge.trackWorkout1) {
       items.push({
         label: "Workout 1",
-        completed: log.workout1Completed || (log.workout1Minutes !== undefined && log.workout1Minutes >= (challenge.workoutMinutes || 45)),
-        value: log.workout1Minutes ? `${log.workout1Minutes} min` : undefined,
+        completed: log ? (log.workout1Completed || (log.workout1Minutes !== undefined && log.workout1Minutes >= (challenge.workoutMinutes || 45))) : false,
+        value: log?.workout1Minutes ? `${log.workout1Minutes} min` : undefined,
         icon: "zap",
         color: "#F59E0B",
         type: "workout",
@@ -227,8 +228,8 @@ export default function AnalyticsScreen() {
     if (challenge.trackWorkout2) {
       items.push({
         label: "Workout 2",
-        completed: log.workout2Completed || (log.workout2Minutes !== undefined && log.workout2Minutes >= (challenge.workoutMinutes || 45)),
-        value: log.workout2Minutes ? `${log.workout2Minutes} min` : undefined,
+        completed: log ? (log.workout2Completed || (log.workout2Minutes !== undefined && log.workout2Minutes >= (challenge.workoutMinutes || 45))) : false,
+        value: log?.workout2Minutes ? `${log.workout2Minutes} min` : undefined,
         icon: "activity",
         color: "#8B5CF6",
         type: "workout",
@@ -239,8 +240,8 @@ export default function AnalyticsScreen() {
     if (challenge.trackWater) {
       items.push({
         label: "Water",
-        completed: log.waterCompleted || (log.waterLiters !== undefined && log.waterLiters >= (challenge.waterLiters || 3.7)),
-        value: log.waterLiters ? `${log.waterLiters}L` : undefined,
+        completed: log ? (log.waterCompleted || (log.waterLiters !== undefined && log.waterLiters >= (challenge.waterLiters || 3.7))) : false,
+        value: log?.waterLiters ? `${log.waterLiters}L` : undefined,
         icon: "droplet",
         color: "#3B82F6",
         type: "water"
@@ -250,7 +251,7 @@ export default function AnalyticsScreen() {
     if (challenge.trackDiet) {
       items.push({
         label: "Diet",
-        completed: !!log.dietCompleted,
+        completed: log ? !!log.dietCompleted : false,
         icon: "check-circle",
         color: "#22C55E",
         type: "diet"
@@ -260,8 +261,8 @@ export default function AnalyticsScreen() {
     if (challenge.trackReading) {
       items.push({
         label: "Reading",
-        completed: log.readingCompleted || (log.readingPages !== undefined && log.readingPages >= (challenge.readingPages || 10)),
-        value: log.readingPages ? `${log.readingPages} pages` : undefined,
+        completed: log ? (log.readingCompleted || (log.readingPages !== undefined && log.readingPages >= (challenge.readingPages || 10))) : false,
+        value: log?.readingPages ? `${log.readingPages} pages` : undefined,
         icon: "book-open",
         color: "#A855F7",
         type: "reading"
@@ -271,7 +272,7 @@ export default function AnalyticsScreen() {
     if (challenge.trackProgressPhoto) {
       items.push({
         label: "Progress Photo",
-        completed: !!log.progressPhotoCompleted,
+        completed: log ? !!log.progressPhotoCompleted : false,
         icon: "camera",
         color: "#EC4899",
         type: "photo"
@@ -281,7 +282,7 @@ export default function AnalyticsScreen() {
     if (challenge.trackNoAlcohol) {
       items.push({
         label: "No Alcohol",
-        completed: !!log.noAlcoholCompleted,
+        completed: log ? !!log.noAlcoholCompleted : false,
         icon: "slash",
         color: "#EF4444",
         type: "alcohol"
@@ -291,54 +292,54 @@ export default function AnalyticsScreen() {
     if (challenge.trackSkincare) {
       items.push({
         label: "Skincare",
-        completed: !!log.skincareCompleted,
+        completed: log ? !!log.skincareCompleted : false,
         icon: "sun",
         color: "#14B8A6",
         type: "skincare"
       });
     }
     
-    if (challenge.trackCalories && log.caloriesConsumed) {
+    if (challenge.trackCalories) {
       items.push({
         label: "Calories",
-        completed: true,
-        value: `${log.caloriesConsumed} cal`,
+        completed: log?.caloriesConsumed ? true : false,
+        value: log?.caloriesConsumed ? `${log.caloriesConsumed} cal` : undefined,
         icon: "pie-chart",
         color: "#14B8A6",
         type: "calories"
       });
     }
     
-    if (challenge.trackWeight && log.currentWeight) {
+    if (challenge.trackWeight) {
       items.push({
         label: "Weight",
-        completed: true,
-        value: `${log.currentWeight} kg`,
+        completed: log?.currentWeight ? true : false,
+        value: log?.currentWeight ? `${log.currentWeight} kg` : undefined,
         icon: "trending-down",
         color: "#6366F1",
         type: "weight"
       });
     }
     
-    if (challenge.trackMood && log.moodScore) {
+    if (challenge.trackMood) {
       const moodEmojis = ["😢", "😕", "😐", "🙂", "😄"];
       items.push({
         label: "Mood",
-        completed: true,
-        value: moodEmojis[log.moodScore - 1] || "😐",
+        completed: log?.moodScore ? true : false,
+        value: log?.moodScore ? moodEmojis[log.moodScore - 1] || "😐" : undefined,
         icon: "smile",
         color: "#F59E0B",
         type: "mood"
       });
     }
     
-    if (challenge.trackSleep && log.sleepMinutes) {
-      const hours = Math.floor(log.sleepMinutes / 60);
-      const mins = log.sleepMinutes % 60;
+    if (challenge.trackSleep) {
+      const hours = log?.sleepMinutes ? Math.floor(log.sleepMinutes / 60) : 0;
+      const mins = log?.sleepMinutes ? log.sleepMinutes % 60 : 0;
       items.push({
         label: "Sleep",
-        completed: true,
-        value: `${hours}h ${mins}m`,
+        completed: log?.sleepMinutes ? true : false,
+        value: log?.sleepMinutes ? `${hours}h ${mins}m` : undefined,
         icon: "moon",
         color: "#8B5CF6",
         type: "sleep"
@@ -644,7 +645,7 @@ export default function AnalyticsScreen() {
       const hasLog = !!log;
       
       // Check if any activity was completed (not just logged)
-      const hasCompletedActivity = log && (
+      const hasCompletedActivity = !!(log && (
         log.workout1Completed || log.workout2Completed ||
         log.dietCompleted || log.waterCompleted ||
         log.readingCompleted || log.progressPhotoCompleted ||
@@ -655,7 +656,7 @@ export default function AnalyticsScreen() {
         (log.workout2Minutes && log.workout2Minutes > 0) ||
         (log.waterLiters && log.waterLiters > 0) ||
         (log.readingPages && log.readingPages > 0)
-      );
+      ));
 
       console.log(`📊 Day ${dayStr}: hasLog=${hasLog}, hasActivity=${hasCompletedActivity}, isPartOfChallenge=${isPartOfChallenge}`, log ? {
         workout1Completed: log.workout1Completed,
@@ -716,18 +717,18 @@ export default function AnalyticsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+    <SafeAreaView className="flex-1 bg-blue-50" edges={["top"]}>
       {/* Header */}
-      <View className="bg-white px-5 py-4 border-b border-gray-100">
+      <View className="bg-white px-5 py-4 border-b border-blue-100">
         <Text className="text-2xl font-bold text-gray-900">Analytics</Text>
-        <Text className="text-sm text-gray-500 mt-1">Track your progress and insights</Text>
+        <Text className="text-sm text-blue-600 mt-1">Track your progress and insights</Text>
       </View>
 
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {!stats ? (
           <View className="flex-1 items-center justify-center p-8 mt-20">
-            <View className="h-20 w-20 items-center justify-center rounded-full bg-gray-100 mb-4">
-              <Feather name="bar-chart-2" size={40} color="#9CA3AF" />
+            <View className="h-20 w-20 items-center justify-center rounded-full bg-blue-100 mb-4">
+              <Feather name="bar-chart-2" size={40} color="#3B82F6" />
             </View>
             <Text className="text-lg font-semibold text-gray-800 mb-2">No Data Yet</Text>
             <Text className="text-sm text-gray-500 text-center">
@@ -896,9 +897,9 @@ export default function AnalyticsScreen() {
         presentationStyle="pageSheet"
         onRequestClose={() => setShowDayModal(false)}
       >
-        <SafeAreaView className="flex-1 bg-gray-50">
+        <SafeAreaView className="flex-1 bg-blue-50">
           {/* Modal Header */}
-          <View className="bg-white px-5 py-4 border-b border-gray-100 flex-row items-center justify-between">
+          <View className="bg-white px-5 py-4 border-b border-blue-100 flex-row items-center justify-between">
             <View>
               <Text className="text-xl font-bold text-gray-900">
                 {selectedDate ? format(selectedDate, "EEEE, MMM d") : ""}
@@ -918,20 +919,69 @@ export default function AnalyticsScreen() {
           </View>
 
           <ScrollView className="flex-1 p-4">
+            {/* Loading overlay when creating log */}
+            {creatingLog && (
+              <View className="absolute inset-0 z-10 bg-white/80 items-center justify-center rounded-2xl">
+                <ActivityIndicator size="large" color="#3B82F6" />
+                <Text className="text-sm text-gray-600 mt-2">Creating log...</Text>
+              </View>
+            )}
+            
             {/* Completion Status */}
             <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
               <Text className="text-sm font-semibold text-gray-600 mb-4">Completions</Text>
               {getCompletionItems(selectedDayLog).length > 0 ? (
                 <View>
                   {getCompletionItems(selectedDayLog).map((item, index) => {
-                    const handleItemPress = () => {
-                      if (!item.type || !selectedDate || !selectedDayLog?.$id) return;
+                    const handleItemPress = async () => {
+                      if (!item.type || !selectedDate || !challenge || creatingLog) return;
+                      
+                      let logId = selectedDayLog?.$id;
+                      
+                      // If no log exists for this day, create one
+                      if (!logId) {
+                        try {
+                          setCreatingLog(true);
+                          const dateStr = format(selectedDate, 'yyyy-MM-dd');
+                          const newLog = await createDailyLog({
+                            userId: challenge.userId,
+                            challengeId: challenge.$id!,
+                            date: dateStr,
+                            stepsCompleted: false,
+                            stepsCount: 0,
+                            waterCompleted: false,
+                            waterLiters: 0,
+                            dietCompleted: false,
+                            caloriesConsumed: 0,
+                            currentWeight: 0,
+                            workout1Completed: false,
+                            workout1Minutes: 0,
+                            workout2Completed: false,
+                            workout2Minutes: 0,
+                            readingCompleted: false,
+                            readingPages: 0,
+                            progressPhotoCompleted: false,
+                            noAlcoholCompleted: false,
+                            skincareCompleted: false,
+                            meals: "",
+                          });
+                          logId = newLog.$id;
+                          // Refresh logs after creating new one
+                          await fetchAllLogs(challenge.$id!);
+                        } catch (error) {
+                          console.error("Failed to create log:", error);
+                          setCreatingLog(false);
+                          return;
+                        } finally {
+                          setCreatingLog(false);
+                        }
+                      }
                       
                       setShowDayModal(false);
                       
                       const baseParams = {
                         date: format(selectedDate, 'yyyy-MM-dd'),
-                        logId: selectedDayLog.$id
+                        logId: logId
                       };
                       
                       if (item.type === 'workout' && item.workoutNum) {
@@ -1006,7 +1056,7 @@ export default function AnalyticsScreen() {
               ) : (
                 <View className="items-center py-6">
                   <Feather name="calendar" size={32} color="#9CA3AF" />
-                  <Text className="text-sm text-gray-400 mt-2">No data logged for this day</Text>
+                  <Text className="text-sm text-gray-400 mt-2">No activities tracked in your challenge</Text>
                 </View>
               )}
             </View>
