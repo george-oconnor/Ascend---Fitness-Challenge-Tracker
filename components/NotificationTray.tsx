@@ -263,9 +263,9 @@ export function NotificationTray({ visible, onClose }: NotificationTrayProps) {
                         </View>
                         <Pressable
                             onPress={onClose}
-                            className="h-6 w-6 items-center justify-center rounded-full bg-gray-100"
+                            className="h-6 w-6 items-center justify-center rounded-full bg-orange-100"
                         >
-                            <Feather name="x" size={14} color="#374151" />
+                            <Feather name="x" size={14} color="#F97316" />
                         </Pressable>
                     </View>
 
@@ -275,20 +275,20 @@ export function NotificationTray({ visible, onClose }: NotificationTrayProps) {
                             {unreadCount > 0 && (
                                 <Pressable
                                     onPress={markAllAsRead}
-                                    className="flex-row items-center bg-gray-100 px-2 py-1 rounded-full"
+                                    className="flex-row items-center bg-orange-100 px-2 py-1 rounded-full"
                                 >
-                                    <Feather name="check" size={12} color="#6B7280" />
-                                    <Text className="text-[10px] text-gray-600 ml-1">
+                                    <Feather name="check" size={12} color="#F97316" />
+                                    <Text className="text-[10px] text-orange-600 ml-1">
                                         Mark all read
                                     </Text>
                                 </Pressable>
                             )}
                             <Pressable
                                 onPress={clearAllNotifications}
-                                className="flex-row items-center bg-gray-100 px-2 py-1 rounded-full"
+                                className="flex-row items-center bg-orange-100 px-2 py-1 rounded-full"
                             >
-                                <Feather name="trash-2" size={12} color="#6B7280" />
-                                <Text className="text-[10px] text-gray-600 ml-1">Clear all</Text>
+                                <Feather name="trash-2" size={12} color="#F97316" />
+                                <Text className="text-[10px] text-orange-600 ml-1">Clear all</Text>
                             </Pressable>
                         </View>
                     )}
