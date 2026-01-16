@@ -2,7 +2,7 @@ import { useChallengeStore } from "@/store/useChallengeStore";
 import { DailyLog } from "@/types/type.d";
 import { Feather } from "@expo/vector-icons";
 import { eachDayOfInterval, format, parseISO, subDays } from "date-fns";
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { Dimensions, Pressable, ScrollView, Text, View } from "react-native";
 import Svg, { Line, Path, Rect, Text as SvgText } from "react-native-svg";
 
@@ -46,6 +46,20 @@ const GRAPH_CONFIGS: GraphConfig[] = [
     dataKey: "stepsCount",
     formatValue: (value: number) => value.toLocaleString(),
     getMaxValue: () => 15000,
+  },
+  {
+    type: "sleep",
+    title: "Sleep Tracking",
+    icon: "moon",
+    color: "#8B5CF6",
+    bgColor: "#EDE9FE",
+    dataKey: "sleepMinutes",
+    formatValue: (value: number) => {
+      const hours = Math.floor(value / 60);
+      const mins = value % 60;
+      return `${hours}h ${mins}m`;
+    },
+    getMaxValue: () => 600, // 10 hours max
   },
 ];
 
@@ -157,6 +171,7 @@ function MoodChart({ data, color }: { data: { date: Date; value: number | undefi
       {points.map((point, i) => {
         if (point.value === undefined || point.value === 0) return null;
         const iconConfig = MOOD_ICONS[point.value];
+        if (!iconConfig) return null;
         return (
           <View
             key={`icon-point-${i}`}
@@ -299,13 +314,143 @@ function StepsChart({ data, color, goalSteps }: { data: { date: Date; value: num
   );
 }
 
+// Bar chart component for sleep (in hours)
+function SleepChart({ data, color, goalHours }: { data: { date: Date; value: number | undefined }[]; color: string; goalHours: number }) {
+  const chartWidth = CARD_WIDTH - 40;
+  const chartHeight = 180;
+  const padding = { top: 20, right: 10, bottom: 30, left: 35 };
+  
+  const validData = data.filter(d => d.value !== undefined && d.value > 0) as { date: Date; value: number }[];
+  
+  if (validData.length === 0) {
+    return (
+      <View style={{ height: chartHeight, justifyContent: "center", alignItems: "center" }}>
+        <Feather name="moon" size={48} color="#D1D5DB" />
+        <Text className="text-gray-400 mt-3">No sleep data yet</Text>
+        <Text className="text-gray-400 text-sm mt-1">Start logging your sleep to see trends!</Text>
+      </View>
+    );
+  }
+  
+  // Convert to hours for display, but keep in minutes for calculations
+  const goalMinutes = goalHours * 60;
+  const maxMinutes = Math.max(...data.map(d => d.value || 0), goalMinutes);
+  
+  // Calculate dimensions
+  const graphWidth = chartWidth - padding.left - padding.right;
+  const graphHeight = chartHeight - padding.top - padding.bottom;
+  const barWidth = graphWidth / data.length - 8;
+  const barSpacing = 8;
+  
+  return (
+    <View>
+      <Svg width={chartWidth} height={chartHeight}>
+        {/* Goal line */}
+        {goalMinutes > 0 && (() => {
+          const goalY = padding.top + graphHeight - (goalMinutes / maxMinutes) * graphHeight;
+          return (
+            <>
+              <Line
+                x1={padding.left}
+                y1={goalY}
+                x2={chartWidth - padding.right}
+                y2={goalY}
+                stroke="#6366F1"
+                strokeWidth="2"
+                strokeDasharray="6,4"
+              />
+              <SvgText
+                x={padding.left - 5}
+                y={goalY - 5}
+                fill="#6366F1"
+                fontSize="10"
+                textAnchor="end"
+              >
+                Goal
+              </SvgText>
+            </>
+          );
+        })()}
+        
+        {/* Bars */}
+        {data.map((d, i) => {
+          if (d.value === undefined || d.value === 0) return null;
+          const barHeight = (d.value / maxMinutes) * graphHeight;
+          const x = padding.left + (i * (barWidth + barSpacing));
+          const y = padding.top + graphHeight - barHeight;
+          const metGoal = d.value >= goalMinutes;
+          
+          return (
+            <Rect
+              key={i}
+              x={x}
+              y={y}
+              width={barWidth}
+              height={barHeight}
+              fill={metGoal ? color : "#D1D5DB"}
+              rx={4}
+            />
+          );
+        })}
+        
+        {/* X-axis labels (dates) */}
+        {data.map((d, i) => {
+          if (i % 2 !== 0 && i !== data.length - 1) return null;
+          const x = padding.left + (i * (barWidth + barSpacing)) + barWidth / 2;
+          return (
+            <SvgText
+              key={`label-${i}`}
+              x={x}
+              y={chartHeight - 10}
+              fill="#9CA3AF"
+              fontSize="10"
+              textAnchor="middle"
+            >
+              {format(d.date, "MMM d")}
+            </SvgText>
+          );
+        })}
+        
+        {/* Y-axis labels (in hours) */}
+        {[0, 0.5, 1].map((fraction) => {
+          const minutes = Math.round(maxMinutes * fraction);
+          const hours = minutes / 60;
+          const y = padding.top + graphHeight - (fraction * graphHeight);
+          return (
+            <SvgText
+              key={`y-${fraction}`}
+              x={padding.left - 8}
+              y={y + 4}
+              fill="#9CA3AF"
+              fontSize="10"
+              textAnchor="end"
+            >
+              {hours.toFixed(0)}h
+            </SvgText>
+          );
+        })}
+      </Svg>
+    </View>
+  );
+}
+
 export default function SwipeableGraphCard() {
   const { allLogs, challenge } = useChallengeStore();
   const [currentIndex, setCurrentIndex] = useState(0);
   const scrollViewRef = useRef<ScrollView>(null);
   
-  // Show all graphs regardless of tracking status
-  const availableGraphs = GRAPH_CONFIGS;
+  // Shuffle array helper function (Fisher-Yates)
+  const shuffleArray = <T,>(array: T[]): T[] => {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+  };
+  
+  // Randomize graph order once when component mounts (useMemo with empty deps)
+  const availableGraphs = useMemo(() => shuffleArray(GRAPH_CONFIGS), []);
   
   if (availableGraphs.length === 0) {
     return null; // Don't show if no graphs available
@@ -417,15 +562,22 @@ export default function SwipeableGraphCard() {
                 </View>
               </View>
               
-              {/* Chart */}
-              {index === currentIndex && graph.type === "mood" && (
+              {/* Chart - Always render all charts to prevent jarring transitions */}
+              {graph.type === "mood" && (
                 <MoodChart data={graphData} color={graph.color} />
               )}
-              {index === currentIndex && graph.type === "steps" && (
+              {graph.type === "steps" && (
                 <StepsChart 
                   data={graphData} 
                   color={graph.color} 
                   goalSteps={challenge?.stepsGoal || 10000}
+                />
+              )}
+              {graph.type === "sleep" && (
+                <SleepChart 
+                  data={graphData} 
+                  color={graph.color} 
+                  goalHours={(challenge as any)?.sleepGoalHours || 8}
                 />
               )}
               
@@ -434,7 +586,13 @@ export default function SwipeableGraphCard() {
                 <View className="flex-1 items-center">
                   <Text className="text-xs text-gray-500 mb-1">Average</Text>
                   <Text className="text-lg font-bold text-gray-800">
-                    {graphAverage > 0 ? (graph.type === "steps" ? Math.round(graphAverage).toLocaleString() : graphAverage.toFixed(1)) : "--"}
+                    {graphAverage > 0 ? (
+                      graph.type === "steps" 
+                        ? Math.round(graphAverage).toLocaleString() 
+                        : graph.type === "sleep"
+                          ? `${Math.floor(graphAverage / 60)}h ${Math.round(graphAverage % 60)}m`
+                          : graphAverage.toFixed(1)
+                    ) : "--"}
                   </Text>
                 </View>
                 <View className="flex-1 items-center border-l border-gray-100">
@@ -448,7 +606,13 @@ export default function SwipeableGraphCard() {
                         graphTrend > 0 ? "text-green-600" : graphTrend < 0 ? "text-red-600" : "text-gray-500"
                       }`}
                     >
-                      {graphTrend > 0 ? "+" : ""}{graphTrend !== 0 ? (graph.type === "steps" ? Math.round(graphTrend).toLocaleString() : graphTrend.toFixed(1)) : "--"}
+                      {graphTrend > 0 ? "+" : ""}{graphTrend !== 0 ? (
+                        graph.type === "steps" 
+                          ? Math.round(graphTrend).toLocaleString() 
+                          : graph.type === "sleep"
+                            ? `${Math.floor(Math.abs(graphTrend) / 60)}h ${Math.round(Math.abs(graphTrend) % 60)}m`
+                            : graphTrend.toFixed(1)
+                      ) : "--"}
                     </Text>
                   </View>
                 </View>
