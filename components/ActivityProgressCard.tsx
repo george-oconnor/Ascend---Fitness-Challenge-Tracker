@@ -3,7 +3,8 @@ import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { Platform, Pressable, Text, View } from "react-native";
+import { useRef } from "react";
+import { Animated, Platform, Pressable, Text, View } from "react-native";
 import Svg, { Circle } from "react-native-svg";
 
 type ActivityType = "steps" | "workout1" | "workout2" | "water" | "diet" | "reading" | "photo" | "alcohol" | "weight" | "mood" | "calories" | "cycle" | "sleep" | "skincare";
@@ -49,8 +50,8 @@ const ACTIVITY_CONFIG: Record<ActivityType, ActivityConfig> = {
     label: "Diet",
     shortLabel: "Diet",
     icon: "edit-3",
-    color: "#22C55E",
-    lightBgColor: "#DCFCE7",
+    color: "#84CC16",
+    lightBgColor: "#ECFCCB",
   },
   reading: {
     label: "Reading",
@@ -91,8 +92,8 @@ const ACTIVITY_CONFIG: Record<ActivityType, ActivityConfig> = {
     label: "Calories",
     shortLabel: "Cal",
     icon: "pie-chart",
-    color: "#10B981",
-    lightBgColor: "#D1FAE5",
+    color: "#F97316",
+    lightBgColor: "#FFEDD5",
   },
   cycle: {
     label: "Cycle",
@@ -105,8 +106,8 @@ const ACTIVITY_CONFIG: Record<ActivityType, ActivityConfig> = {
     label: "Sleep",
     shortLabel: "Sleep",
     icon: "moon",
-    color: "#8B5CF6",
-    lightBgColor: "#EDE9FE",
+    color: "#6366F1",
+    lightBgColor: "#E0E7FF",
   },
   skincare: {
     label: "Skincare",
@@ -173,10 +174,31 @@ type Props = {
   compact?: boolean;
 };
 
+// Create AnimatedPressable once at module level
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
 export default function ActivityProgressCard({ type, compact = false }: Props) {
   const { challenge, todayLog, isPhotoCompletedWithinDays } = useChallengeStore();
   const { steps: liveSteps, workouts: liveWorkouts, isAuthorized: healthAuthorized } = useHealthStore();
   const { hasLoggedToday: cycleLoggedToday } = useTodayCycleLog();
+  
+  // Animation ref must be called unconditionally at the top level
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+  
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.96,
+      useNativeDriver: true,
+    }).start();
+  };
+  
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      friction: 3,
+      useNativeDriver: true,
+    }).start();
+  };
 
   if (!challenge || !todayLog) return null;
 
@@ -276,9 +298,10 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
       break;
     case "sleep":
       isTracked = (challenge as any).trackSleep ?? false;
-      isCompleted = todayLog.sleepLogged ?? false;
       const sleepMinutes = todayLog.sleepMinutes ?? 0;
       const sleepGoalHours = (challenge as any).sleepGoalHours ?? 8;
+      const sleepGoalMinutes = sleepGoalHours * 60;
+      isCompleted = todayLog.sleepCompleted === true || sleepMinutes >= sleepGoalMinutes;
       current = Math.round((sleepMinutes / 60) * 10) / 10; // Convert to hours with 1 decimal
       goal = sleepGoalHours;
       unit = "h";
@@ -347,13 +370,13 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
       <View className="items-center">
         {/* Health indicator */}
         {isHealthTracked && (
-          <View className="absolute top-0 right-0 bg-purple-100 p-1 rounded-full">
-            <Feather name="heart" size={10} color="#8B5CF6" />
+          <View className="absolute top-0 right-0 p-1 rounded-full" style={{ backgroundColor: `${config.color}20` }}>
+            <Feather name="heart" size={10} color={config.color} />
           </View>
         )}
         
         {/* Circular progress with icon */}
-        <CircularProgress percent={percent} size={64} strokeWidth={5} color={config.color}>
+        <CircularProgress percent={percent} size={64} strokeWidth={5} color={isCompleted ? "#22C55E" : config.color}>
           {isCompleted ? (
             <Feather name="check" size={24} color="#22C55E" />
           ) : (
@@ -362,7 +385,7 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
         </CircularProgress>
         
         {/* Label */}
-        <Text className="text-sm font-semibold text-gray-800 mt-2">{config.label}</Text>
+        <Text className="text-sm font-semibold mt-2" style={{ color: isCompleted ? '#16A34A' : config.color }}>{config.label}</Text>
         
         {/* Progress text */}
         {hasProgress ? (
@@ -379,20 +402,36 @@ export default function ActivityProgressCard({ type, compact = false }: Props) {
 
     if (isNonTappable) {
       return (
-        <View className="bg-white rounded-2xl p-4 shadow-sm flex-1" style={{ minWidth: '45%' as any }}>
+        <View 
+          className="rounded-2xl p-4 flex-1" 
+          style={{ 
+            minWidth: '45%' as any, 
+            backgroundColor: isCompleted ? '#DCFCE7' : config.lightBgColor,
+            borderWidth: 1,
+            borderColor: isCompleted ? '#BBF7D0' : `${config.color}20`,
+          }}
+        >
           {cardContent}
         </View>
       );
     }
     
     return (
-      <Pressable
+      <AnimatedPressable
         onPress={() => router.push(getRouteForType() as any)}
-        className="bg-white rounded-2xl p-4 shadow-sm flex-1"
-        style={{ minWidth: '45%' as any }}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        className="rounded-2xl p-4 flex-1"
+        style={{ 
+          minWidth: '45%' as any, 
+          backgroundColor: isCompleted ? '#DCFCE7' : config.lightBgColor,
+          borderWidth: 1,
+          borderColor: isCompleted ? '#BBF7D0' : `${config.color}20`,
+          transform: [{ scale: scaleAnim }],
+        }}
       >
         {cardContent}
-      </Pressable>
+      </AnimatedPressable>
     );
   }
 
