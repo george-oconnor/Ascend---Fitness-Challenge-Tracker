@@ -644,7 +644,8 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             log(`😴 Sleep: ${sleepHours}h ${sleepMins}m ${sleepGoalMet ? '✅' : '❌'}`);
             
             updates.sleepMinutes = sleepData.asleepMinutes;
-            updates.sleepLogged = sleepGoalMet;
+            updates.sleepLogged = true;
+            updates.sleepCompleted = sleepGoalMet;
             if (sleepData.startTime && sleepData.endTime) {
               updates.sleepStartTime = sleepData.startTime.toISOString();
               updates.sleepEndTime = sleepData.endTime.toISOString();
@@ -668,37 +669,39 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         }
       }
 
-      // Sync steps data
-      if ((challenge as any).trackSteps) {
-        try {
-          log("👟 Fetching steps data...");
-          const { healthService } = await import("@/lib/health");
-          const stepsCount = await healthService.getStepsForDate(date);
-          if (stepsCount > 0) {
-            const stepsGoal = (challenge as any).stepsGoal || 10000;
-            const stepsGoalMet = stepsCount >= stepsGoal;
-            
-            log(`👟 Steps: ${stepsCount.toLocaleString()} ${stepsGoalMet ? '✅' : '❌'}`);
-            
-            updates.stepsCount = stepsCount;
+      // Sync steps data - always pull from Apple Health for display
+      try {
+        log("👟 Fetching steps data...");
+        const { healthService } = await import("@/lib/health");
+        const stepsCount = await healthService.getStepsForDate(date);
+        if (stepsCount > 0) {
+          const stepsGoal = (challenge as any).stepsGoal || 10000;
+          const stepsGoalMet = stepsCount >= stepsGoal;
+          const isTracking = (challenge as any).trackSteps;
+          
+          log(`👟 Steps: ${stepsCount.toLocaleString()} ${stepsGoalMet ? '✅' : '❌'} ${isTracking ? '(tracked)' : '(display only)'}`);
+          
+          updates.stepsCount = stepsCount;
+          // Only mark as completed if we're tracking steps
+          if (isTracking) {
             updates.stepsCompleted = stepsGoalMet;
-            
-            activityLogsToCreate.push({
-              userId: challenge.userId,
-              challengeId: challengeId,
-              type: 'steps',
-              title: 'Steps (Resync)',
-              description: `${stepsCount.toLocaleString()} steps from Apple Health`,
-              value: stepsCount,
-              unit: 'steps',
-              date: dateStr,
-            });
-          } else {
-            log("👟 No steps data found");
           }
-        } catch (error) {
-          log("👟 Steps sync skipped: " + (error instanceof Error ? error.message : 'Unknown error'));
+            
+          activityLogsToCreate.push({
+            userId: challenge.userId,
+            challengeId: challengeId,
+            type: 'steps',
+            title: isTracking ? 'Steps (Resync)' : 'Steps (Auto-sync)',
+            description: `${stepsCount.toLocaleString()} steps from Apple Health${isTracking ? '' : ' (display only)'}`,
+            value: stepsCount,
+            unit: 'steps',
+            date: dateStr,
+          });
+        } else {
+          log("👟 No steps data found");
         }
+      } catch (error) {
+        log("👟 Steps sync skipped: " + (error instanceof Error ? error.message : 'Unknown error'));
       }
 
       // Only update if there are changes
@@ -772,15 +775,18 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
 
       const updates: Partial<DailyLog> = {};
 
-      // Sync steps if tracking is enabled
-      if (challenge.trackSteps && healthState.steps > 0) {
+      // Sync steps - always pull from Apple Health for display
+      if (healthState.steps > 0) {
         const newStepsCount = Math.round(healthState.steps);
         const stepsGoalMet = newStepsCount >= (challenge.stepsGoal || 0);
         
         // Only update if steps changed
         if (newStepsCount !== todayLog.stepsCount) {
           updates.stepsCount = newStepsCount;
-          updates.stepsCompleted = stepsGoalMet;
+          // Only mark as completed if we're tracking steps
+          if (challenge.trackSteps) {
+            updates.stepsCompleted = stepsGoalMet;
+          }
         }
       }
 
@@ -811,7 +817,8 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             const sleepGoalMet = sleepData.asleepMinutes >= sleepGoalMinutes;
             if (sleepData.asleepMinutes !== todayLog.sleepMinutes) {
               updates.sleepMinutes = sleepData.asleepMinutes;
-              updates.sleepLogged = sleepGoalMet;
+              updates.sleepLogged = true;
+              updates.sleepCompleted = sleepGoalMet;
               // Also sync the times if available
               if (sleepData.startTime && sleepData.endTime) {
                 updates.sleepStartTime = sleepData.startTime.toISOString();
