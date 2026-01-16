@@ -109,11 +109,11 @@ export default function LogSkincareScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gradient-to-b from-teal-50 to-white">
+    <SafeAreaView className="flex-1 bg-teal-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-teal-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-teal-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#14B8A6" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">Skincare Routine</Text>
         <View className="w-10" />
@@ -122,8 +122,8 @@ export default function LogSkincareScreen() {
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="p-4">
           {/* Skincare Steps */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <Text className="text-sm font-semibold text-gray-700 mb-4">
+          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-teal-100">
+            <Text className="text-sm font-semibold text-teal-700 mb-4">
               Completed Steps
             </Text>
             <View className="gap-3">
@@ -178,8 +178,8 @@ export default function LogSkincareScreen() {
           </View>
 
           {/* Notes */}
-          <View className="bg-white rounded-2xl p-4 shadow-sm mb-4">
-            <Text className="text-sm font-semibold text-gray-700 mb-3">
+          <View className="bg-white rounded-2xl p-4 shadow-sm mb-4 border border-teal-100">
+            <Text className="text-sm font-semibold text-teal-700 mb-3">
               Notes (Optional)
             </Text>
             <TextInput
