@@ -154,11 +154,11 @@ export default function ActivityScreen() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaView className="flex-1 bg-gray-50" edges={["top"]}>
+      <SafeAreaView className="flex-1 bg-purple-50" edges={["top"]}>
         {/* Header */}
-        <View className="bg-white px-5 py-4 border-b border-gray-100">
+        <View className="bg-white px-5 py-4 border-b border-purple-100">
           <Text className="text-2xl font-bold text-gray-900">Activity</Text>
-          <Text className="text-sm text-gray-500 mt-1">Your recent activity feed</Text>
+          <Text className="text-sm text-purple-600 mt-1">Your recent activity feed</Text>
         </View>
 
         <ScrollView 
@@ -178,8 +178,8 @@ export default function ActivityScreen() {
         {/* Recent Activity Feed */}
         {groupedActivities.length === 0 ? (
           <View className="flex-1 items-center justify-center p-8 mt-10">
-            <View className="h-16 w-16 items-center justify-center rounded-full bg-gray-100 mb-4">
-              <Feather name="activity" size={32} color="#9CA3AF" />
+            <View className="h-16 w-16 items-center justify-center rounded-full bg-purple-100 mb-4">
+              <Feather name="activity" size={32} color="#8B5CF6" />
             </View>
             <Text className="text-lg font-semibold text-gray-800 mb-2">No Activity Yet</Text>
             <Text className="text-sm text-gray-500 text-center">
@@ -188,7 +188,7 @@ export default function ActivityScreen() {
           </View>
         ) : (
           <View className="p-4">
-            <Text className="text-sm font-semibold text-gray-500 mb-3 ml-1">Recent Activity</Text>
+            <Text className="text-sm font-semibold text-purple-700 mb-3 ml-1">Recent Activity</Text>
             {groupedActivities.map((group) => {
               const isExpanded = expandedGroups.has(group.title);
               const displayLimit = isExpanded ? group.data.length : 5;
