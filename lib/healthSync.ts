@@ -120,7 +120,8 @@ class HealthSyncService {
       }
 
       // Request read and write permissions for quantity types
-      const readPermissions = [
+      // @kingstinct/react-native-healthkit uses { toRead, toShare } format
+      const toRead = [
         HKQuantityTypes.DietaryWater,
         HKQuantityTypes.BodyMass,
         HKQuantityTypes.DietaryEnergyConsumed,
@@ -129,7 +130,7 @@ class HealthSyncService {
         "HKDataTypeIdentifierStateOfMind", // Mood - iOS 17+
       ];
 
-      const writePermissions = [
+      const toShare = [
         HKQuantityTypes.DietaryWater,
         HKQuantityTypes.BodyMass,
         HKQuantityTypes.DietaryEnergyConsumed,
@@ -137,7 +138,7 @@ class HealthSyncService {
         "HKDataTypeIdentifierStateOfMind", // Mood - iOS 17+
       ];
 
-      await requestAuthorization(readPermissions, writePermissions);
+      await requestAuthorization({ toRead, toShare });
       this.isAuthorized = true;
       console.log("✅ HealthSync: Authorization granted");
       return true;
@@ -205,15 +206,21 @@ class HealthSyncService {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const result = await queryQuantitySamples(HKQuantityTypes.DietaryWater, {
-        from: startOfDay,
-        to: endOfDay,
+      // queryQuantitySamples expects: (identifier, { filter: { date: { startDate, endDate } }, unit, limit })
+      const samples = await queryQuantitySamples(HKQuantityTypes.DietaryWater, {
+        filter: {
+          date: {
+            startDate: startOfDay,
+            endDate: endOfDay,
+          },
+        },
         unit: HKUnits.Liter,
+        limit: 0, // 0 or negative = fetch all
       });
 
-      if (result?.samples && result.samples.length > 0) {
+      if (samples && samples.length > 0) {
         // Sum all water samples for the day
-        const totalLiters = result.samples.reduce(
+        const totalLiters = samples.reduce(
           (sum: number, sample: any) => sum + (sample.quantity || 0),
           0
         );
@@ -274,16 +281,21 @@ class HealthSyncService {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const result = await queryQuantitySamples(HKQuantityTypes.BodyMass, {
-        from: startOfDay,
-        to: endOfDay,
+      // queryQuantitySamples expects: (identifier, { filter: { date: { startDate, endDate } }, unit, limit, ascending })
+      const samples = await queryQuantitySamples(HKQuantityTypes.BodyMass, {
+        filter: {
+          date: {
+            startDate: startOfDay,
+            endDate: endOfDay,
+          },
+        },
         unit: HKUnits.Kilogram,
         limit: 1,
         ascending: false, // Most recent first
       });
 
-      if (result?.samples && result.samples.length > 0) {
-        return Math.round(result.samples[0].quantity * 10) / 10; // Round to 1 decimal
+      if (samples && samples.length > 0) {
+        return Math.round(samples[0].quantity * 10) / 10; // Round to 1 decimal
       }
 
       return null;
@@ -310,16 +322,20 @@ class HealthSyncService {
       const startDate = new Date();
       startDate.setDate(startDate.getDate() - 30);
 
-      const result = await queryQuantitySamples(HKQuantityTypes.BodyMass, {
-        from: startDate,
-        to: endDate,
+      const samples = await queryQuantitySamples(HKQuantityTypes.BodyMass, {
+        filter: {
+          date: {
+            startDate,
+            endDate,
+          },
+        },
         unit: HKUnits.Kilogram,
         limit: 1,
         ascending: false,
       });
 
-      if (result?.samples && result.samples.length > 0) {
-        const sample = result.samples[0];
+      if (samples && samples.length > 0) {
+        const sample = samples[0];
         return {
           weight: Math.round(sample.quantity * 10) / 10,
           date: new Date(sample.startDate),
@@ -394,15 +410,21 @@ class HealthSyncService {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const result = await queryQuantitySamples(HKQuantityTypes.DietaryEnergyConsumed, {
-        from: startOfDay,
-        to: endOfDay,
+      // queryQuantitySamples expects: (identifier, { filter: { date: { startDate, endDate } }, unit, limit })
+      const samples = await queryQuantitySamples(HKQuantityTypes.DietaryEnergyConsumed, {
+        filter: {
+          date: {
+            startDate: startOfDay,
+            endDate: endOfDay,
+          },
+        },
         unit: HKUnits.Kilocalorie,
+        limit: 0, // 0 or negative = fetch all
       });
 
-      if (result?.samples && result.samples.length > 0) {
+      if (samples && samples.length > 0) {
         // Sum all calorie samples for the day
-        const totalCalories = result.samples.reduce(
+        const totalCalories = samples.reduce(
           (sum: number, sample: any) => sum + (sample.quantity || 0),
           0
         );
@@ -439,10 +461,14 @@ class HealthSyncService {
         return false;
       }
 
-      await saveCategorySample(HKCategoryTypes.SleepAnalysis, sleepType, {
-        startDate: startTime,
-        endDate: endTime,
-      });
+      // @kingstinct/react-native-healthkit saveCategorySample signature:
+      // saveCategorySample(identifier, value, startDate, endDate, metadata?)
+      await saveCategorySample(
+        HKCategoryTypes.SleepAnalysis,
+        sleepType,
+        startTime,
+        endTime
+      );
 
       const durationMinutes = Math.round((endTime.getTime() - startTime.getTime()) / 60000);
       logger.info("Apple Health sync: sleep saved", { type: "sleep", durationMinutes, startTime: startTime.toISOString(), endTime: endTime.toISOString() });
@@ -484,12 +510,18 @@ class HealthSyncService {
       const endQuery = new Date(date);
       endQuery.setHours(12, 0, 0, 0);
 
-      const result = await queryCategorySamples(HKCategoryTypes.SleepAnalysis, {
-        from: startQuery,
-        to: endQuery,
+      // queryCategorySamples expects: (identifier, { filter: { date: { startDate, endDate } }, limit })
+      const samples = await queryCategorySamples(HKCategoryTypes.SleepAnalysis, {
+        filter: {
+          date: {
+            startDate: startQuery,
+            endDate: endQuery,
+          },
+        },
+        limit: 0, // 0 or negative = fetch all
       });
 
-      if (!result?.samples || result.samples.length === 0) {
+      if (!samples || samples.length === 0) {
         return null;
       }
 
@@ -502,7 +534,7 @@ class HealthSyncService {
       let earliestStart: Date | null = null;
       let latestEnd: Date | null = null;
 
-      for (const sample of result.samples) {
+      for (const sample of samples) {
         const start = new Date(sample.startDate);
         const end = new Date(sample.endDate);
         const durationMinutes = (end.getTime() - start.getTime()) / 60000;
@@ -657,12 +689,14 @@ class HealthSyncService {
         .map((e) => this.emotionMapping[e])
         .filter(Boolean);
 
-      await saveStateOfMindSample({
-        kind: HealthSyncService.MoodKind.DailyMood,
-        valence,
-        labels: hkLabels,
+      // saveStateOfMindSample expects positional args: (date, kind, valence, labels, associations, metadata?)
+      await saveStateOfMindSample(
         date,
-      });
+        HealthSyncService.MoodKind.DailyMood,
+        valence,
+        hkLabels,
+        [] // associations (empty)
+      );
 
       logger.info("Apple Health sync: mood saved", { type: "mood", score, valence, emotionCount: emotions.length, date: date.toISOString() });
       return true;
@@ -702,15 +736,20 @@ class HealthSyncService {
       const endOfDay = new Date(date);
       endOfDay.setHours(23, 59, 59, 999);
 
-      const result = await queryStateOfMindSamples({
-        from: startOfDay,
-        to: endOfDay,
-        kind: HealthSyncService.MoodKind.DailyMood,
+      // queryStateOfMindSamples expects: ({ filter: { date: { startDate, endDate } }, limit })
+      const samples = await queryStateOfMindSamples({
+        filter: {
+          date: {
+            startDate: startOfDay,
+            endDate: endOfDay,
+          },
+        },
+        limit: 0, // 0 or negative = fetch all
       });
 
-      if (result?.samples && result.samples.length > 0) {
+      if (samples && samples.length > 0) {
         // Get most recent mood for the day
-        const sample = result.samples[result.samples.length - 1];
+        const sample = samples[samples.length - 1];
         const score = this.valenceToMoodScore(sample.valence);
 
         // Reverse map HealthKit labels back to our emotion IDs
