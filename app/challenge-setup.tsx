@@ -256,11 +256,11 @@ export default function ChallengeSetupScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-purple-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="x" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-purple-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-purple-100 rounded-full">
+          <Feather name="x" size={24} color="#8B5CF6" />
         </Pressable>
         <Text className="text-lg font-bold text-gray-900">
           {isEditing ? "Edit Challenge" : "Set Up Challenge"}
@@ -271,8 +271,8 @@ export default function ChallengeSetupScreen() {
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         <View className="p-4">
           {/* Start Date */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <Text className="text-sm font-semibold text-gray-700 mb-3">Start Date</Text>
+          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-purple-100">
+            <Text className="text-sm font-semibold text-purple-700 mb-3">Start Date</Text>
             <Pressable
               onPress={() => setShowDatePicker(true)}
               className="flex-row items-center justify-between bg-gray-50 rounded-xl p-4"
@@ -308,8 +308,8 @@ export default function ChallengeSetupScreen() {
           </View>
 
           {/* Duration */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <Text className="text-sm font-semibold text-gray-700 mb-3">Challenge Duration</Text>
+          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-purple-100">
+            <Text className="text-sm font-semibold text-purple-700 mb-3">Challenge Duration</Text>
             <View className="flex-row items-center bg-gray-50 rounded-xl px-4 py-4">
               <Feather name="clock" size={20} color="#6B7280" />
               <TextInput
@@ -325,8 +325,8 @@ export default function ChallengeSetupScreen() {
           </View>
 
           {/* Exercise */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <Text className="text-sm font-semibold text-gray-700 mb-4">Exercise</Text>
+          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-purple-100">
+            <Text className="text-sm font-semibold text-purple-700 mb-4">Exercise</Text>
 
             {/* Workout 1 */}
             <View className="flex-row items-center justify-between py-3">
@@ -417,8 +417,8 @@ export default function ChallengeSetupScreen() {
           </View>
 
           {/* Nutrition & Weight */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <Text className="text-sm font-semibold text-gray-700 mb-4">Nutrition & Weight</Text>
+          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-purple-100">
+            <Text className="text-sm font-semibold text-purple-700 mb-4">Nutrition & Weight</Text>
 
             {/* Track Calorie Intake */}
             <View className="flex-row items-center justify-between py-3">
@@ -602,8 +602,8 @@ export default function ChallengeSetupScreen() {
           {/* Removed separate Nutrition card; merged above */}
 
           {/* Habits */}
-          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm">
-            <Text className="text-sm font-semibold text-gray-700 mb-4">Habits</Text>
+          <View className="bg-white rounded-2xl p-4 mb-4 shadow-sm border border-purple-100">
+            <Text className="text-sm font-semibold text-purple-700 mb-4">Habits</Text>
 
             {["trackReading", "trackProgressPhoto", "trackMood", "trackSleep", "trackSkincare"].map((key, index, arr) => {
               const option = TRACKING_OPTIONS.find((o) => o.key === key)!;
