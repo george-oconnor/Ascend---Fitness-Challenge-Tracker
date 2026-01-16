@@ -157,12 +157,13 @@ export function getTaskStatuses(challenge: Challenge, log: DailyLog | null, allL
     });
   }
   
-  // Sleep - logged
+  // Sleep - need to meet goal hours
   if (challenge.trackSleep) {
+    const sleepGoalMinutes = (challenge.sleepGoalHours || 8) * 60;
     tasks.push({
       id: "sleep",
       label: "Sleep",
-      completed: log?.sleepLogged === true,
+      completed: log?.sleepCompleted === true || (log?.sleepMinutes ?? 0) >= sleepGoalMinutes,
     });
   }
   
