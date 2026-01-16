@@ -390,16 +390,16 @@ export default function LogDietScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-gray-50">
+    <SafeAreaView className="flex-1 bg-lime-50">
       {/* Header */}
-      <View className="flex-row items-center justify-between px-4 py-4 border-b border-gray-100 bg-white">
-        <Pressable onPress={() => router.back()} className="p-2 -ml-2">
-          <Feather name="arrow-left" size={24} color="#181C2E" />
+      <View className="flex-row items-center justify-between px-4 py-4 border-b border-lime-100 bg-white">
+        <Pressable onPress={() => router.back()} className="p-2 -ml-2 bg-lime-100 rounded-full">
+          <Feather name="arrow-left" size={24} color="#84CC16" />
         </Pressable>
         <View className="flex-1 items-center">
           <Text className="text-lg font-bold text-gray-900">Log Diet</Text>
           {isEditingPastDay && (
-            <Text className="text-xs text-gray-500">{format(targetDate, 'MMM d, yyyy')}</Text>
+            <Text className="text-xs text-lime-600">{format(targetDate, 'MMM d, yyyy')}</Text>
           )}
         </View>
         <View className="w-10" />
@@ -413,8 +413,8 @@ export default function LogDietScreen() {
           <View className="px-4 pt-6">
             {/* Header Section */}
             <View className="items-center mb-6">
-              <View className="h-20 w-20 rounded-full bg-green-100 items-center justify-center mb-3">
-                <Feather name="edit-3" size={40} color="#22C55E" />
+              <View className="h-20 w-20 rounded-full bg-lime-100 items-center justify-center mb-3">
+                <Feather name="edit-3" size={40} color="#84CC16" />
               </View>
               <Text className="text-xl font-bold text-gray-800">Today's Meals</Text>
               <View className="mt-3">
