@@ -82,7 +82,7 @@ export async function getCurrentUser() {
 }
 
 export async function requestPasswordReset(email: string) {
-  return await account.createRecovery(email, `${process.env.EXPO_PUBLIC_RESET_PASSWORD_URL || "http://localhost:3000"}/reset-password`);
+  return await account.createRecovery(email, `${process.env.EXPO_PUBLIC_RESET_PASSWORD_URL || "https://george-oconnor.github.io/Ascend---Fitness-Challenge-Tracker"}/reset-password`);
 }
 
 export async function resetPassword(userId: string, secret: string, newPassword: string) {
