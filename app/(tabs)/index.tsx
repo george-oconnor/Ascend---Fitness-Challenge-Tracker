@@ -219,18 +219,20 @@ export default function HomeScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      // Refresh challenge data
+      // Sync health data from Apple Health first if available
+      if (Platform.OS === "ios" && isAuthorized) {
+        // Fetch latest health data from Apple Health
+        await fetchTodayData();
+      }
+      
+      // Refresh challenge data (this also fetches today's log)
       if (user?.id) {
         await fetchChallenge(user.id);
       }
       
-      // Sync health data from Apple Health if available
-      if (Platform.OS === "ios" && isAuthorized) {
-        await fetchTodayData();
-        // Sync health data to daily log
-        if (challenge?.$id && todayLog?.$id) {
-          await syncHealthData();
-        }
+      // Sync health data to daily log after challenge is refreshed
+      if (Platform.OS === "ios" && isAuthorized && challenge?.$id && todayLog?.$id) {
+        await syncHealthData();
       }
     } finally {
       setRefreshing(false);
