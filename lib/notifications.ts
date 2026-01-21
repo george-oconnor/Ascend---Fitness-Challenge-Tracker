@@ -134,7 +134,7 @@ export class NotificationService {
     // Morning motivation (8 AM)
     reminders.push({
       title: "🌅 Good Morning!",
-      body: "Start your day strong - time to tackle your 75 Hard tasks!",
+      body: "Start your day strong - time to tackle your daily tasks!",
       hour: 8,
     });
 

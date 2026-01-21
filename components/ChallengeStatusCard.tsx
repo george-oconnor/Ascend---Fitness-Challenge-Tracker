@@ -92,7 +92,7 @@ export default function ChallengeStatusCard() {
           <View className="flex-1">
             <View className="flex-row items-center">
               <Text className="text-white text-lg font-bold mb-1">
-                Start Your 75 Hard Challenge
+                Start Your Challenge
               </Text>
               <Feather name="target" size={18} color="white" style={{ marginLeft: 8 }} />
             </View>

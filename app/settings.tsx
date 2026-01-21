@@ -3,17 +3,19 @@ import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-    ActivityIndicator,
-    Pressable,
-    ScrollView,
-    Text,
-    View,
+  ActivityIndicator,
+  Alert,
+  Pressable,
+  ScrollView,
+  Text,
+  View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
-  const { user, logout } = useSessionStore();
+  const { user, logout, deleteAccount } = useSessionStore();
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const handleLogout = async () => {
     setLoading(true);
@@ -25,6 +27,35 @@ export default function SettingsScreen() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      "Delete Account",
+      "Are you sure you want to delete your account? This action cannot be undone and will permanently delete all your data including challenges, logs, and progress.",
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteAccount();
+              router.replace("/auth");
+            } catch (err) {
+              const message = err instanceof Error ? err.message : "Failed to delete account";
+              Alert.alert("Error", message);
+            } finally {
+              setDeleting(false);
+            }
+          }
+        }
+      ]
+    );
   };
 
   const MenuItem = ({ 
@@ -133,7 +164,7 @@ export default function SettingsScreen() {
             <Pressable 
               onPress={handleLogout}
               disabled={loading}
-              className="flex-row items-center px-4 py-3.5"
+              className="flex-row items-center px-4 py-3.5 border-b border-gray-100"
             >
               <View className="h-8 w-8 items-center justify-center rounded-full bg-red-100 mr-3">
                 {loading ? (
@@ -143,6 +174,21 @@ export default function SettingsScreen() {
                 )}
               </View>
               <Text className="flex-1 text-base text-red-500">Log Out</Text>
+            </Pressable>
+            
+            <Pressable 
+              onPress={handleDeleteAccount}
+              disabled={deleting}
+              className="flex-row items-center px-4 py-3.5"
+            >
+              <View className="h-8 w-8 items-center justify-center rounded-full bg-red-100 mr-3">
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#EF4444" />
+                ) : (
+                  <Feather name="trash-2" size={18} color="#EF4444" />
+                )}
+              </View>
+              <Text className="flex-1 text-base text-red-500">Delete My Account</Text>
             </Pressable>
           </View>
         </View>
