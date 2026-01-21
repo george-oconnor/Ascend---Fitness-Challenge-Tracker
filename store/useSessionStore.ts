@@ -1,4 +1,4 @@
-import { createAccount, createUserProfile, getCurrentSession, getCurrentUser, getUserProfile, signIn, signOut } from "@/lib/appwrite";
+import { createAccount, createUserProfile, deleteUserAccount, getCurrentSession, getCurrentUser, getUserProfile, signIn, signOut } from "@/lib/appwrite";
 import { captureException, clearUser as clearSentryUser, logger, setUser as setSentryUser } from "@/lib/sentry";
 import type { SessionState } from "@/types/type";
 import { create } from "zustand";
@@ -94,6 +94,19 @@ export const useSessionStore = create<SessionState>((set) => ({
       const errorMsg = err instanceof Error ? err.message : "Logout failed";
       captureException(err instanceof Error ? err : new Error(errorMsg));
       set({ error: errorMsg });
+    }
+  },
+
+  deleteAccount: async () => {
+    try {
+      await deleteUserAccount();
+      clearSentryUser();
+      set({ user: null, token: null, status: "unauthenticated", error: null });
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : "Failed to delete account";
+      captureException(err instanceof Error ? err : new Error(errorMsg));
+      set({ error: errorMsg });
+      throw err;
     }
   },
 
