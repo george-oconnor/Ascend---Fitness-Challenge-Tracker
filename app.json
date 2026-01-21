@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "description": "Ascend - Transform your life through daily fitness challenges and habit tracking",
     "ios": {
-        "buildNumber": "6",
+        "buildNumber": "7",
       "supportsTablet": true,
       "bundleIdentifier": "com.georgeoc.75hardapp",
       "entitlements": {
