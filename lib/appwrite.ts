@@ -1,6 +1,18 @@
 import type { ActivityLog, ActivityType, Challenge, CycleLog, DailyLog, UserBadge, UserProfile } from "@/types/type";
 import { BadgeId } from "@/types/type";
-import { Account, Client, Databases, Query } from "appwrite";
+import { Account, Client, Databases, Permission, Query, Role } from "appwrite";
+
+/**
+ * Generate document-level permissions for a specific user.
+ * This ensures only the owner (and no one else) can read/update/delete their data.
+ */
+function getUserPermissions(userId: string): string[] {
+  return [
+    Permission.read(Role.user(userId)),
+    Permission.update(Role.user(userId)),
+    Permission.delete(Role.user(userId)),
+  ];
+}
 
 const endpoint = process.env.EXPO_PUBLIC_APPWRITE_ENDPOINT;
 const projectId = process.env.EXPO_PUBLIC_APPWRITE_PROJECT_ID;
@@ -42,6 +54,17 @@ export async function signOut() {
   }
 }
 
+export async function deleteUserAccount() {
+  try {
+    // This will permanently delete the user account and all associated data
+    // Note: This cannot be undone
+    return await account.delete();
+  } catch (err) {
+    console.error("deleteUserAccount error:", err);
+    throw err;
+  }
+}
+
 export async function getCurrentSession() {
   try {
     return await account.getSession("current");
@@ -77,7 +100,8 @@ export async function createUserProfile(authId: string, email: string, firstName
       email,
       firstName,
       lastName,
-    }
+    },
+    getUserPermissions(authId)
   );
   return doc as unknown as UserProfile;
 }
@@ -115,7 +139,8 @@ export async function createChallenge(challenge: Omit<Challenge, "$id">): Promis
     DATABASE_ID,
     COLLECTIONS.CHALLENGES,
     "unique()",
-    challenge
+    challenge,
+    getUserPermissions(challenge.userId)
   );
   return doc as unknown as Challenge;
 }
@@ -148,12 +173,13 @@ export async function updateChallenge(challengeId: string, data: Partial<Challen
 }
 
 // Daily Log functions
-export async function createDailyLog(log: Omit<DailyLog, "$id">): Promise<DailyLog> {
+export async function createDailyLog(log: Omit<DailyLog, "$id">, userId: string): Promise<DailyLog> {
   const doc = await databases.createDocument(
     DATABASE_ID,
     COLLECTIONS.DAILY_LOGS,
     "unique()",
-    log
+    log,
+    getUserPermissions(userId)
   );
   return doc as unknown as DailyLog;
 }
@@ -213,7 +239,8 @@ export async function createCycleLog(log: Omit<CycleLog, "$id">): Promise<CycleL
     DATABASE_ID,
     COLLECTIONS.CYCLE_LOGS,
     "unique()",
-    log
+    log,
+    getUserPermissions(log.userId)
   );
   return doc as unknown as CycleLog;
 }
@@ -287,7 +314,8 @@ export async function createActivityLog(log: Omit<ActivityLog, "$id">): Promise<
     DATABASE_ID,
     COLLECTIONS.ACTIVITY_LOGS,
     "unique()",
-    log
+    log,
+    getUserPermissions(log.userId)
   );
   return doc as unknown as ActivityLog;
 }
@@ -403,7 +431,8 @@ export async function createUserBadge(userId: string, badgeId: BadgeId, challeng
         userId,
         badgeId,
         ...(challengeId && { challengeId }),
-      }
+      },
+      getUserPermissions(userId)
     );
     console.log(`🏅 Badge earned: ${badgeId}`);
     return doc as unknown as UserBadge;
