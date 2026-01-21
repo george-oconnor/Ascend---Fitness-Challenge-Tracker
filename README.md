@@ -1,101 +1,34 @@
-# Loaded - The Personal Budget Tracker
+# 75 Hard Challenge Tracker
 
-A React Native app built with Expo. This README provides a clean starting point for local development, environment setup, and contribution workflow.
+A mobile app built with React Native and Expo for tracking the 75 Hard fitness challenge. Track daily tasks, monitor progress, sync with Apple Health, and stay accountable throughout the 75-day journey.
+
+## Features
+
+- **Daily Task Tracking**: Log workouts, water intake, diet compliance, progress photos, and reading
+- **Apple Health Integration**: Automatically sync steps, weight, water, and other health metrics
+- **Challenge Management**: Set start/end dates and track overall progress
+- **Activity Feed**: View your daily logs and completed tasks
+- **Analytics Dashboard**: Visualize your progress over time
+- **User Authentication**: Secure login with Appwrite backend
+- **Offline Support**: Track activities even without internet connection
+
+## Tech Stack
+
+- **Framework**: Expo (React Native)
+- **Backend**: Appwrite
+- **State Management**: Zustand
+- **Styling**: NativeWind (Tailwind CSS)
+- **Health Data**: react-native-health (Apple HealthKit)
+- **Error Tracking**: Sentry
 
 ## Requirements
 
 - Node.js (LTS recommended)
-- npm (or yarn/pnpm)
-- iOS Simulator (Xcode) or Android Emulator (Android Studio), optional
+- npm or yarn
+- iOS Simulator (Xcode) for iOS development
+- Appwrite instance (backend)
 
 ## Quick Start
-
-```bash
-# install dependencies
-npm install
-
-# start the Expo dev server
-npx expo start
-
-# common shortcuts once the server is up
-# i: open iOS simulator, a: open Android emulator, w: open web
-```
-
-If you prefer npm scripts, `npm start` typically runs the same dev server.
-
-## Project Structure
-
-- `app/`: Screens and routes (Expo Router / file-based routing)
-- `assets/`: Images, fonts, static assets
-- Other folders as needed for state, services, components
-
-Develop by editing files under `app/`. Routes are inferred from the filesystem when using Expo Router.
-
-## Environment Variables
-
-- Local environment files are ignored by git (see `.gitignore`).
-- For client-side values in Expo, prefix variables with `EXPO_PUBLIC_`.
-
-Example `.env.example`:
-
-```env
-# Visible to the app at runtime (Expo)
-EXPO_PUBLIC_API_BASE_URL=https://api.example.com
-
-# Non-exposed values (for tooling/scripts only)
-SENTRY_AUTH_TOKEN=your-token-here
-```
-
-Create your own `.env` by copying `.env.example` and adjusting values. Keep secrets out of source control.
-
-## Useful Commands
-
-```bash
-# clear Metro/Expo cache if needed
-npx expo start -c
-
-# install a new package
-npm install <package>
-
-# run TypeScript checks (if configured)
-npm run typecheck
-
-# run tests (if configured)
-npm test
-```
-
-## Contributing
-
-Use branches and pull requests:
-
-```bash
-# create a feature branch
-git checkout -b feature/your-change
-
-# stage and commit
-git add -A
-git commit -m "feat: describe your change"
-
-# push and set upstream
-git push -u origin feature/your-change
-```
-
-Open a PR on GitHub and merge when reviewed.
-
-## Troubleshooting
-
-- Simulator not launching: ensure Xcode/Android Studio is installed and emulators are set up.
-- Stale build or bundler issues: try `npx expo start -c`.
-- Dependency conflicts: delete `node_modules`, reinstall, and restart the dev server.
-
-## Notes
-
-This README is a fresh baseline for the project. Expand it with app-specific details (architecture, state management, API docs, testing setup) as they become available.
-# Welcome to your Expo app 👋
-
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
-
-## Get started
 
 1. Install dependencies
 
@@ -103,59 +36,71 @@ This is an [Expo](https://expo.dev) project created with [`create-expo-app`](htt
    npm install
    ```
 
-2. Start the app
+2. Set up environment variables
+
+   Create a `.env` file with:
+
+   ```env
+   EXPO_PUBLIC_APPWRITE_ENDPOINT=your-appwrite-endpoint
+   EXPO_PUBLIC_APPWRITE_PROJECT_ID=your-project-id
+   EXPO_PUBLIC_APPWRITE_DATABASE_ID=your-database-id
+   EXPO_PUBLIC_APPWRITE_COLLECTION_ID=your-collection-id
+   EXPO_PUBLIC_SENTRY_DSN=your-sentry-dsn
+   ```
+
+3. Start the app
 
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
+## Project Structure
 
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
+- `app/`: Screens and routes (file-based routing with Expo Router)
+  - `(tabs)/`: Main tab navigation (Home, Activity, Analytics, Profile)
+  - `auth/`: Authentication screens
+  - Individual log screens for each activity type
+- `components/`: Reusable UI components
+- `lib/`: Utility functions and API clients
+- `store/`: Zustand state management stores
+- `constants/`: App constants and configurations
+- `hooks/`: Custom React hooks
+- `assets/`: Images, fonts, and icons
 
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Building for Production
 
 ```bash
-npm run reset-project
-```
+# iOS TestFlight build
+eas build --profile testflight --platform ios --auto-submit
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+# Production build
+eas build --profile production --platform ios
+```
 
 ## Learn more
 
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- [Expo documentation](https://docs.expo.dev/)
+- [Appwrite documentation](https://appwrite.io/docs)
+- [75 Hard Challenge](https://andyfrisella.com/pages/75hard-info)
 
 ## Contributing
 
-Work in branches and open pull requests.
+Work in branches and open pull requests:
 
 ```bash
 # create a feature branch
-git checkout -b feature/readme-update
+git checkout -b feature/your-feature
 
 # stage and commit your changes
-git add README.md
-git commit -m "docs: add contributing section"
+git add .
+git commit -m "feat: add new feature"
 
 # push and set upstream
-git push -u origin feature/readme-update
+git push -u origin feature/your-feature
 ```
 
-Then open a PR on GitHub and merge when approved.
+Then open a PR on GitHub for review.
+
+## License
+
+MIT
