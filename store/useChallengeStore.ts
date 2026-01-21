@@ -140,7 +140,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             noAlcoholCompleted: false,
             skincareCompleted: false,
             meals: "",
-          });
+          }, challenge.userId);
         }
       }
 

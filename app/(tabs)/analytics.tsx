@@ -118,7 +118,7 @@ export default function AnalyticsScreen() {
             challengeId: challengeId,
             userId: user!.id,
             date: format(selectedDate, 'yyyy-MM-dd'),
-          });
+          }, user!.id);
           logId = newLog.$id;
           addLog('✅ Daily log created!');
         }
@@ -977,7 +977,7 @@ export default function AnalyticsScreen() {
                             noAlcoholCompleted: false,
                             skincareCompleted: false,
                             meals: "",
-                          });
+                          }, challenge.userId);
                           logId = newLog.$id;
                           // Refresh logs after creating new one
                           await fetchAllLogs(challenge.$id!);
