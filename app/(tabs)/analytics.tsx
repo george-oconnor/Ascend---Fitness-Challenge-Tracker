@@ -89,9 +89,8 @@ export default function AnalyticsScreen() {
 
   // Handle re-sync from Apple Health
   const handleResyncHealthData = async () => {
-    if (!selectedDate || !selectedDayLog?.$id || !challenge?.$id || resyncing) return;
+    if (!selectedDate || !challenge?.$id || resyncing) return;
     
-    const logId = selectedDayLog.$id;
     const challengeId = challenge.$id;
     
     // First close the day modal and show resync modal
@@ -110,6 +109,20 @@ export default function AnalyticsScreen() {
       };
       
       try {
+        // If no log exists for this date, create one first
+        let logId = selectedDayLog?.$id;
+        
+        if (!logId) {
+          addLog('📝 Creating daily log for this date...');
+          const newLog = await createDailyLog({
+            challengeId: challengeId,
+            userId: user!.id,
+            date: format(selectedDate, 'yyyy-MM-dd'),
+          });
+          logId = newLog.$id;
+          addLog('✅ Daily log created!');
+        }
+        
         addLog('🔄 Starting health data resync...');
         await resyncHealthDataForDate(selectedDate, logId, addLog);
         addLog('✅ Resync complete!');
@@ -1508,7 +1521,7 @@ export default function AnalyticsScreen() {
             )}
 
             {/* Re-sync from Apple Health button (iOS only) */}
-            {Platform.OS === "ios" && selectedDayLog && (
+            {Platform.OS === "ios" && selectedDate && challenge && (
               <Pressable
                 onPress={handleResyncHealthData}
                 disabled={resyncing}
