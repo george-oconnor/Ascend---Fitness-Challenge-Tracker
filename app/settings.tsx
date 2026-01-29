@@ -1,19 +1,23 @@
+import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
-  Pressable,
-  ScrollView,
-  Text,
-  View,
+    ActivityIndicator,
+    Alert,
+    Linking,
+    Pressable,
+    ScrollView,
+    Switch,
+    Text,
+    View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
   const { user, logout, deleteAccount } = useSessionStore();
+  const { notificationsEnabled, setNotificationsEnabled } = useNotificationStore();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -56,6 +60,10 @@ export default function SettingsScreen() {
         }
       ]
     );
+  };
+
+  const handleNotificationToggle = async (value: boolean) => {
+    await setNotificationsEnabled(value);
   };
 
   const MenuItem = ({ 
@@ -121,18 +129,20 @@ export default function SettingsScreen() {
             <MenuItem 
               icon="user" 
               label="Edit Profile" 
-              onPress={() => {}}
+              onPress={() => router.push("/edit-profile")}
             />
-            <MenuItem 
-              icon="lock" 
-              label="Change Password" 
-              onPress={() => {}}
-            />
-            <MenuItem 
-              icon="bell" 
-              label="Notifications" 
-              onPress={() => {}}
-            />
+            <Pressable className="flex-row items-center bg-white px-4 py-3.5 border-b border-gray-100">
+              <View className="h-8 w-8 items-center justify-center rounded-full mr-3 bg-gray-100">
+                <Feather name="bell" size={18} color="#6B7280" />
+              </View>
+              <Text className="flex-1 text-base text-gray-900">Notifications</Text>
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={handleNotificationToggle}
+                trackColor={{ false: "#D1D5DB", true: "#A78BFA" }}
+                thumbColor={notificationsEnabled ? "#8B5CF6" : "#F3F4F6"}
+              />
+            </Pressable>
           </View>
         </View>
 
@@ -141,19 +151,14 @@ export default function SettingsScreen() {
           <Text className="text-xs font-semibold text-gray-400 uppercase px-5 mb-2">Support</Text>
           <View className="bg-white rounded-xl overflow-hidden mx-4">
             <MenuItem 
-              icon="help-circle" 
-              label="Help & FAQ" 
-              onPress={() => {}}
-            />
-            <MenuItem 
               icon="message-circle" 
               label="Contact Us" 
-              onPress={() => {}}
+              onPress={() => Linking.openURL('mailto:george@georgeoc.com')}
             />
             <MenuItem 
               icon="shield" 
               label="Privacy Policy" 
-              onPress={() => {}}
+              onPress={() => Linking.openURL('https://george-oconnor.github.io/Ascend---Fitness-Challenge-Tracker/privacy')}
             />
           </View>
         </View>

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Ascend - Fitness Challenge Tracker",
+    "name": "Ascend",
     "slug": "75-hard",
     "version": "1.0.1",
     "orientation": "portrait",
@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "description": "Ascend - Transform your life through daily fitness challenges and habit tracking",
     "ios": {
-        "buildNumber": "7",
+        "buildNumber": "8",
       "supportsTablet": true,
       "bundleIdentifier": "com.georgeoc.75hardapp",
       "entitlements": {

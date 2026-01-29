@@ -1,4 +1,5 @@
 import { BadgeCelebration } from "@/components/BadgeCelebration";
+import { setNotificationsEnabledCheck } from "@/lib/notifications";
 import { initSentry, logger } from "@/lib/sentry";
 import { useHealthStore } from "@/store/useHealthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
@@ -36,7 +37,7 @@ export default function RootLayout() {
   });
 
   const { checkSession, status } = useSessionStore();
-  const { initialize: initNotifications, celebratingBadge, dismissBadgeCelebration } = useNotificationStore();
+  const { initialize: initNotifications, celebratingBadge, dismissBadgeCelebration, notificationsEnabled } = useNotificationStore();
   const { initialize: initHealth, isNativeModuleAvailable, isAuthorized, error: healthError } = useHealthStore();
   const router = useRouter();
   const segments = useSegments();
@@ -48,6 +49,9 @@ export default function RootLayout() {
   // Initialize notifications
   useEffect(() => {
     initNotifications();
+    
+    // Set up the notifications enabled check for the notification service
+    setNotificationsEnabledCheck(() => notificationsEnabled);
 
     // Listen for notifications received while app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
@@ -75,7 +79,7 @@ export default function RootLayout() {
         responseListener.current.remove();
       }
     };
-  }, []);
+  }, [notificationsEnabled]);
 
   // Initialize HealthKit early on iOS
   useEffect(() => {

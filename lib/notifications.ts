@@ -3,6 +3,18 @@ import type { BadgeId, Challenge, DailyLog } from "@/types/type";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
 
+// Helper to check if notifications are enabled
+// This will be checked by the store before calling these methods
+let notificationsEnabledCheck: (() => boolean) | null = null;
+
+export function setNotificationsEnabledCheck(check: () => boolean) {
+  notificationsEnabledCheck = check;
+}
+
+function areNotificationsEnabled(): boolean {
+  return notificationsEnabledCheck ? notificationsEnabledCheck() : true;
+}
+
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
@@ -94,6 +106,11 @@ export class NotificationService {
     taskType?: string
   ): Promise<string | null> {
     try {
+      // Check if notifications are enabled
+      if (!areNotificationsEnabled()) {
+        return null;
+      }
+      
       const trigger = new Date();
       trigger.setHours(triggerHour, 0, 0, 0);
 
@@ -177,6 +194,8 @@ export class NotificationService {
    * Send immediate notification for badge earned
    */
   static async notifyBadgeEarned(badgeId: BadgeId): Promise<void> {
+    if (!areNotificationsEnabled()) return;
+    
     const badge = BADGES[badgeId];
     if (!badge) return;
 
@@ -195,6 +214,8 @@ export class NotificationService {
    * Send notification when all daily tasks are complete
    */
   static async notifyDayComplete(dayNumber?: number): Promise<void> {
+    if (!areNotificationsEnabled()) return;
+    
     const messages = [
       "Amazing work! You crushed it today! 💪",
       "Another day down! You're unstoppable! 🔥",
@@ -220,6 +241,8 @@ export class NotificationService {
    * Send notification when step goal is reached
    */
   static async notifyStepGoalReached(steps: number, goal?: number): Promise<void> {
+    if (!areNotificationsEnabled()) return;
+    
     const body = goal 
       ? `You hit ${steps.toLocaleString()} steps today! Goal: ${goal.toLocaleString()}`
       : `You hit ${steps.toLocaleString()} steps today! 🎉`;
@@ -239,6 +262,8 @@ export class NotificationService {
    * Send notification when a workout is detected from Apple Health
    */
   static async notifyWorkoutDetected(duration: number, workoutName?: string): Promise<void> {
+    if (!areNotificationsEnabled()) return;
+    
     const name = workoutName || "Workout";
     await Notifications.scheduleNotificationAsync({
       content: {

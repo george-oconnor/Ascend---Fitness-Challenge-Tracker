@@ -38,6 +38,7 @@ type NotificationState = {
   // Notification state
   isInitialized: boolean;
   hasPermission: boolean;
+  notificationsEnabled: boolean;
   
   // Recently notified (to prevent duplicates)
   notifiedStepGoals: Set<string>; // date strings
@@ -47,6 +48,7 @@ type NotificationState = {
   
   // Actions
   initialize: () => Promise<void>;
+  setNotificationsEnabled: (enabled: boolean) => Promise<void>;
   showBadgeCelebration: (badge: Badge) => void;
   dismissBadgeCelebration: () => void;
   queueBadgeCelebration: (badge: Badge) => void;
@@ -81,6 +83,7 @@ export const useNotificationStore = create<NotificationState>()(
       badgeQueue: [],
       isInitialized: false,
       hasPermission: false,
+      notificationsEnabled: true,
       notifiedStepGoals: new Set(),
       notifiedWorkouts: new Set(),
       notifiedDayComplete: new Set(),
@@ -89,6 +92,15 @@ export const useNotificationStore = create<NotificationState>()(
       initialize: async () => {
         const hasPermission = await NotificationService.initialize();
         set({ isInitialized: true, hasPermission });
+      },
+
+      setNotificationsEnabled: async (enabled: boolean) => {
+        set({ notificationsEnabled: enabled });
+        
+        if (!enabled) {
+          // Cancel all scheduled notifications when disabled
+          await NotificationService.cancelAllScheduledReminders();
+        }
       },
 
       addNotification: (notification) => {
@@ -157,7 +169,7 @@ export const useNotificationStore = create<NotificationState>()(
       },
 
       queueBadgeCelebration: (badge: Badge) => {
-        const { badgeQueue, celebratingBadge, notifiedBadges, addNotification } = get();
+        const { badgeQueue, celebratingBadge, notifiedBadges, addNotification, notificationsEnabled } = get();
         
         // Don't queue if already notified
         if (notifiedBadges.has(badge.id)) return;
@@ -165,8 +177,10 @@ export const useNotificationStore = create<NotificationState>()(
         // Mark as notified
         set({ notifiedBadges: new Set([...notifiedBadges, badge.id]) });
         
-        // Send push notification
-        NotificationService.notifyBadgeEarned(badge.id);
+        // Send push notification only if enabled
+        if (notificationsEnabled) {
+          NotificationService.notifyBadgeEarned(badge.id);
+        }
         
         // Add to in-app notification tray
         addNotification({
@@ -239,6 +253,7 @@ export const useNotificationStore = create<NotificationState>()(
       partialize: (state) => ({
         notifications: state.notifications,
         unreadCount: state.unreadCount,
+        notificationsEnabled: state.notificationsEnabled,
         // Convert Sets to arrays for storage
         notifiedBadges: Array.from(state.notifiedBadges),
       }),
