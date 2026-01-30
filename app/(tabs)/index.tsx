@@ -231,13 +231,17 @@ export default function HomeScreen() {
       }
       
       // Sync health data to daily log after challenge is refreshed
-      if (Platform.OS === "ios" && isAuthorized && challenge?.$id && todayLog?.$id) {
-        await syncHealthData();
+      // Get fresh values from store instead of using closure variables
+      if (Platform.OS === "ios" && isAuthorized) {
+        const { challenge: freshChallenge, todayLog: freshTodayLog } = useChallengeStore.getState();
+        if (freshChallenge?.$id && freshTodayLog?.$id) {
+          await syncHealthData();
+        }
       }
     } finally {
       setRefreshing(false);
     }
-  }, [user?.id, isAuthorized, challenge?.$id, todayLog?.$id, fetchChallenge, fetchTodayData, syncHealthData]);
+  }, [user?.id, isAuthorized, fetchChallenge, fetchTodayData, syncHealthData]);
 
   // Auto-sync health data when it changes
   useEffect(() => {
