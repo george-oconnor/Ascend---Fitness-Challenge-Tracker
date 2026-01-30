@@ -775,19 +775,25 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
 
       const updates: Partial<DailyLog> = {};
 
-      // Sync steps - always pull from Apple Health for display
-      if (healthState.steps > 0) {
-        const newStepsCount = Math.round(healthState.steps);
-        const stepsGoalMet = newStepsCount >= (challenge.stepsGoal || 0);
-        
-        // Only update if steps changed
-        if (newStepsCount !== todayLog.stepsCount) {
-          updates.stepsCount = newStepsCount;
-          // Only mark as completed if we're tracking steps
-          if (challenge.trackSteps) {
-            updates.stepsCompleted = stepsGoalMet;
+      // Sync steps - always pull from Apple Health for display, fetching fresh data directly
+      try {
+        const { healthService } = await import("@/lib/health");
+        const stepsCount = await healthService.getStepsForDate(new Date());
+        if (stepsCount > 0) {
+          const newStepsCount = Math.round(stepsCount);
+          const stepsGoalMet = newStepsCount >= (challenge.stepsGoal || 0);
+          
+          // Only update if steps changed
+          if (newStepsCount !== todayLog.stepsCount) {
+            updates.stepsCount = newStepsCount;
+            // Only mark as completed if we're tracking steps
+            if (challenge.trackSteps) {
+              updates.stepsCompleted = stepsGoalMet;
+            }
           }
         }
+      } catch (error) {
+        console.log("Steps sync skipped:", error);
       }
 
       // Sync water if tracking is enabled
