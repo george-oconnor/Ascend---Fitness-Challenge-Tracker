@@ -1,7 +1,7 @@
 import type { Badge } from "@/types/type";
 import { Feather } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Animated, Dimensions, Modal, Pressable, StyleSheet, Text, View } from "react-native";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
@@ -153,7 +153,10 @@ export function BadgeCelebration({ badge, visible, onDismiss }: BadgeCelebration
   }, []);
 
   const startConfetti = useCallback(() => {
-    setShowConfetti(true);
+    // Use requestAnimationFrame to ensure confetti starts smoothly
+    requestAnimationFrame(() => {
+      setShowConfetti(true);
+    });
   }, []);
 
   useEffect(() => {
@@ -196,12 +199,19 @@ export function BadgeCelebration({ badge, visible, onDismiss }: BadgeCelebration
       ];
 
       // Trigger haptics when badge appears
-      setTimeout(triggerHaptics, 400);
+      const hapticsTimer = setTimeout(triggerHaptics, 400);
       
-      // Start confetti
-      setTimeout(startConfetti, 500);
+      // Start confetti - defer to avoid blocking main thread
+      const confettiTimer = setTimeout(startConfetti, 500);
       
+      // Start animations
       Animated.sequence(animations).start();
+      
+      // Cleanup timers on unmount
+      return () => {
+        clearTimeout(hapticsTimer);
+        clearTimeout(confettiTimer);
+      };
     }
   }, [visible, badge]);
 
@@ -260,14 +270,17 @@ export function BadgeCelebration({ badge, visible, onDismiss }: BadgeCelebration
 
   if (!badge) return null;
 
-  // Generate confetti particles
-  const confettiParticles = showConfetti
-    ? [...Array(40)].map((_, i) => ({
-        id: i,
-        delay: Math.random() * 500,
-        startX: Math.random() * SCREEN_WIDTH,
-      }))
-    : [];
+  // Generate confetti particles - memoized and reduced count for better performance
+  const confettiParticles = useMemo(() => 
+    showConfetti
+      ? [...Array(25)].map((_, i) => ({
+          id: i,
+          delay: Math.random() * 500,
+          startX: Math.random() * SCREEN_WIDTH,
+        }))
+      : [],
+    [showConfetti]
+  );
 
   return (
     <Modal
