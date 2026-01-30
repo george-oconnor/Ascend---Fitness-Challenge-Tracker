@@ -604,19 +604,34 @@ export default function AnalyticsScreen() {
     
     if (newBadges.length > 0) {
       console.log("🏅 Saving new badges:", newBadges);
-      // Save each new badge and trigger celebration
-      newBadges.forEach(async (badgeId) => {
-        const saved = await createUserBadge(user.id, badgeId, challenge?.$id);
-        if (saved) {
-          setSavedBadges(prev => [...prev, saved]);
-          
-          // Trigger badge celebration!
-          const badge = BADGES[badgeId];
-          if (badge) {
-            queueBadgeCelebration(badge);
+      
+      // Save badges asynchronously and defer celebrations
+      const saveBadges = async () => {
+        const badgesToCelebrate: Badge[] = [];
+        
+        for (const badgeId of newBadges) {
+          const saved = await createUserBadge(user.id, badgeId, challenge?.$id);
+          if (saved) {
+            setSavedBadges(prev => [...prev, saved]);
+            
+            // Collect badges to celebrate after all are saved
+            const badge = BADGES[badgeId];
+            if (badge) {
+              badgesToCelebrate.push(badge);
+            }
           }
         }
-      });
+        
+        // Defer badge celebrations to avoid blocking during health sync
+        // Use requestAnimationFrame to ensure celebrations happen after current render cycle
+        requestAnimationFrame(() => {
+          badgesToCelebrate.forEach(badge => {
+            queueBadgeCelebration(badge);
+          });
+        });
+      };
+      
+      saveBadges();
     }
   }, [user?.id, earnedBadges, savedBadgeIds, badgesLoading, challenge?.$id, queueBadgeCelebration]);
 
