@@ -268,8 +268,6 @@ export function BadgeCelebration({ badge, visible, onDismiss }: BadgeCelebration
     ],
   };
 
-  if (!badge) return null;
-
   // Generate confetti particles - memoized and reduced count for better performance
   const confettiParticles = useMemo(() => 
     showConfetti
@@ -281,6 +279,8 @@ export function BadgeCelebration({ badge, visible, onDismiss }: BadgeCelebration
       : [],
     [showConfetti]
   );
+
+  if (!badge) return null;
 
   return (
     <Modal
