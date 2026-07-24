@@ -1,6 +1,7 @@
 import { BadgeCelebration } from "@/components/BadgeCelebration";
 import { ICloudGate } from "@/components/ICloudGate";
 import { setNotificationsEnabledCheck } from "@/lib/notifications";
+import { getHasSeenOnboarding } from "@/lib/onboarding";
 import { initSentry, logger } from "@/lib/sentry";
 import { useHealthStore } from "@/store/useHealthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
@@ -8,7 +9,7 @@ import { useSessionStore } from "@/store/useSessionStore";
 import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { SplashScreen, Stack, useRouter, useSegments } from "expo-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import './globals.css';
@@ -43,6 +44,7 @@ export default function RootLayout() {
   const segments = useSegments();
   const navigationAttempted = useRef(false);
   const healthInitAttempted = useRef(false);
+  const [hasSeenOnboarding, setHasSeenOnboardingState] = useState<boolean | null>(null);
   const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
   const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
@@ -110,16 +112,23 @@ export default function RootLayout() {
   }, [fontsLoaded, error]);
 
   useEffect(() => {
+    getHasSeenOnboarding().then(setHasSeenOnboardingState);
+  }, []);
+
+  useEffect(() => {
     // icloud-unavailable renders the ICloudGate in place of the Stack below,
     // so it doesn't need (or want) a route change.
     if (status === "loading" || status === "idle" || status === "icloud-unavailable") return;
+    // Wait for the onboarding flag before deciding where an unauthenticated
+    // user should land.
+    if (status === "unauthenticated" && hasSeenOnboarding === null) return;
 
-    const inPreAuth = segments[0] === "auth" || segments[0] === "migrate";
+    const inPreAuth = segments[0] === "auth" || segments[0] === "migrate" || segments[0] === "onboarding";
 
     if (status === "unauthenticated" && !inPreAuth) {
       if (!navigationAttempted.current) {
         navigationAttempted.current = true;
-        router.replace("/auth");
+        router.replace(hasSeenOnboarding ? "/auth" : "/onboarding");
       }
     } else if (status === "authenticated" && inPreAuth) {
       if (!navigationAttempted.current) {
@@ -130,7 +139,7 @@ export default function RootLayout() {
       // Reset flag when in correct route
       navigationAttempted.current = false;
     }
-  }, [status, segments]);
+  }, [status, segments, hasSeenOnboarding]);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
