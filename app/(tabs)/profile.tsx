@@ -1,5 +1,5 @@
 import { BADGES } from "@/constants/badges";
-import { getUserBadges } from "@/lib/appwrite";
+import { getUserBadges } from "@/lib/cloudkit";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { BadgeId } from "@/types/type.d";

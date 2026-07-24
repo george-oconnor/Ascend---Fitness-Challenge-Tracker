@@ -1,4 +1,4 @@
-import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/cloudkit";
 import { healthSyncService, HKCategoryValueSleepAnalysis } from "@/lib/healthSync";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";

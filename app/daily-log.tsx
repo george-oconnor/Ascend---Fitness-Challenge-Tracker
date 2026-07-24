@@ -9,7 +9,9 @@ import { ActivityIndicator, Platform, Pressable, ScrollView, Text, View } from "
 import { SafeAreaView } from "react-native-safe-area-context";
 
 type TaskItem = {
-  key: keyof DailyLog;
+  // "cycleLogged" is a synthetic key — cycle data lives in a separate
+  // CycleLog collection, not a DailyLog field; see getTaskCompleted below.
+  key: keyof DailyLog | "cycleLogged";
   label: string;
   description: string;
   icon: keyof typeof Feather.glyphMap;
@@ -306,7 +308,7 @@ export default function DailyLogScreen() {
 
   if ((challenge as any).trackCycle) {
     tasks.push({
-      key: "cycleLogged" as keyof DailyLog,
+      key: "cycleLogged",
       label: "Cycle Tracking",
       description: cycleLoggedToday ? "Logged today" : "Log cycle data",
       icon: "heart",

@@ -121,7 +121,7 @@ export default function ActivityScreen() {
     const earlierItems: ActivityLog[] = [];
 
     activityLogs.forEach((item) => {
-      const itemDate = parseISO(item.$createdAt || item.date);
+      const itemDate = parseISO(item.date);
       if (isToday(itemDate)) {
         todayItems.push(item);
       } else if (isYesterday(itemDate)) {
@@ -211,9 +211,9 @@ export default function ActivityScreen() {
                           iconBgColor={config.bgColor}
                           title={item.title}
                           description={item.description}
-                          timestamp={formatActivityDate(item.$createdAt || item.date)}
+                          timestamp={formatActivityDate(item.date)}
                           showBorder={index < displayData.length - 1 || hasMore}
-                          onDelete={() => handleDeleteActivity(item.$id, item.title)}
+                          onDelete={() => handleDeleteActivity(item.$id!, item.title)}
                         />
                       );
                     })}

@@ -8,9 +8,10 @@ import {
     getChallenge,
     getDailyLog,
     getDailyLogsForChallenge,
+    updateActivityLog,
     updateChallenge,
     updateDailyLog
-} from "@/lib/appwrite";
+} from "@/lib/cloudkit";
 import { isDayComplete } from "@/lib/dayCompletion";
 import { NotificationService } from "@/lib/notifications";
 import { captureException, logger } from "@/lib/sentry";
@@ -43,6 +44,8 @@ type ChallengeState = {
     description: string;
     value?: number;
     unit?: string;
+    /** Defaults to today if omitted — pass this when logging/editing a past day. */
+    date?: string;
   }) => Promise<void>;
   syncHealthData: () => Promise<void>;
   resyncHealthDataForDate: (date: Date, logId: string, logCallback?: (message: string) => void) => Promise<void>;
@@ -269,7 +272,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         description: activity.description,
         value: activity.value,
         unit: activity.unit,
-        date: getTodayDateString(),
+        date: activity.date || getTodayDateString(),
       });
       
       // Add to local state (prepend since it's newest)
@@ -605,22 +608,28 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           if (waterLiters && waterLiters > 0) {
             const waterGoal = (challenge as any).waterGoalLiters || 3.7;
             const waterGoalMet = waterLiters >= waterGoal;
-            
+
             log(`💧 Water: ${waterLiters.toFixed(2)}L ${waterGoalMet ? '✅' : '❌'}`);
-            
+
             updates.waterLiters = waterLiters;
             updates.waterCompleted = waterGoalMet;
-            
-            activityLogsToCreate.push({
+
+            const waterLogData = {
               userId: challenge.userId,
               challengeId: challengeId,
-              type: 'water',
+              type: 'water' as const,
               title: 'Water Intake (Resync)',
               description: `${waterLiters.toFixed(2)}L from Apple Health`,
               value: waterLiters,
               unit: 'L',
               date: dateStr,
-            });
+            };
+            const existingWaterLogs = await getActivityLogsForDate(challengeId, dateStr, 'water');
+            if (existingWaterLogs.length > 0) {
+              activityLogsToUpdate.push({ id: existingWaterLogs[0].$id!, data: waterLogData });
+            } else {
+              activityLogsToCreate.push(waterLogData);
+            }
           } else {
             log("💧 No water data found");
           }
@@ -640,9 +649,9 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
             const sleepGoalMet = sleepData.asleepMinutes >= sleepGoalMinutes;
             const sleepHours = Math.floor(sleepData.asleepMinutes / 60);
             const sleepMins = sleepData.asleepMinutes % 60;
-            
+
             log(`😴 Sleep: ${sleepHours}h ${sleepMins}m ${sleepGoalMet ? '✅' : '❌'}`);
-            
+
             updates.sleepMinutes = sleepData.asleepMinutes;
             updates.sleepLogged = true;
             updates.sleepCompleted = sleepGoalMet;
@@ -650,17 +659,23 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
               updates.sleepStartTime = sleepData.startTime.toISOString();
               updates.sleepEndTime = sleepData.endTime.toISOString();
             }
-            
-            activityLogsToCreate.push({
+
+            const sleepLogData = {
               userId: challenge.userId,
               challengeId: challengeId,
-              type: 'sleep',
+              type: 'sleep' as const,
               title: 'Sleep (Resync)',
               description: `${sleepHours}h ${sleepMins}m from Apple Health`,
               value: sleepData.asleepMinutes,
               unit: 'min',
               date: dateStr,
-            });
+            };
+            const existingSleepLogs = await getActivityLogsForDate(challengeId, dateStr, 'sleep');
+            if (existingSleepLogs.length > 0) {
+              activityLogsToUpdate.push({ id: existingSleepLogs[0].$id!, data: sleepLogData });
+            } else {
+              activityLogsToCreate.push(sleepLogData);
+            }
           } else {
             log("😴 No sleep data found");
           }
@@ -678,25 +693,31 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           const stepsGoal = (challenge as any).stepsGoal || 10000;
           const stepsGoalMet = stepsCount >= stepsGoal;
           const isTracking = (challenge as any).trackSteps;
-          
+
           log(`👟 Steps: ${stepsCount.toLocaleString()} ${stepsGoalMet ? '✅' : '❌'} ${isTracking ? '(tracked)' : '(display only)'}`);
-          
+
           updates.stepsCount = stepsCount;
           // Only mark as completed if we're tracking steps
           if (isTracking) {
             updates.stepsCompleted = stepsGoalMet;
           }
-            
-          activityLogsToCreate.push({
+
+          const stepsLogData = {
             userId: challenge.userId,
             challengeId: challengeId,
-            type: 'steps',
+            type: 'steps' as const,
             title: isTracking ? 'Steps (Resync)' : 'Steps (Auto-sync)',
             description: `${stepsCount.toLocaleString()} steps from Apple Health${isTracking ? '' : ' (display only)'}`,
             value: stepsCount,
             unit: 'steps',
             date: dateStr,
-          });
+          };
+          const existingStepsLogs = await getActivityLogsForDate(challengeId, dateStr, 'steps');
+          if (existingStepsLogs.length > 0) {
+            activityLogsToUpdate.push({ id: existingStepsLogs[0].$id!, data: stepsLogData });
+          } else {
+            activityLogsToCreate.push(stepsLogData);
+          }
         } else {
           log("👟 No steps data found");
         }
@@ -726,21 +747,40 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         log("ℹ️ No changes needed");
       }
       
-      // Create activity logs
+      // Create, update, and delete activity logs
+      const hasActivityLogChanges =
+        activityLogsToCreate.length > 0 || activityLogsToUpdate.length > 0 || activityLogsToDelete.length > 0;
+
       if (activityLogsToCreate.length > 0) {
         log(`📝 Creating ${activityLogsToCreate.length} activity log(s)...`);
         for (const activityLog of activityLogsToCreate) {
           await createActivityLog(activityLog);
           log(`✅ Created: ${activityLog.title}`);
         }
-        log(`✅ All activity logs created`);
-        
-        // Refresh activity logs to show new ones
+      }
+
+      if (activityLogsToUpdate.length > 0) {
+        log(`📝 Updating ${activityLogsToUpdate.length} activity log(s)...`);
+        for (const { id, data } of activityLogsToUpdate) {
+          await updateActivityLog(id, data);
+          log(`✅ Updated: ${data.title}`);
+        }
+      }
+
+      if (activityLogsToDelete.length > 0) {
+        log(`🗑️ Removing ${activityLogsToDelete.length} stale activity log(s)...`);
+        for (const id of activityLogsToDelete) {
+          await deleteActivityLog(id);
+        }
+      }
+
+      if (hasActivityLogChanges) {
+        // Refresh activity logs to reflect the changes
         const refreshedActivityLogs = await getActivityLogsForChallenge(challenge.$id);
         set({ activityLogs: refreshedActivityLogs });
         log(`🔄 Activity logs refreshed`);
       } else {
-        log(`ℹ️ No activity logs to create`);
+        log(`ℹ️ No activity logs to create, update, or delete`);
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to re-sync health data";
@@ -782,13 +822,38 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         if (stepsCount > 0) {
           const newStepsCount = Math.round(stepsCount);
           const stepsGoalMet = newStepsCount >= (challenge.stepsGoal || 0);
-          
+
           // Only update if steps changed
           if (newStepsCount !== todayLog.stepsCount) {
             updates.stepsCount = newStepsCount;
             // Only mark as completed if we're tracking steps
             if (challenge.trackSteps) {
               updates.stepsCompleted = stepsGoalMet;
+            }
+
+            // Keep today's "steps" activity log entry up to date so the
+            // Activity tab reflects auto-synced steps, not just manual resyncs.
+            try {
+              const todayStr = getTodayDateString();
+              const existingStepsLogs = await getActivityLogsForDate(challenge.$id!, todayStr, "steps");
+              const description = `${newStepsCount.toLocaleString()} steps from Apple Health${challenge.trackSteps ? "" : " (display only)"}`;
+              if (existingStepsLogs.length > 0) {
+                await updateActivityLog(existingStepsLogs[0].$id!, { value: newStepsCount, description });
+              } else {
+                await createActivityLog({
+                  userId: challenge.userId,
+                  challengeId: challenge.$id!,
+                  type: "steps",
+                  title: challenge.trackSteps ? "Steps" : "Steps (Auto-sync)",
+                  description,
+                  value: newStepsCount,
+                  unit: "steps",
+                  date: todayStr,
+                });
+              }
+              await get().fetchActivityLogs(challenge.$id!);
+            } catch (activityError) {
+              console.log("Steps activity log sync skipped:", activityError);
             }
           }
         }
@@ -854,10 +919,10 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       // If workouts changed, use resyncHealthData to properly handle activity logs
       if (hasWorkoutTracking && hasWorkouts && challenge.$id) {
         try {
-          console.log("🏋️ syncHealthData: Delegating to resyncHealthData for workout sync");
-          await get().resyncHealthData(challenge.$id, new Date(), () => {});
-          // resyncHealthData handles both the daily log update and activity log creation
-          return; // Exit early since resyncHealthData handled everything
+          console.log("🏋️ syncHealthData: Delegating to resyncHealthDataForDate for workout sync");
+          await get().resyncHealthDataForDate(new Date(), todayLog.$id, () => {});
+          // resyncHealthDataForDate handles both the daily log update and activity log creation
+          return; // Exit early since resyncHealthDataForDate handled everything
         } catch (error) {
           console.error("Failed to resync workout data:", error);
           // Fall through to regular sync if resync fails

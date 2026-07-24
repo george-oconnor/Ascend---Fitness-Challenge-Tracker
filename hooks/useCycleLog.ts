@@ -1,4 +1,4 @@
-import { getCycleLog } from "@/lib/appwrite";
+import { getCycleLog } from "@/lib/cloudkit";
 import { useSessionStore } from "@/store/useSessionStore";
 import { CycleLog } from "@/types/type.d";
 import { useFocusEffect } from "expo-router";

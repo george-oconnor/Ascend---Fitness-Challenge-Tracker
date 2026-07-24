@@ -133,8 +133,9 @@ function ConfettiCelebration({ show }: { show: boolean }) {
       confettiPieces.forEach((piece, i) => {
         piece.y.setValue(-20);
         piece.opacity.setValue(1);
-        piece.x.setValue(Math.random() * 350);
-        
+        const startX = Math.random() * 350;
+        piece.x.setValue(startX);
+
         Animated.sequence([
           Animated.delay(i * 30),
           Animated.parallel([
@@ -144,7 +145,7 @@ function ConfettiCelebration({ show }: { show: boolean }) {
               useNativeDriver: true,
             }),
             Animated.timing(piece.x, {
-              toValue: piece.x._value + (Math.random() - 0.5) * 100,
+              toValue: startX + (Math.random() - 0.5) * 100,
               duration: 2000,
               useNativeDriver: true,
             }),

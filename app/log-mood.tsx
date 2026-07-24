@@ -1,4 +1,4 @@
-import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/cloudkit";
 import { healthSyncService } from "@/lib/healthSync";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 type MoodOption = {
   score: number;
   icon: keyof typeof Feather.glyphMap;
+  emoji: string;
   label: string;
   color: string;
   bgColor: string;
@@ -23,6 +24,7 @@ const MOOD_OPTIONS: MoodOption[] = [
   {
     score: 1,
     icon: "frown",
+    emoji: "😞",
     label: "Struggling",
     color: "#EF4444",
     bgColor: "bg-red-50",
@@ -31,6 +33,7 @@ const MOOD_OPTIONS: MoodOption[] = [
   {
     score: 2,
     icon: "meh",
+    emoji: "😕",
     label: "Down",
     color: "#F97316",
     bgColor: "bg-orange-50",
@@ -39,6 +42,7 @@ const MOOD_OPTIONS: MoodOption[] = [
   {
     score: 3,
     icon: "minus",
+    emoji: "😐",
     label: "Okay",
     color: "#EAB308",
     bgColor: "bg-yellow-50",
@@ -47,6 +51,7 @@ const MOOD_OPTIONS: MoodOption[] = [
   {
     score: 4,
     icon: "smile",
+    emoji: "🙂",
     label: "Good",
     color: "#22C55E",
     bgColor: "bg-green-50",
@@ -55,6 +60,7 @@ const MOOD_OPTIONS: MoodOption[] = [
   {
     score: 5,
     icon: "sun",
+    emoji: "😄",
     label: "Great",
     color: "#10B981",
     bgColor: "bg-emerald-50",

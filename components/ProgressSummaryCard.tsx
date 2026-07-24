@@ -33,8 +33,8 @@ export default function ProgressSummaryCard() {
   const liveOutdoorMinutes = todayLog.workout1Minutes ?? 0;
   const liveIndoorMinutes = todayLog.workout2Minutes ?? 0;
 
-  const exerciseItems: JSX.Element[] = [];
-  const nutritionItems: JSX.Element[] = [];
+  const exerciseItems: React.ReactNode[] = [];
+  const nutritionItems: React.ReactNode[] = [];
   const habitBools: Array<{ key: keyof typeof todayLog; label: string; value?: boolean }> = [];
 
   // Exercise group

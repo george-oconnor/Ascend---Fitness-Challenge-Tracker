@@ -379,7 +379,7 @@ class HealthService {
 
           if (!results || results.length === 0) {
             console.log("🏋️ getWorkoutsForDate: No workouts found for today");
-            logger.warn("HealthKit returned no workouts", {
+            logger.debug("HealthKit returned no workouts", {
               dateRange: { start: options.startDate, end: options.endDate },
             });
             resolve([]);

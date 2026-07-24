@@ -1,4 +1,4 @@
-import { createCycleLog, getCycleLog, getLastPeriodStart, updateCycleLog } from "@/lib/appwrite";
+import { createCycleLog, getCycleLog, getLastPeriodStart, updateCycleLog } from "@/lib/cloudkit";
 import { cycleHealthService } from "@/lib/cycleHealth";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";

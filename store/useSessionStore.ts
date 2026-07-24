@@ -1,31 +1,63 @@
-import { createAccount, createUserProfile, deleteUserAccount, getCurrentSession, getCurrentUser, getUserProfile, signIn, signOut } from "@/lib/appwrite";
+import {
+  activateCloudKitSession,
+  checkICloud,
+  clearStoredIdentity,
+  getStoredIdentity,
+  isAppleCancel,
+  isAppleCredentialValid,
+  signInWithApple,
+  type AppleIdentity,
+} from "@/lib/auth";
+import { deleteUserAccount, updateUserProfile } from "@/lib/cloudkit";
+import { cloudKitHasData, resetMigrationFlag } from "@/lib/migration";
 import { captureException, clearUser as clearSentryUser, logger, setUser as setSentryUser } from "@/lib/sentry";
 import type { SessionState } from "@/types/type";
 import { create } from "zustand";
+
+const identityToUser = (identity: AppleIdentity, name?: string, email?: string) => ({
+  id: identity.appleUserId,
+  email: email ?? identity.email,
+  name: name ?? identity.fullName,
+});
 
 export const useSessionStore = create<SessionState>((set) => ({
   user: null,
   token: null,
   status: "idle",
   error: null,
-  
+  needsMigrationCheck: false,
+
   checkSession: async () => {
     set({ status: "loading" });
     try {
-      const session = await getCurrentSession();
-      if (!session) {
+      const identity = await getStoredIdentity();
+      if (!identity) {
         set({ user: null, token: null, status: "unauthenticated", error: null });
         return;
       }
-
-      const user = await getCurrentUser();
-      if (user) {
-        setSentryUser({ id: user.$id, email: user.email, username: user.name });
-        set({ user: { id: user.$id, email: user.email, name: user.name }, token: session.$id, status: "authenticated", error: null });
+      if (!(await isAppleCredentialValid(identity.appleUserId))) {
+        await clearStoredIdentity();
+        set({ user: null, token: null, status: "unauthenticated", error: null });
+        return;
+      }
+      if ((await checkICloud()) !== "available") {
+        // Signed in, but the device has no usable iCloud account — data is
+        // unreachable until they sign in. ICloudGate handles this state.
+        set({ user: identityToUser(identity), token: null, status: "icloud-unavailable", error: null });
         return;
       }
 
-      set({ user: null, token: null, status: "unauthenticated", error: null });
+      const { userRecordName, name, email } = await activateCloudKitSession(identity);
+      const needsMigrationCheck = !(await cloudKitHasData());
+      setSentryUser({ id: identity.appleUserId, email: email ?? identity.email, username: name });
+      set({
+        user: identityToUser(identity, name, email),
+        token: userRecordName,
+        status: "authenticated",
+        error: null,
+        needsMigrationCheck,
+      });
+      updateUserProfile(identity.appleUserId, { lastLoginTime: new Date().toISOString() }).catch(() => {});
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to check session";
       captureException(err instanceof Error ? err : new Error(errorMsg));
@@ -33,63 +65,69 @@ export const useSessionStore = create<SessionState>((set) => ({
     }
   },
 
-  login: async (email: string, password: string) => {
+  loginWithApple: async () => {
     set({ status: "loading", error: null });
     try {
-      await signIn(email, password);
-      const user = await getCurrentUser();
-      if (user) {
-        // Check if user profile exists, create if missing (migration for existing users)
-        const existingProfile = await getUserProfile(user.$id);
-        if (!existingProfile) {
-          const nameParts = (user.name || "").split(" ");
-          const firstName = nameParts[0] || "";
-          const lastName = nameParts.slice(1).join(" ") || "";
-          await createUserProfile(user.$id, user.email, firstName, lastName);
-          logger.info("Created missing user profile during login", { userId: user.$id });
-        }
-        
-        setSentryUser({ id: user.$id, email: user.email, username: user.name });
-        logger.info("User logged in", { userId: user.$id });
-        set({ user: { id: user.$id, email: user.email, name: user.name }, token: user.$id, status: "authenticated", error: null });
+      logger.info("Sign in with Apple attempt");
+      const identity = await signInWithApple();
+
+      if ((await checkICloud()) !== "available") {
+        set({ user: identityToUser(identity), token: null, status: "icloud-unavailable", error: null });
+        return;
       }
+
+      const { userRecordName, name, email } = await activateCloudKitSession(identity);
+      const needsMigrationCheck = !(await cloudKitHasData());
+      setSentryUser({ id: identity.appleUserId, email: email ?? identity.email, username: name });
+      logger.info("Sign in with Apple successful", { userId: identity.appleUserId });
+      set({
+        user: identityToUser(identity, name, email),
+        token: userRecordName,
+        status: "authenticated",
+        error: null,
+        needsMigrationCheck,
+      });
+      updateUserProfile(identity.appleUserId, { lastLoginTime: new Date().toISOString() }).catch(() => {});
     } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Login failed";
-      captureException(err instanceof Error ? err : new Error(errorMsg), { email });
+      if (isAppleCancel(err)) {
+        set({ status: "unauthenticated", error: null });
+        return;
+      }
+      const errorMsg = err instanceof Error ? err.message : "Sign in failed";
+      captureException(err instanceof Error ? err : new Error(errorMsg), {
+        operation: "sign_in_apple",
+      });
       set({ status: "error", error: errorMsg });
       throw err;
     }
   },
 
-  signup: async (email: string, password: string, firstName: string, lastName: string) => {
-    set({ status: "loading", error: null });
+  recheckICloud: async () => {
+    const identity = await getStoredIdentity();
+    if (!identity) {
+      set({ user: null, token: null, status: "unauthenticated", error: null });
+      return;
+    }
+    if ((await checkICloud()) !== "available") {
+      set({ user: identityToUser(identity), token: null, status: "icloud-unavailable", error: null });
+      return;
+    }
     try {
-      const fullName = `${firstName} ${lastName}`.trim();
-      await createAccount(email, password, fullName);
-      await signIn(email, password);
-      
-      const user = await getCurrentUser();
-      if (user) {
-        // Create user profile in users collection
-        await createUserProfile(user.$id, email, firstName, lastName);
-        
-        setSentryUser({ id: user.$id, email: user.email, username: fullName });
-        logger.info("User signed up", { userId: user.$id });
-        set({ user: { id: user.$id, email: user.email, name: fullName }, token: user.$id, status: "authenticated", error: null });
-      }
-    } catch (err) {
-      const errorMsg = err instanceof Error ? err.message : "Signup failed";
-      captureException(err instanceof Error ? err : new Error(errorMsg), { email, firstName, lastName });
-      set({ status: "error", error: errorMsg });
-      throw err;
+      const { userRecordName, name, email } = await activateCloudKitSession(identity);
+      setSentryUser({ id: identity.appleUserId, email: email ?? identity.email, username: name });
+      set({ user: identityToUser(identity, name, email), token: userRecordName, status: "authenticated", error: null });
+    } catch {
+      set({ user: identityToUser(identity), token: null, status: "icloud-unavailable", error: null });
     }
   },
+
+  dismissMigrationCheck: () => set({ needsMigrationCheck: false }),
 
   logout: async () => {
     try {
-      await signOut();
+      await clearStoredIdentity();
       clearSentryUser();
-      set({ user: null, token: null, status: "unauthenticated", error: null });
+      set({ user: null, token: null, status: "unauthenticated", error: null, needsMigrationCheck: false });
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Logout failed";
       captureException(err instanceof Error ? err : new Error(errorMsg));
@@ -98,15 +136,27 @@ export const useSessionStore = create<SessionState>((set) => ({
   },
 
   deleteAccount: async () => {
+    const state = useSessionStore.getState();
+    const userId = state.user?.id;
+    if (!userId) {
+      return { success: false, error: "No user logged in" };
+    }
     try {
-      await deleteUserAccount();
-      clearSentryUser();
-      set({ user: null, token: null, status: "unauthenticated", error: null });
+      logger.info("Account deletion initiated", { userId });
+      const result = await deleteUserAccount(userId);
+      if (result.success) {
+        await clearStoredIdentity();
+        await resetMigrationFlag();
+        clearSentryUser();
+        set({ user: null, token: null, status: "unauthenticated", error: null, needsMigrationCheck: false });
+      }
+      return result;
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : "Failed to delete account";
-      captureException(err instanceof Error ? err : new Error(errorMsg));
-      set({ error: errorMsg });
-      throw err;
+      captureException(err instanceof Error ? err : new Error(errorMsg), {
+        operation: "delete_account",
+      });
+      return { success: false, error: errorMsg };
     }
   },
 

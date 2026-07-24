@@ -1,4 +1,4 @@
-import { updateDailyLog } from "@/lib/appwrite";
+import { updateDailyLog } from "@/lib/cloudkit";
 import { healthService } from "@/lib/health";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
@@ -176,7 +176,7 @@ export default function LogCaloriesScreen() {
   useEffect(() => {
     if (targetLog?.calorieDetails) {
       try {
-        const parsed = JSON.parse(todayLog.calorieDetails);
+        const parsed = JSON.parse(targetLog.calorieDetails);
         setMealCalories({
           breakfast: parsed.breakfast ?? 0,
           lunch: parsed.lunch ?? 0,

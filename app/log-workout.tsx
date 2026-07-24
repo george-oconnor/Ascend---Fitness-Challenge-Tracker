@@ -1,8 +1,9 @@
-import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/cloudkit";
 import { healthService } from "@/lib/health";
 import { captureException } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
+import type { ActivityType } from "@/types/type";
 import { Feather } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";
 import { router, useLocalSearchParams } from "expo-router";
@@ -72,9 +73,22 @@ function WorkoutProgress({ current, goal, color }: { current: number; goal: numb
 }
 
 // Parse workout details from JSON string
+type WorkoutEntryData = {
+  type: string;
+  notes: string;
+  syncedFromHealth: boolean;
+  syncedToHealth?: boolean;
+  activityName?: string;
+  calories?: number;
+  distance?: string;
+  isOutdoor?: boolean;
+  startTime?: string;
+  endTime?: string;
+};
+
 type WorkoutDetailsData = {
-  workout1?: { type: string; notes: string; syncedFromHealth: boolean };
-  workout2?: { type: string; notes: string; syncedFromHealth: boolean };
+  workout1?: WorkoutEntryData;
+  workout2?: WorkoutEntryData;
 };
 
 function parseWorkoutDetails(detailsString?: string): WorkoutDetailsData {
@@ -206,14 +220,14 @@ export default function LogWorkoutScreen() {
         
         // Create or update activity log
         const dateStr = format(targetDate, 'yyyy-MM-dd');
-        const activityType = isWorkout1 ? 'workout1' : 'workout2';
+        const activityType: ActivityType = isWorkout1 ? 'workout1' : 'workout2';
         const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, activityType);
         const workoutType = WORKOUT_TYPES.find(t => t.id === selectedType);
         
         const activityData = {
           userId: challenge.userId,
           challengeId: challenge.$id!,
-          type: activityType as const,
+          type: activityType,
           title: `${isWorkout1 ? "Workout 1" : "Workout 2"} Complete`,
           description: `${workoutType?.label || "Workout"} - ${totalMinutes} minutes${notes ? ` - ${notes}` : ""}`,
           value: totalMinutes,
@@ -316,7 +330,7 @@ export default function LogWorkoutScreen() {
         
         for (const log of existingLogs) {
           if (log.$id) {
-            const { deleteActivityLog } = await import("@/lib/appwrite");
+            const { deleteActivityLog } = await import("@/lib/cloudkit");
             await deleteActivityLog(log.$id);
           }
         }

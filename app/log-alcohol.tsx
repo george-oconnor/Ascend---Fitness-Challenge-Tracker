@@ -1,4 +1,4 @@
-import { updateDailyLog } from "@/lib/appwrite";
+import { updateDailyLog } from "@/lib/cloudkit";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";
 import { format, parseISO } from "date-fns";

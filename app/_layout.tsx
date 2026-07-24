@@ -1,11 +1,11 @@
 import { BadgeCelebration } from "@/components/BadgeCelebration";
+import { ICloudGate } from "@/components/ICloudGate";
 import { setNotificationsEnabledCheck } from "@/lib/notifications";
 import { initSentry, logger } from "@/lib/sentry";
 import { useHealthStore } from "@/store/useHealthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { useFonts } from "expo-font";
-import * as Linking from 'expo-linking';
 import * as Notifications from "expo-notifications";
 import { SplashScreen, Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef } from "react";
@@ -43,8 +43,8 @@ export default function RootLayout() {
   const segments = useSegments();
   const navigationAttempted = useRef(false);
   const healthInitAttempted = useRef(false);
-  const notificationListener = useRef<Notifications.Subscription>();
-  const responseListener = useRef<Notifications.Subscription>();
+  const notificationListener = useRef<Notifications.Subscription | undefined>(undefined);
+  const responseListener = useRef<Notifications.Subscription | undefined>(undefined);
 
   // Initialize notifications
   useEffect(() => {
@@ -101,41 +101,6 @@ export default function RootLayout() {
     }
   }, []);
 
-  // Handle deep links for password reset
-  useEffect(() => {
-    const handleDeepLink = async (event: { url: string }) => {
-      const { hostname, path, queryParams } = Linking.parse(event.url);
-      
-      // Handle budgetapp://reset-password?userId=...&secret=...
-      if (hostname === 'reset-password' || path === 'reset-password') {
-        const userId = queryParams?.userId as string;
-        const secret = queryParams?.secret as string;
-        
-        if (userId && secret) {
-          router.push({
-            pathname: '/auth/reset-password',
-            params: { userId, secret }
-          } as any);
-        }
-        return;
-      }
-    };
-
-    // Handle initial URL (app opened from link)
-    Linking.getInitialURL().then((url) => {
-      if (url) {
-        handleDeepLink({ url });
-      }
-    });
-
-    // Handle URL when app is already open
-    const subscription = Linking.addEventListener('url', handleDeepLink);
-
-    return () => {
-      subscription.remove();
-    };
-  }, []);
-
   useEffect(() => {
     if (error) throw error;
     if (fontsLoaded) {
@@ -145,16 +110,18 @@ export default function RootLayout() {
   }, [fontsLoaded, error]);
 
   useEffect(() => {
-    if (status === "loading" || status === "idle") return;
+    // icloud-unavailable renders the ICloudGate in place of the Stack below,
+    // so it doesn't need (or want) a route change.
+    if (status === "loading" || status === "idle" || status === "icloud-unavailable") return;
 
-    const inAuthGroup = segments[0] === "auth";
+    const inPreAuth = segments[0] === "auth" || segments[0] === "migrate";
 
-    if (status === "unauthenticated" && !inAuthGroup) {
+    if (status === "unauthenticated" && !inPreAuth) {
       if (!navigationAttempted.current) {
         navigationAttempted.current = true;
         router.replace("/auth");
       }
-    } else if (status === "authenticated" && inAuthGroup) {
+    } else if (status === "authenticated" && inPreAuth) {
       if (!navigationAttempted.current) {
         navigationAttempted.current = true;
         router.replace("/");
@@ -167,8 +134,12 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <Stack screenOptions={{ headerShown: false }} />
-      
+      {status === "icloud-unavailable" ? (
+        <ICloudGate />
+      ) : (
+        <Stack screenOptions={{ headerShown: false }} />
+      )}
+
       {/* Badge celebration modal - shows when user earns a new badge */}
       <BadgeCelebration
         badge={celebratingBadge}

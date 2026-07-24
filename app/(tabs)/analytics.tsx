@@ -1,10 +1,11 @@
 import SwipeableGraphCard from "@/components/SwipeableGraphCard";
 import { BADGES } from "@/constants/badges";
-import { createDailyLog, createUserBadge, getUserBadges } from "@/lib/appwrite";
+import { createDailyLog, createUserBadge, getUserBadges } from "@/lib/cloudkit";
+import { isDayComplete } from "@/lib/dayCompletion";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
-import { ActivityLog, ActivityType, BadgeId, DailyLog, UserBadge } from "@/types/type.d";
+import { ActivityLog, ActivityType, Badge, BadgeId, DailyLog, UserBadge } from "@/types/type.d";
 import { Feather } from "@expo/vector-icons";
 import { addDays, differenceInDays, eachDayOfInterval, format, isAfter, isBefore, parseISO, startOfWeek, subDays } from "date-fns";
 import { router, useLocalSearchParams } from "expo-router";
@@ -124,7 +125,7 @@ export default function AnalyticsScreen() {
         }
         
         addLog('🔄 Starting health data resync...');
-        await resyncHealthDataForDate(selectedDate, logId, addLog);
+        await resyncHealthDataForDate(selectedDate, logId!, addLog);
         addLog('✅ Resync complete!');
         
         // Refresh to show updated data
@@ -671,20 +672,12 @@ export default function AnalyticsScreen() {
       
       // Check if log exists for this day
       const hasLog = !!log;
-      
-      // Check if any activity was completed (not just logged)
-      const hasCompletedActivity = !!(log && (
-        log.workout1Completed || log.workout2Completed ||
-        log.dietCompleted || log.waterCompleted ||
-        log.readingCompleted || log.progressPhotoCompleted ||
-        log.stepsCompleted ||
-        // Also consider logged values as activity
-        (log.stepsCount && log.stepsCount > 0) ||
-        (log.workout1Minutes && log.workout1Minutes > 0) ||
-        (log.workout2Minutes && log.workout2Minutes > 0) ||
-        (log.waterLiters && log.waterLiters > 0) ||
-        (log.readingPages && log.readingPages > 0)
-      ));
+
+      // A day only gets the checkmark if every tracked task actually met its
+      // goal that day — same definition used for streaks/notifications
+      // elsewhere, not just "something was logged" (e.g. steps auto-syncing
+      // to a nonzero value shouldn't count as the day being done).
+      const hasCompletedActivity = !!(log && isDayComplete(challenge, log, allLogs));
 
       console.log(`📊 Day ${dayStr}: hasLog=${hasLog}, hasActivity=${hasCompletedActivity}, isPartOfChallenge=${isPartOfChallenge}`, log ? {
         workout1Completed: log.workout1Completed,
@@ -862,7 +855,7 @@ export default function AnalyticsScreen() {
                 <Text className="text-sm font-semibold text-gray-500 mb-3 ml-1">Daily Averages</Text>
                 <View className="flex-row flex-wrap gap-3 mb-4">
                   {challenge?.trackSteps && (
-                    <View className="flex-1 min-w-[45%]">
+                    <View className="w-[47%]">
                       <StatCard
                         icon="activity"
                         label="Avg Steps"
@@ -873,7 +866,7 @@ export default function AnalyticsScreen() {
                     </View>
                   )}
                   {challenge?.trackWater && (
-                    <View className="flex-1 min-w-[45%]">
+                    <View className="w-[47%]">
                       <StatCard
                         icon="droplet"
                         label="Avg Water"
@@ -885,7 +878,7 @@ export default function AnalyticsScreen() {
                     </View>
                   )}
                   {challenge?.trackReading && (
-                    <View className="flex-1 min-w-[45%]">
+                    <View className="w-[47%]">
                       <StatCard
                         icon="book-open"
                         label="Avg Reading"
@@ -897,7 +890,7 @@ export default function AnalyticsScreen() {
                     </View>
                   )}
                   {(challenge?.trackWorkout1 || challenge?.trackWorkout2) && (
-                    <View className="flex-1 min-w-[45%]">
+                    <View className="w-[47%]">
                       <StatCard
                         icon="clock"
                         label="Total Workout"

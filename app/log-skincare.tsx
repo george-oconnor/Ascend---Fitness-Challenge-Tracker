@@ -1,4 +1,4 @@
-import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/cloudkit";
 import { logger } from "@/lib/sentry";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { Feather } from "@expo/vector-icons";

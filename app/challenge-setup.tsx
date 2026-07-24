@@ -233,7 +233,7 @@ export default function ChallengeSetupScreen() {
     const challengeData = {
       userId: user.id,
       startDate: startDate.toISOString().split("T")[0],
-      endDate: durationMode === 'endDate' ? endDate.toISOString() : null,
+      endDate: durationMode === 'endDate' ? endDate.toISOString() : undefined,
       totalDays: calculatedTotalDays,
       trackWorkout1: tracking.trackWorkout1,
       trackWorkout2: tracking.trackWorkout2,

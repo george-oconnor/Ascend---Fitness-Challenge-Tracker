@@ -1,4 +1,4 @@
-import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/appwrite";
+import { createActivityLog, getActivityLogsForDate, updateActivityLog, updateDailyLog } from "@/lib/cloudkit";
 import { healthService } from "@/lib/health";
 import { healthSyncService } from "@/lib/healthSync";
 import { captureException, captureMessage } from "@/lib/sentry";
@@ -442,7 +442,7 @@ export default function LogWeightScreen() {
         </Pressable>
 
         {/* Remove Weight Button - only show if weight exists */}
-        {targetLog.weightLogged && targetLog.currentWeight > 0 && (
+        {targetLog.weightLogged && (targetLog.currentWeight ?? 0) > 0 && (
           <Pressable
             onPress={handleRemoveWeight}
             disabled={saving}
