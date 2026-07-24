@@ -1,0 +1,150 @@
+DEFINE SCHEMA
+
+    RECORD TYPE UserProfile (
+        authId STRING,
+        createdAt TIMESTAMP,
+        email STRING,
+        firstName STRING,
+        lastLoginTime TIMESTAMP,
+        lastName STRING,
+        "___recordID" REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE Challenge (
+        averageCycleLength INT64,
+        averagePeriodLength INT64,
+        caloriesGoal INT64,
+        caloriesGoalDirection STRING,
+        createdAt TIMESTAMP QUERYABLE SORTABLE,
+        endDate TIMESTAMP,
+        lastPeriodStart TIMESTAMP,
+        progressPhotoDays INT64,
+        readingPages INT64,
+        sleepGoalHours DOUBLE,
+        startDate TIMESTAMP,
+        stepsGoal INT64,
+        totalDays INT64,
+        trackCalories INT64,
+        trackCycle INT64,
+        trackDiet INT64,
+        trackMood INT64,
+        trackNoAlcohol INT64,
+        trackProgressPhoto INT64,
+        trackReading INT64,
+        trackSkincare INT64,
+        trackSleep INT64,
+        trackSteps INT64,
+        trackWater INT64,
+        trackWeight INT64,
+        trackWorkout1 INT64,
+        trackWorkout2 INT64,
+        userId STRING,
+        waterLiters DOUBLE,
+        weightGoal DOUBLE,
+        workoutMinutes INT64,
+        "___recordID" REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE DailyLog (
+        alcoholDetails STRING,
+        calorieDetails STRING,
+        caloriesConsumed DOUBLE,
+        challengeId STRING QUERYABLE,
+        currentWeight DOUBLE,
+        date TIMESTAMP QUERYABLE SORTABLE,
+        dietCompleted INT64,
+        finishedBook INT64,
+        meals STRING,
+        moodNotes STRING,
+        moodScore INT64,
+        noAlcoholCompleted INT64,
+        notes STRING,
+        progressPhotoCompleted INT64,
+        readingCompleted INT64,
+        readingPages INT64,
+        skincareCompleted INT64,
+        skincareNotes STRING,
+        sleepCompleted INT64,
+        sleepEndTime STRING,
+        sleepLogged INT64,
+        sleepMinutes INT64,
+        sleepQuality INT64,
+        sleepStartTime STRING,
+        stepsCompleted INT64,
+        stepsCount INT64,
+        userId STRING,
+        waterCompleted INT64,
+        waterLiters DOUBLE,
+        weightLogged INT64,
+        workout1Completed INT64,
+        workout1Minutes INT64,
+        workout2Completed INT64,
+        workout2Minutes INT64,
+        workoutDetails STRING,
+        "___recordID" REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE CycleLog (
+        basalTemp DOUBLE,
+        cervicalMucus STRING,
+        cycleDay INT64,
+        date TIMESTAMP QUERYABLE SORTABLE,
+        isPeriodEnd INT64,
+        isPeriodStart INT64 QUERYABLE,
+        notes STRING,
+        ovulationTest STRING,
+        periodFlow STRING,
+        sexualActivity STRING,
+        symptoms STRING,
+        userId STRING,
+        "___recordID" REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE ActivityLog (
+        challengeId STRING QUERYABLE,
+        createdAt TIMESTAMP QUERYABLE SORTABLE,
+        date TIMESTAMP QUERYABLE,
+        description STRING,
+        title STRING,
+        type STRING QUERYABLE,
+        unit STRING,
+        userId STRING,
+        value DOUBLE,
+        "___recordID" REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE UserBadge (
+        badgeId STRING,
+        challengeId STRING,
+        createdAt TIMESTAMP SORTABLE,
+        userId STRING,
+        "___recordID" REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_creator"
+    );
+
+    RECORD TYPE MigrationState (
+        appwriteUserId STRING,
+        counts STRING,
+        migratedAt TIMESTAMP,
+        "___recordID" REFERENCE QUERYABLE,
+        GRANT WRITE TO "_creator",
+        GRANT CREATE TO "_icloud",
+        GRANT READ TO "_creator"
+    );
