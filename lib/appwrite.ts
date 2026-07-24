@@ -54,17 +54,6 @@ export async function signOut() {
   }
 }
 
-export async function deleteUserAccount() {
-  try {
-    // This will permanently delete the user account and all associated data
-    // Note: This cannot be undone
-    return await account.delete();
-  } catch (err) {
-    console.error("deleteUserAccount error:", err);
-    throw err;
-  }
-}
-
 export async function getCurrentSession() {
   try {
     return await account.getSession("current");
@@ -233,6 +222,55 @@ export async function getDailyLogsForChallenge(challengeId: string): Promise<Dai
   }
 }
 
+/**
+ * Pages through every document matching `queries` via cursor pagination.
+ * Appwrite caps a single list call at 100 documents; migration needs the full
+ * history, not just the first page, so this loops with Query.cursorAfter
+ * until a page comes back short of the page size.
+ */
+async function listAllDocuments(collectionId: string, queries: string[]): Promise<any[]> {
+  const PAGE_SIZE = 100;
+  const all: any[] = [];
+  let cursor: string | undefined;
+  for (;;) {
+    const pageQueries = [...queries, Query.limit(PAGE_SIZE)];
+    if (cursor) pageQueries.push(Query.cursorAfter(cursor));
+    const response = await databases.listDocuments(DATABASE_ID, collectionId, pageQueries);
+    all.push(...response.documents);
+    if (response.documents.length < PAGE_SIZE) break;
+    cursor = response.documents[response.documents.length - 1].$id;
+  }
+  return all;
+}
+
+/** Every Challenge document for a user (not just the latest) — used by the migration. */
+export async function getAllChallengesForUser(userId: string): Promise<Challenge[]> {
+  try {
+    const docs = await listAllDocuments(COLLECTIONS.CHALLENGES, [
+      Query.equal("userId", userId),
+      Query.orderAsc("$createdAt"),
+    ]);
+    return docs as unknown as Challenge[];
+  } catch (err) {
+    console.error("getAllChallengesForUser error:", err);
+    return [];
+  }
+}
+
+/** Every DailyLog document for a user across all of their challenges — used by the migration. */
+export async function getAllDailyLogsForUser(userId: string): Promise<DailyLog[]> {
+  try {
+    const docs = await listAllDocuments(COLLECTIONS.DAILY_LOGS, [
+      Query.equal("userId", userId),
+      Query.orderAsc("date"),
+    ]);
+    return docs as unknown as DailyLog[];
+  } catch (err) {
+    console.error("getAllDailyLogsForUser error:", err);
+    return [];
+  }
+}
+
 // Cycle Log functions
 export async function createCycleLog(log: Omit<CycleLog, "$id">): Promise<CycleLog> {
   const doc = await databases.createDocument(
@@ -286,6 +324,20 @@ export async function getCycleLogsForUser(userId: string, limit: number = 90): P
   }
 }
 
+/** Every CycleLog document for a user, unpaginated — used by the migration. */
+export async function getAllCycleLogsForUser(userId: string): Promise<CycleLog[]> {
+  try {
+    const docs = await listAllDocuments(COLLECTIONS.CYCLE_LOGS, [
+      Query.equal("userId", userId),
+      Query.orderAsc("date"),
+    ]);
+    return docs as unknown as CycleLog[];
+  } catch (err) {
+    console.error("getAllCycleLogsForUser error:", err);
+    return [];
+  }
+}
+
 export async function getLastPeriodStart(userId: string): Promise<CycleLog | null> {
   try {
     const response = await databases.listDocuments(
@@ -318,6 +370,20 @@ export async function createActivityLog(log: Omit<ActivityLog, "$id">): Promise<
     getUserPermissions(log.userId)
   );
   return doc as unknown as ActivityLog;
+}
+
+/** Every ActivityLog document for a user, unpaginated — used by the migration. */
+export async function getAllActivityLogsForUser(userId: string): Promise<ActivityLog[]> {
+  try {
+    const docs = await listAllDocuments(COLLECTIONS.ACTIVITY_LOGS, [
+      Query.equal("userId", userId),
+      Query.orderAsc("$createdAt"),
+    ]);
+    return docs as unknown as ActivityLog[];
+  } catch (err) {
+    console.error("getAllActivityLogsForUser error:", err);
+    return [];
+  }
 }
 
 export async function getActivityLogs(userId: string, limit: number = 50): Promise<ActivityLog[]> {
