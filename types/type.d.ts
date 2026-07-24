@@ -81,6 +81,7 @@ export type UserProfile = {
   firstName?: string;
   lastName?: string;
   createdAt: string;
+  lastLoginTime?: string;
   badges?: string; // JSON array of earned badge IDs
 };
 
@@ -112,7 +113,7 @@ export type Badge = {
   bgColor: string;
 };
 
-export type SessionStatus = "idle" | "loading" | "authenticated" | "unauthenticated" | "error";
+export type SessionStatus = "idle" | "loading" | "authenticated" | "unauthenticated" | "icloud-unavailable" | "error";
 
 export type SessionUser = {
   id: string;
@@ -127,11 +128,15 @@ export type SessionState = {
   token: string | null;
   status: SessionStatus;
   error: string | null;
+  /** True right after a fresh Sign in with Apple whose CloudKit zone has no data yet — offer the migration flow. */
+  needsMigrationCheck: boolean;
   checkSession: () => Promise<void>;
-  login: (email: string, password: string) => Promise<void>;
-  signup: (email: string, password: string, firstName: string, lastName: string) => Promise<void>;
+  loginWithApple: () => Promise<void>;
+  /** Re-evaluate iCloud availability (e.g. from the ICloudGate "Retry" button). */
+  recheckICloud: () => Promise<void>;
+  dismissMigrationCheck: () => void;
   logout: () => Promise<void>;
-  deleteAccount: () => Promise<void>;
+  deleteAccount: () => Promise<{ success: boolean; error?: string }>;
   setSession: (payload: { user: SessionUser; token: string }) => void;
   setStatus: (status: SessionStatus) => void;
   setError: (message: string | null) => void;
