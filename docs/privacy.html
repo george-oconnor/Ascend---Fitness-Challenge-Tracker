@@ -10,7 +10,7 @@
             padding: 0;
             box-sizing: border-box;
         }
-        
+
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
             line-height: 1.6;
@@ -19,7 +19,7 @@
             min-height: 100vh;
             padding: 20px;
         }
-        
+
         .container {
             max-width: 900px;
             margin: 0 auto;
@@ -28,28 +28,28 @@
             box-shadow: 0 10px 40px rgba(0, 0, 0, 0.1);
             overflow: hidden;
         }
-        
+
         header {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 40px;
             text-align: center;
         }
-        
+
         header h1 {
             font-size: 2.5em;
             margin-bottom: 10px;
         }
-        
+
         header p {
             font-size: 1.1em;
             opacity: 0.9;
         }
-        
+
         main {
             padding: 40px;
         }
-        
+
         h2 {
             color: #667eea;
             margin-top: 30px;
@@ -57,42 +57,42 @@
             border-bottom: 2px solid #667eea;
             padding-bottom: 10px;
         }
-        
+
         h3 {
             color: #764ba2;
             margin-top: 20px;
             margin-bottom: 10px;
         }
-        
+
         p {
             margin-bottom: 15px;
             text-align: justify;
         }
-        
+
         ul {
             margin-left: 20px;
             margin-bottom: 15px;
         }
-        
+
         li {
             margin-bottom: 10px;
         }
-        
+
         strong {
             color: #333;
         }
-        
+
         a {
             color: #667eea;
             text-decoration: none;
             transition: color 0.3s ease;
         }
-        
+
         a:hover {
             color: #764ba2;
             text-decoration: underline;
         }
-        
+
         .contact-info {
             background: #f5f7fa;
             padding: 20px;
@@ -100,7 +100,7 @@
             margin: 20px 0;
             border-left: 4px solid #667eea;
         }
-        
+
         .last-updated {
             text-align: center;
             color: #666;
@@ -109,7 +109,7 @@
             padding-top: 20px;
             border-top: 1px solid #eee;
         }
-        
+
         footer {
             background: #f5f7fa;
             padding: 20px 40px;
@@ -118,20 +118,20 @@
             font-size: 0.9em;
             border-top: 1px solid #eee;
         }
-        
+
         @media (max-width: 768px) {
             body {
                 padding: 10px;
             }
-            
+
             main {
                 padding: 20px;
             }
-            
+
             header {
                 padding: 30px 20px;
             }
-            
+
             header h1 {
                 font-size: 1.8em;
             }
@@ -142,193 +142,100 @@
     <div class="container">
         <header>
             <h1>Privacy Policy</h1>
-            <p>75 Hard - Fitness Challenge Tracker</p>
+            <p>Ascend - 75 Hard Challenge Tracker</p>
         </header>
-        
+
         <main>
-            <p class="last-updated"><strong>Last Updated:</strong> January 16, 2026</p>
-            
+            <p class="last-updated"><strong>Last Updated:</strong> July 24, 2026</p>
+
             <h2>Introduction</h2>
-            <p>75 Hard - Fitness Challenge Tracker ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how we collect, use, and safeguard your personal information when you use our mobile application.</p>
-            
-            <h2>Information We Collect</h2>
-            
+            <p>Ascend ("we," "our," or "us") is committed to protecting your privacy. This Privacy Policy explains how the app handles your information. The short version: your data is stored privately in your own iCloud account, not on any server we operate, and we never see it.</p>
+
+            <h2>How You Sign In</h2>
+            <p>Ascend uses <strong>Sign in with Apple</strong> as its only sign-in method. There is no username or password to create or remember. Depending on what you choose to share when you sign in, we may receive your name and email address (Apple may provide a private relay email address instead of your real one — that's your choice, made through Apple's sign-in screen, not something we control).</p>
+
+            <h2>Where Your Data Lives</h2>
+            <p>All of your challenge data — daily logs, cycle tracking, activity history, badges, and profile information — is stored in your <strong>own private iCloud database (Apple's CloudKit)</strong>, not on servers we operate. We do not have a company database of user data, and we cannot access, read, or export your data even if we wanted to — it's protected by your iCloud account the same way your Photos or Notes are.</p>
+            <p>Some app preferences (like notification settings) are stored locally on your device only.</p>
+
+            <h2>Information the App Collects</h2>
+
             <h3>Information You Provide</h3>
             <ul>
-                <li><strong>Account Information:</strong> When you create an account, we collect your email address and password (encrypted)</li>
-                <li><strong>Health Data:</strong> Fitness activities, workout logs, water intake, weight, sleep data, mood entries, and cycle tracking you manually enter</li>
-                <li><strong>Photo Data:</strong> Photos you upload as part of your daily logs</li>
-                <li><strong>Challenge Data:</strong> Your 75-day challenge progress, completion status, and badges earned</li>
-                <li><strong>Health Integration Data:</strong> Data synced from Apple Health, Google Fit, and HealthKit including steps, workouts, heart rate, and other health metrics</li>
+                <li><strong>Profile Information:</strong> Your name and/or email, if shared via Sign in with Apple</li>
+                <li><strong>Challenge Configuration:</strong> Your challenge goals, start date, and which of the 75 Hard rules you're tracking</li>
+                <li><strong>Daily Logs:</strong> Fitness activities, workout minutes, water intake, weight, sleep, mood, diet, cycle tracking, and skincare entries you log manually</li>
+                <li><strong>Progress Photo Checkmark:</strong> Whether you've taken your daily progress photo — the app tracks this as a simple yes/no. It does <strong>not</strong> capture, upload, or store the photo itself; the image stays on your device/camera roll and never touches the app's storage</li>
             </ul>
-            
+
+            <h3>Information From Apple Health</h3>
+            <p>If you grant permission, the app reads step count, workouts, sleep, and water intake from Apple Health (HealthKit) to automatically fill in your daily log. This only happens with your explicit permission, granted through Apple's own HealthKit authorization screen, and can be revoked at any time in iOS Settings.</p>
+
             <h3>Automatically Collected Information</h3>
             <ul>
-                <li><strong>Device Information:</strong> Device type, operating system version, and unique device identifiers</li>
-                <li><strong>Usage Data:</strong> App features used, session duration, and interaction patterns</li>
-                <li><strong>Error Logs:</strong> Crash reports and error logs to improve app stability</li>
+                <li><strong>Crash and Error Reports:</strong> If the app crashes or hits an error, basic diagnostic information (device type, OS version, app version, and the error itself) is sent to Sentry, our crash-reporting service, to help us fix bugs. This does not include your health data or personal content.</li>
             </ul>
-            
-            <h2>How We Use Your Information</h2>
-            <p>We use the collected information to:</p>
-            <ul>75 Hard service</li>
-                <li>Sync your data across your devices</li>
+
+            <h2>How Your Information Is Used</h2>
+            <p>Your data is used only to:</p>
+            <ul>
                 <li>Track your 75-day challenge progress and completion</li>
-                <li>Send you daily reminders and motivational notifications</li>
-                <li>Integrate with Apple Health and Google Fit to sync your health data</li>
-                <li>Generate analytics and progress reports</li>
+                <li>Sync your data across your own devices via your iCloud account</li>
+                <li>Integrate with Apple Health to auto-fill daily metrics you've authorized</li>
+                <li>Generate your analytics, charts, and streaks</li>
                 <li>Award badges and achievements</li>
-                <li>Improve app functionality and user experience</li>
-                <li>Provide customer support</li>
-                <li>Ensure security and prevent unauthorized access
-                <li>Ensure security and prevent fraud</li>
+                <li>Diagnose and fix crashes/bugs (via Sentry)</li>
             </ul>
-            
-            <h2>Data Storage and Security</h2>
-            
-            <h3>Security Measures</h3>
+
+            <h2>Data Sharing</h2>
+            <p><strong>We do NOT:</strong></p>
             <ul>
-                <li>All data is encrypted in transit using TLS/SSL</li>
-                <li>Passwords are hashed using industry-standard encryption</li>
-                <li>Data is stored on secure servers provided by Appwrite</li>
-                <li>We implement role-based access controls</li>
-                <li>Regular security audits and updates</li>
-            </ul>cure servers provided by Appwrite. By using 75 Hard, you acknowledge that your data may be transferred to, stored, and processed internationally according to applicable privacy laws
-            
-            <h3>Data Location</h3>
-            <p>Your data is stored on servers located in the European Union (Frankfurt, Germany) through our backend service provider, Appwrite.</p>
-            
-            <h2>Data Sharing and Disclosure</h2>
-            <p><strong>We do NOhealth data with advertisers</li>
-                <li>Use your data for marketing purposes without explicit consent</li>
-                <li>Share sensitive health information with fitness companies or data brokers
-                <li>Sell your personal information to third parties</li>
-                <li>Share your financial data with advertisers</li>
-                <li>Use your data for marketing purposes without consent</li>
+                <li>Sell your personal information to anyone</li>
+                <li>Share your health data with advertisers or data brokers</li>
+                <li>Use your data for advertising or marketing purposes</li>
+                <li>Have access to a company-wide database of user data to share in the first place — it lives in your iCloud, not ours</li>
             </ul>
-            
-            <p><strong>We MAY share information only in these circumstances:</strong></p>
+            <p><strong>The only outside parties involved are:</strong></p>
             <ul>
-                <li><strong>With Your Consent:</strong> When you explicitly authorize us to share information</li>
-                <li><strong>Service Providers:</strong> With trusted third-party service providers (Appwrite) who assist in operating our app</li>
-                <li><strong>Legal Requirements:</strong> When required by law, court order, or legal process</li>
-                <li><strong>Safety and Security:</strong> To protect the rights, property, or safety of Ascend Fitness, our users, or the public</li>
+                <li><strong>Apple</strong> — for Sign in with Apple and iCloud/CloudKit storage, governed by <a href="https://www.apple.com/privacy/" target="_blank">Apple's Privacy Policy</a></li>
+                <li><strong>Sentry</strong> — for crash/error reporting only, governed by <a href="https://sentry.io/privacy/" target="_blank">Sentry's Privacy Policy</a></li>
             </ul>
-            
+
+            <h2>One-Time Account Migration (Existing Users Only)</h2>
+            <p>Ascend previously used a different backend provider (Appwrite) for accounts. If you're an existing user migrating to the current version, the app offers a one-time import: you sign into your old account once, and the app copies your existing challenges, daily logs, cycle tracking, activity history, and badges into your iCloud. Your old account credentials are used only for this one-time read and are never stored by the app. New users never encounter this step.</p>
+
             <h2>Your Rights and Choices</h2>
-            <p>You have the right to:</p>
             <ul>
-                <li><strong>Access:</strong> Request a copy of your personal data</li>
-                <li><strong>Correction:</strong> Update or correct inaccurate information</li>
-                <li><strong>Deletion:</strong> Request deletion of your account and associated data</li>
-                <li><strong>Data Portability:</strong> Export your data in a machine-readable format</li>
-                <li><strong>Opt-Out:</strong> Disable notifications and certain data collection features</li>
+                <li><strong>Access:</strong> Your data is already fully accessible to you at all times, in the app and via iCloud</li>
+                <li><strong>Correction:</strong> Edit or correct any logged data directly in the app</li>
+                <li><strong>Deletion:</strong> Profile → "Delete Account" immediately and permanently deletes your entire iCloud data store for the app — this is not a support request that takes days to process; it happens instantly, on your device, using your iCloud account</li>
+                <li><strong>Revoke Health Access:</strong> Disable HealthKit permissions at any time in iOS Settings → Privacy & Security → Health</li>
             </ul>
-            <p>To exercise these rights, contact us at <strong>george@georgeoc.com</strong></p>
-            
+            <p>Questions about your data or this policy? Contact us at <strong>george@georgeoc.com</strong></p>
+
             <h2>Data Retention</h2>
-            <ul>
-                <li><strong>Active accounts:</strong> Data is retained while your account is active</li>
-                <li><strong>Deleted accounts:</strong> Data is permanently deleted within 30 days of account deletion</li>
-                <li><strong>Backup data:</strong> May be retained for up to 90 days for disaster recovery purposes</li>
-            </ul>
-            
+            <p>Your data persists in your iCloud account for as long as you keep the app installed and signed in. Deleting your account (Profile → Delete Account) removes it immediately. We do not separately retain backups of your data — there's nothing on our end to retain, since your data was never stored by us in the first place.</p>
+
             <h2>Children's Privacy</h2>
-            <p>Ascend Fitness is not intended for users under the age of 13. We do not knowingly collect personal information from children under 13. If you believe we have collected information from a child under 13, please contact us immediately.</p>
-            
-            <h2>Third-Party Services</h2>
-            <p>Our app uses the following third-party services:</p>
-            
-            <h3>Appwrite</h3>
-            <ul>secure data storage</li>
-                <li><strong>Data Shared:</strong> All user-generated content including health logs, challenge progress, and user accounts</li>
-                <li><strong>Privacy Policy:</strong> <a href="https://appwrite.io/privacy" target="_blank">https://appwrite.io/privacy</a></li>
-            </ul>
-            
-            <h3>Apple Health & HealthKit</h3>
-            <ul>
-                <li><strong>Purpose:</strong> Reading and syncing your health metrics (steps, workouts, heart rate, etc.)</li>
-                <li><strong>Data Shared:</strong> Only health data you authorize the app to access</li>
-                <li><strong>Privacy Policy:</strong> <a href="https://www.apple.com/privacy/" target="_blank">https://www.apple.com/privacy/</a></li>
-            </ul>
-            
-            <h3>Google Fit</h3>
-            <ul>
-                <li><strong>Purpose:</strong> Reading and syncing your fitness data</li>
-                <li><strong>Data Shared:</strong> Only fitness data you authorize the app to access</li>
-                <li><strong>Privacy Policy:</strong> <a href="https://policies.google.com/privacy" target="_blank">https://policies.google.com/privacy</a></li>
-            </ul>
-            
-            <h3>Sentry</h3>
-            <ul>
-                <li><strong>Purpose:</strong> Error tracking and crash reporting to improve app stability</li>
-                <li><strong>Data Shared:</strong> Error logs, device information, app version (no personal or health data)
-                <li><strong>Data Shared:</strong> Error logs, device information, app version</li>
-                <li><strong>Privacy Policy:</strong> <a href="https://sentry.io/privacy/" target="_blank">https://sentry.io/privacy/</a></li>
-            </ul>
-            
+            <p>Ascend is not intended for users under the age of 13. We do not knowingly collect personal information from children under 13.</p>
+
             <h2>Cookies and Tracking</h2>
-            <p>We do not use cookies or third-party tracking technologies for advertising purposes. We only use essential session data to maintain your logged-in state.</p>
-            
-            <h2>International Data Transfers</h2>
-            <p>If you are accessing Ascend Fitness from outside the European Union, please note that your information may be transferred to, stored, and processed in the EU where our servers are located. By using the app, you consent to this transfer.</p>
-            
+            <p>Ascend does not use cookies or third-party advertising trackers. There is no ad network integrated into this app.</p>
+
             <h2>Changes to This Privacy Policy</h2>
-            <p>We may update this Privacy Policy from time to time. We will notify you of any material changes by:</p>
-            <ul>
-                <li>Posting the new Privacy Policy in the app</li>
-                <li>Sending you an email notification (if you've provided an email)</li>
-                <li>Displaying a prominent notice in the app</li>
-            </ul>
-            <p>Your continued use of Ascend Fitness after changes become effective constitutes acceptance of the revised policy.</p>
-            
-            <h2>Data Breach Notification</h2>
-            <p>In the event of a data breach that affects your personal information, we will:</p>
-            <ul>
-                <li>Notify affected users within 72 hours</li>
-                <li>Describe the nature of the breach</li>
-                <li>Provide recommended actions to protect your information</li>
-                <li>Report to relevant data protection authorities as required by law</li>
-            </ul>
-            
-            <h2>California Privacy Rights (CCPA)</h2>
-            <p>If you are a California resident, you have additional rights under the California Consumer Privacy Act:</p>
-            <ul>
-                <li>Right to know what personal information is collected</li>
-                <li>Right to know if personal information is sold or disclosed</li>
-                <li>Right to say no to the sale of personal information</li>
-                <li>Right to access your personal information</li>
-                <li>Right to equal service and price</li>
-            </ul>
-            
-            <h2>European Privacy Rights (GDPR)</h2>
-            <p>If you are in the European Union, you have rights under the General Data Protection Regulation:</p>
-            <ul>
-                <li>Right to be informed about data collection</li>
-                <li>Right to access your personal data</li>
-                <li>Right to rectification of inaccurate data</li>
-                <li>Right to erasure ("right to be forgotten")</li>
-                <li>Right to restrict processing</li>
-                <li>Right to data portability</li>
-        </main>
-        
-        <footer>
-            <p>&copy; 2026 75 Hard - Fitness Challengerequests regarding this Privacy Policy or our data practices, please contact us:</p>
-                <p>
-                    <strong>Email:</strong> george@georgeoc.com
-                </p>
-            </div>
-            
+            <p>We may update this Privacy Policy from time to time. Material changes will be reflected by updating the "Last Updated" date above and, where appropriate, an in-app notice.</p>
+
             <h2>Consent</h2>
-            <p>By using Ascend Fitness, you acknowledge that you have read and understood this Privacy Policy and agree to its terms.</p>
-            
-            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
-            
-            <p style="color: #999; font-size: 0.9em;"><strong>Note:</strong> This privacy policy is provided as a template. Please consult with a legal professional to ensure compliance with all applicable laws and regulations in your jurisdiction.</p>
+            <p>By using Ascend, you acknowledge that you have read and understood this Privacy Policy.</p>
+
+            <div class="contact-info">
+                <p>For any questions regarding this Privacy Policy or our data practices, please contact:</p>
+                <p><strong>Email:</strong> george@georgeoc.com</p>
+            </div>
         </main>
-        
+
         <footer>
-            <p>&copy; 2026 Ascend Fitness - The 75 Hard Challenge Tracker. All rights reserved.</p>
+            <p>&copy; 2026 Ascend - The 75 Hard Challenge Tracker. All rights reserved.</p>
         </footer>
     </div>
 </body>
