@@ -40,7 +40,7 @@ const SLIDES: Slide[] = [
     iconBg: "#D1FAE5",
     iconColor: "#2F9B65",
     title: "Track every rule, every day",
-    description: "Workouts, diet, water, reading, and your daily progress photo — all in one place, with streaks that keep you honest.",
+    description: "Workouts, diet, water, reading, and your daily progress photo — all in one place, so nothing slips through the cracks.",
   },
   {
     key: "sync",
@@ -51,12 +51,12 @@ const SLIDES: Slide[] = [
     description: "Steps, workouts, sleep, and water fill in automatically from Apple Health, so most days log themselves.",
   },
   {
-    key: "private",
-    icon: "lock",
-    iconBg: "#DBEAFE",
-    iconColor: "#2563EB",
-    title: "Private by design",
-    description: "No accounts, no ads, no servers. Sign in with Apple, and your data lives only in your iCloud — we never see it.",
+    key: "streaks",
+    icon: "award",
+    iconBg: "#FEF3C7",
+    iconColor: "#D97706",
+    title: "Streaks, badges, and charts",
+    description: "Watch your streak grow day by day, unlock badges at every milestone, and see it all come together in your analytics.",
   },
 ];
 

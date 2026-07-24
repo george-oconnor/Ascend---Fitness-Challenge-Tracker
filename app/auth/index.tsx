@@ -32,7 +32,7 @@ export default function LoginScreen() {
         <View className="items-center mb-12">
           <Text className="text-4xl font-bold text-dark-100 mb-3">Ascend</Text>
           <Text className="text-base text-gray-500 text-center">
-            Your 75 Hard progress, stored privately in your iCloud. No account, no tracking.
+            Track workouts, water, sleep, and more — synced automatically, with streaks and badges to keep you going.
           </Text>
         </View>
 
