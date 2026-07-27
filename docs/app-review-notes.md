@@ -95,6 +95,6 @@ collects (see `docs/privacy.html` for the full accounting):
 
 ## Version/build reference
 
-Current TestFlight build under review: `1.0.3` / build `2`. If a fresh build
+Current TestFlight build under review: `2.0.0` / build `1`. If a fresh build
 is cut, bump the build number here and in `app.json` before resubmitting —
 App Store Connect rejects a repeat of the same version+build pair.
