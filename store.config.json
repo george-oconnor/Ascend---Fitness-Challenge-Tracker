@@ -1,0 +1,30 @@
+{
+  "configVersion": 0,
+  "apple": {
+    "copyright": "2026 George O'Connor",
+    "categories": ["HEALTH_AND_FITNESS", "LIFESTYLE"],
+    "info": {
+      "en-US": {
+        "title": "Ascend: 75 Hard Tracker",
+        "subtitle": "Daily habit & challenge log",
+        "description": "Ascend is your daily companion for the 75 Hard challenge — build discipline one day at a time by tracking the habits that matter, and watch your streak grow.\n\nWHAT YOU CAN TRACK\n• Daily workouts (two-a-day support)\n• Water intake\n• Diet adherence\n• Steps (auto-synced from Apple Health)\n• Reading\n• Progress photos\n• Weight\n• Mood\n• Sleep\n• Skincare\n• Cycle tracking\n\nBUILT AROUND YOUR CHALLENGE\nSet up your own challenge — choose which rules to track, set your goals, and pick your duration. Not doing the strict 75-day version? Customize it to fit whatever challenge you're running.\n\nAPPLE HEALTH INTEGRATION\nConnect Apple Health once and Ascend automatically pulls in your steps, workouts, sleep, and water intake — no manual double-entry.\n\nSTRAVA INTEGRATION\nConnect Strava and your workouts sync in with their correct activity type automatically — no more re-entering runs, rides, or lifts by hand.\n\nYOUR DATA, YOUR ICLOUD\nAscend stores your data in your own private iCloud account, not on a company server. Sign in with Apple — no usernames, no passwords, no account to leak. Nobody but you can see your logs, not even us.\n\nSTAY MOTIVATED\nTrack your streak, review weekly and monthly analytics, and earn badges as you hit milestones. See exactly how consistent you've been at a glance.\n\nAscend is ad-free, doesn't sell your data, and doesn't track you across other apps or websites.",
+        "keywords": [
+          "75hard",
+          "habit tracker",
+          "challenge",
+          "discipline",
+          "fitness",
+          "workout log",
+          "streak",
+          "strava",
+          "water intake",
+          "goals"
+        ],
+        "promoText": "Now powered by iCloud — your data stays private in your own account, synced across your devices. Connect Strava for accurate workout types. No ads.",
+        "releaseNotes": "2.0.0 brings a full rebuild on Apple's private iCloud storage — your data now lives in your own iCloud account, synced across devices, with Sign in with Apple replacing email/password. Also new: Strava integration for automatic workout syncing.",
+        "supportUrl": "https://george-oconnor.github.io/Ascend---Fitness-Challenge-Tracker/support.html",
+        "privacyPolicyUrl": "https://george-oconnor.github.io/Ascend---Fitness-Challenge-Tracker/privacy.html"
+      }
+    }
+  }
+}

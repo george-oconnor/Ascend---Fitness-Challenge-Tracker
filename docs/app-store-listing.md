@@ -23,9 +23,9 @@ Daily habit & challenge log
 
 ```
 Now powered by iCloud — your data stays private in your own account, synced
-across your devices. Sign in with Apple, no passwords, no ads.
+across your devices. Connect Strava for accurate workout types. No ads.
 ```
-(136 characters)
+(140 characters)
 
 ## Description (4000 char max)
 
@@ -56,6 +56,10 @@ APPLE HEALTH INTEGRATION
 Connect Apple Health once and Ascend automatically pulls in your steps,
 workouts, sleep, and water intake — no manual double-entry.
 
+STRAVA INTEGRATION
+Connect Strava and your workouts sync in with their correct activity type
+automatically — no more re-entering runs, rides, or lifts by hand.
+
 YOUR DATA, YOUR ICLOUD
 Ascend stores your data in your own private iCloud account, not on a company
 server. Sign in with Apple — no usernames, no passwords, no account to leak.
@@ -72,9 +76,9 @@ apps or websites.
 ## Keywords (100 char max, comma-separated, no spaces after commas)
 
 ```
-75hard,habit tracker,challenge,discipline,fitness,workout log,streak,water intake,health,goals
+75hard,habit tracker,challenge,discipline,fitness,workout log,streak,strava,water intake,goals
 ```
-(check exact length before submitting — trim if over 100)
+(96 characters)
 
 ## Support URL
 
@@ -85,7 +89,9 @@ https://george-oconnor.github.io/Ascend---Fitness-Challenge-Tracker/support.html
 
 ## Marketing URL (optional)
 
-Leave blank, or point at the same GitHub Pages site if you want a public landing page.
+Left blank in `store.config.json` — the GitHub Pages site's root
+(`.../Ascend---Fitness-Challenge-Tracker/`) 404s, there's no `docs/index.html`.
+Add one and set this field if you want a public landing page later.
 
 ## Privacy Policy URL
 
@@ -98,19 +104,19 @@ https://george-oconnor.github.io/Ascend---Fitness-Challenge-Tracker/privacy.html
 
 ## Notes / things to double check before submitting
 
-- **Verify the actual hosting URL** for `docs/*.html` — this repo's `git remote`
-  points at `github.com/george-oconnor/Ascend---Fitness-Challenge-Tracker`, so
-  if GitHub Pages is enabled for it, the URLs above should be right, but
-  confirm rather than assume.
-- **Screenshots**: not addressed here — App Store Connect requires new
-  screenshots per device size. Since the sign-in flow and possibly some
-  screens changed (no more email/password screens), any existing screenshots
-  showing the old login UI need retaking.
-- **`docs/support.html` still needs a cleanup pass** — it currently mentions
-  Google Fit integration (this is an iOS-only app now, no Android/Google Fit
-  code exists) and says data is stored "on our servers" (no longer true, see
-  the rewritten `privacy.html`). Not touched yet — flagging it since it's part
-  of the same public-facing doc set and the App Store listing links to it.
+- **Hosting URLs verified 2026-07-27**: both `privacy.html` and `support.html`
+  return HTTP 200 at the `github.io` URLs above via GitHub Pages. The URLs in
+  this doc and in `store.config.json` are confirmed correct.
+- **`docs/support.html` cleanup is done** — no Google Fit or "our servers"
+  language remains; it correctly describes Sign in with Apple + iCloud storage
+  and includes the old-account migration FAQ.
+- **Screenshots**: still not addressed. App Store Connect requires screenshots
+  per device size (6.7", 6.5", iPad if supporting tablet). Since the sign-in
+  flow changed (no more email/password screens) and Strava is a new feature,
+  any existing screenshots need retaking — EAS Metadata reads these from local
+  files (see `store.config.json`'s `screenshots` field), so they need to exist
+  on disk before running `eas metadata:push`.
 - **App Privacy questionnaire** (the separate data-collection form in App
   Store Connect, not this listing copy) — see `docs/app-review-notes.md` for
-  what to select there.
+  what to select there. EAS Metadata does not cover this field; it must still
+  be set manually in App Store Connect's web UI.
