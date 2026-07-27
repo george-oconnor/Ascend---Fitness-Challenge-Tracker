@@ -52,7 +52,7 @@ export default function RootLayout() {
 
   const { checkSession, status } = useSessionStore();
   const { initialize: initNotifications, celebratingBadge, dismissBadgeCelebration, notificationsEnabled } = useNotificationStore();
-  const { initialize: initHealth, isNativeModuleAvailable, isAuthorized, error: healthError } = useHealthStore();
+  const { initialize: initHealth, isNativeModuleAvailable, isAuthorized, error: healthError, enableHealthBackgroundSync } = useHealthStore();
   const router = useRouter();
   const segments = useSegments();
   const navigationAttempted = useRef(false);
@@ -111,6 +111,9 @@ export default function RootLayout() {
           isNativeModuleAvailable,
           healthError,
         });
+        if (authorized) {
+          enableHealthBackgroundSync();
+        }
       }).catch((err) => {
         logger.error("HealthKit initialization error in _layout", {
           error: err?.message || String(err),

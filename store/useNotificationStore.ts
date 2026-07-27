@@ -45,6 +45,10 @@ type NotificationState = {
   notifiedWorkouts: Set<string>; // date+workout type
   notifiedDayComplete: Set<string>; // date strings
   notifiedBadges: Set<BadgeId>;
+  notifiedWaterGoals: Set<string>; // date strings
+  notifiedSleepGoals: Set<string>; // date strings
+  notifiedWeightLogged: Set<string>; // date strings
+  lastStepsMilestoneNotified: Record<string, number>; // date -> last "remaining" bucket notified
   
   // Actions
   initialize: () => Promise<void>;
@@ -65,10 +69,19 @@ type NotificationState = {
   markWorkoutNotified: (date: string, workoutType: string) => void;
   markDayCompleteNotified: (date: string) => void;
   markBadgeNotified: (badgeId: BadgeId) => void;
+  markWaterGoalNotified: (date: string) => void;
+  markSleepGoalNotified: (date: string) => void;
+  markWeightLoggedNotified: (date: string) => void;
+  markStepsMilestoneNotified: (date: string, remainingBucket: number) => void;
   hasNotifiedStepGoal: (date: string) => boolean;
   hasNotifiedWorkout: (date: string, workoutType: string) => boolean;
   hasNotifiedDayComplete: (date: string) => boolean;
   hasNotifiedBadge: (badgeId: BadgeId) => boolean;
+  hasNotifiedWaterGoal: (date: string) => boolean;
+  hasNotifiedSleepGoal: (date: string) => boolean;
+  hasNotifiedWeightLogged: (date: string) => boolean;
+  /** True once a milestone at or below this remaining-steps bucket has already fired today. */
+  hasNotifiedStepsMilestone: (date: string, remainingBucket: number) => boolean;
   
   // Clear for new day
   clearDailyNotifications: () => void;
@@ -88,6 +101,10 @@ export const useNotificationStore = create<NotificationState>()(
       notifiedWorkouts: new Set(),
       notifiedDayComplete: new Set(),
       notifiedBadges: new Set(),
+      notifiedWaterGoals: new Set(),
+      notifiedSleepGoals: new Set(),
+      notifiedWeightLogged: new Set(),
+      lastStepsMilestoneNotified: {},
 
       initialize: async () => {
         const hasPermission = await NotificationService.initialize();
@@ -221,6 +238,26 @@ export const useNotificationStore = create<NotificationState>()(
         set({ notifiedBadges: new Set([...notifiedBadges, badgeId]) });
       },
 
+      markWaterGoalNotified: (date: string) => {
+        const { notifiedWaterGoals } = get();
+        set({ notifiedWaterGoals: new Set([...notifiedWaterGoals, date]) });
+      },
+
+      markSleepGoalNotified: (date: string) => {
+        const { notifiedSleepGoals } = get();
+        set({ notifiedSleepGoals: new Set([...notifiedSleepGoals, date]) });
+      },
+
+      markWeightLoggedNotified: (date: string) => {
+        const { notifiedWeightLogged } = get();
+        set({ notifiedWeightLogged: new Set([...notifiedWeightLogged, date]) });
+      },
+
+      markStepsMilestoneNotified: (date: string, remainingBucket: number) => {
+        const { lastStepsMilestoneNotified } = get();
+        set({ lastStepsMilestoneNotified: { ...lastStepsMilestoneNotified, [date]: remainingBucket } });
+      },
+
       hasNotifiedStepGoal: (date: string) => {
         return get().notifiedStepGoals.has(date);
       },
@@ -238,11 +275,32 @@ export const useNotificationStore = create<NotificationState>()(
         return get().notifiedBadges.has(badgeId);
       },
 
+      hasNotifiedWaterGoal: (date: string) => {
+        return get().notifiedWaterGoals.has(date);
+      },
+
+      hasNotifiedSleepGoal: (date: string) => {
+        return get().notifiedSleepGoals.has(date);
+      },
+
+      hasNotifiedWeightLogged: (date: string) => {
+        return get().notifiedWeightLogged.has(date);
+      },
+
+      hasNotifiedStepsMilestone: (date: string, remainingBucket: number) => {
+        const lastBucket = get().lastStepsMilestoneNotified[date];
+        return lastBucket !== undefined && lastBucket <= remainingBucket;
+      },
+
       clearDailyNotifications: () => {
         set({
           notifiedStepGoals: new Set(),
           notifiedWorkouts: new Set(),
           notifiedDayComplete: new Set(),
+          notifiedWaterGoals: new Set(),
+          notifiedSleepGoals: new Set(),
+          notifiedWeightLogged: new Set(),
+          lastStepsMilestoneNotified: {},
           // Don't clear badge notifications - they persist
         });
       },

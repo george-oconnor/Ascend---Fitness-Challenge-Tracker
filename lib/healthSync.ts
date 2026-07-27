@@ -16,12 +16,15 @@ const HKQuantityTypes = {
   BodyMass: "HKQuantityTypeIdentifierBodyMass",
   DietaryEnergyConsumed: "HKQuantityTypeIdentifierDietaryEnergyConsumed",
   ActiveEnergyBurned: "HKQuantityTypeIdentifierActiveEnergyBurned",
+  StepCount: "HKQuantityTypeIdentifierStepCount",
 } as const;
 
 // HealthKit Category Type Identifiers
 const HKCategoryTypes = {
   SleepAnalysis: "HKCategoryTypeIdentifierSleepAnalysis",
 } as const;
+
+const HKWorkoutType = "HKWorkoutTypeIdentifier";
 
 // Sleep analysis values
 export enum HKCategoryValueSleepAnalysis {
@@ -128,6 +131,7 @@ class HealthSyncService {
         HKQuantityTypes.DietaryEnergyConsumed,
         HKQuantityTypes.ActiveEnergyBurned,
         HKCategoryTypes.SleepAnalysis,
+        HKWorkoutType,
       ];
 
       const toShare = [
@@ -809,7 +813,93 @@ class HealthSyncService {
 
     return { water, weight, calories, sleep, mood };
   }
+
+  // ==================== BACKGROUND WORKOUT SYNC ====================
+
+  /**
+   * Enables HealthKit background delivery for workouts, so this app can be
+   * woken (per Apple's best-effort scheduling — not instant, and affected by
+   * Low Power Mode) when a new workout is written outside the app, e.g. from
+   * an Apple Watch. Requires com.apple.developer.healthkit.background-delivery.
+   */
+  async enableWorkoutBackgroundDelivery(): Promise<boolean> {
+    if (!(await this.ensureAuthorized())) return false;
+    try {
+      const { enableBackgroundDelivery, UpdateFrequency } = this.HealthKit;
+      if (!enableBackgroundDelivery) return false;
+      await enableBackgroundDelivery(HKWorkoutType, UpdateFrequency.immediate);
+      logger.info("HealthSync: workout background delivery enabled");
+      return true;
+    } catch (error: any) {
+      console.error("❌ HealthSync: Failed to enable workout background delivery:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Subscribes to workout changes (HKObserverQuery under the hood). The
+   * callback fires with no payload beyond "this type changed" — callers
+   * should re-fetch to see what's new. Returns an unsubscribe function, or
+   * null if the module isn't available.
+   */
+  subscribeToWorkoutChanges(callback: () => void): (() => void) | null {
+    if (!this.loadModule() || !this.HealthKit) return null;
+    const { subscribeToChanges } = this.HealthKit;
+    if (!subscribeToChanges) return null;
+
+    const subscription = subscribeToChanges(HKWorkoutType, () => callback());
+    return () => subscription.remove();
+  }
+
+  /**
+   * Generic version of enableWorkoutBackgroundDelivery for any HealthKit
+   * sample type. Use 'hourly' (or coarser) for high-frequency types like
+   * step count — Apple discourages 'immediate' there since it wakes the app
+   * far more often than a discrete-event type like a workout.
+   */
+  async enableBackgroundDeliveryFor(
+    typeIdentifier: string,
+    frequency: "immediate" | "hourly" = "immediate"
+  ): Promise<boolean> {
+    if (!(await this.ensureAuthorized())) return false;
+    try {
+      const { enableBackgroundDelivery, UpdateFrequency } = this.HealthKit;
+      if (!enableBackgroundDelivery) return false;
+      const updateFrequency = frequency === "hourly" ? UpdateFrequency.hourly : UpdateFrequency.immediate;
+      await enableBackgroundDelivery(typeIdentifier, updateFrequency);
+      logger.info("HealthSync: background delivery enabled", { typeIdentifier, frequency });
+      return true;
+    } catch (error: any) {
+      console.error(`❌ HealthSync: Failed to enable background delivery for ${typeIdentifier}:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * Generic version of subscribeToWorkoutChanges for any HealthKit sample type.
+   */
+  subscribeToTypeChanges(typeIdentifier: string, callback: () => void): (() => void) | null {
+    if (!this.loadModule() || !this.HealthKit) return null;
+    const { subscribeToChanges } = this.HealthKit;
+    if (!subscribeToChanges) return null;
+
+    const subscription = subscribeToChanges(typeIdentifier, () => callback());
+    return () => subscription.remove();
+  }
 }
+
+// Mood/State of Mind is deliberately excluded — it uses HealthKit's newer,
+// separately-consented "State of Mind" authorization flow rather than the
+// standard toRead/toShare request this library issues for everything else,
+// and mood has no goal concept to notify on regardless (it's a subjective
+// log, not a pass/fail metric like water or sleep).
+export const HealthKitBackgroundTypes = {
+  Workout: HKWorkoutType,
+  Water: HKQuantityTypes.DietaryWater,
+  Weight: HKQuantityTypes.BodyMass,
+  Sleep: HKCategoryTypes.SleepAnalysis,
+  Steps: HKQuantityTypes.StepCount,
+} as const;
 
 // Export singleton instance
 export const healthSyncService = new HealthSyncService();

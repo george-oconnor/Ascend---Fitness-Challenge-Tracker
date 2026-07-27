@@ -1,7 +1,33 @@
 import { BADGES } from "@/constants/badges";
 import type { BadgeId, Challenge, DailyLog } from "@/types/type";
+import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { Platform } from "react-native";
+
+/**
+ * Registers for remote push (requesting permission if needed) and returns an
+ * Expo push token, or null if permission was denied or this isn't a real device.
+ */
+export async function getExpoPushTokenAsync(): Promise<string | null> {
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+    if (existingStatus !== "granted") {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+    if (finalStatus !== "granted") return null;
+
+    const projectId = Constants.expoConfig?.extra?.eas?.projectId;
+    if (!projectId) return null;
+
+    const { data } = await Notifications.getExpoPushTokenAsync({ projectId });
+    return data;
+  } catch (error) {
+    console.error("Failed to get Expo push token:", error);
+    return null;
+  }
+}
 
 // Helper to check if notifications are enabled
 // This will be checked by the store before calling these methods
@@ -32,7 +58,11 @@ export type NotificationType =
   | "day_complete"
   | "badge_earned"
   | "steps_goal"
-  | "workout_detected";
+  | "steps_milestone"
+  | "workout_detected"
+  | "water_goal"
+  | "sleep_goal"
+  | "weight_logged";
 
 interface NotificationData {
   type: NotificationType;
@@ -270,6 +300,78 @@ export class NotificationService {
         title: "💪 Workout Logged!",
         body: `${name} (${duration} min) completed!`,
         data: { type: "workout_detected", workoutName: name, duration } as NotificationData,
+        sound: true,
+      },
+      trigger: null,
+    });
+  }
+
+  /**
+   * Send an encouraging notification at a step-count milestone (not the full
+   * goal — that's notifyStepGoalReached). Intended to fire at most a few
+   * times a day as "remaining to goal" crosses round thresholds.
+   */
+  static async notifyStepsMilestone(remaining: number): Promise<void> {
+    if (!areNotificationsEnabled()) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "👣 Almost there!",
+        body: `${remaining.toLocaleString()} steps to go!`,
+        data: { type: "steps_milestone", remaining } as NotificationData,
+        sound: true,
+      },
+      trigger: null,
+    });
+  }
+
+  /**
+   * Send notification when today's water goal is reached
+   */
+  static async notifyWaterGoalReached(liters: number): Promise<void> {
+    if (!areNotificationsEnabled()) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "💧 Water Goal Reached!",
+        body: `You hit ${liters.toFixed(1)}L today!`,
+        data: { type: "water_goal", liters } as NotificationData,
+        sound: true,
+      },
+      trigger: null,
+    });
+  }
+
+  /**
+   * Send notification when today's sleep goal is reached
+   */
+  static async notifySleepGoalReached(minutes: number): Promise<void> {
+    if (!areNotificationsEnabled()) return;
+
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "😴 Sleep Goal Reached!",
+        body: `You got ${hours}h ${mins}m of sleep last night!`,
+        data: { type: "sleep_goal", minutes } as NotificationData,
+        sound: true,
+      },
+      trigger: null,
+    });
+  }
+
+  /**
+   * Send notification when a new weight entry is picked up from Apple Health
+   */
+  static async notifyWeightLogged(weightKg: number): Promise<void> {
+    if (!areNotificationsEnabled()) return;
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "⚖️ Weight Logged",
+        body: `${weightKg.toFixed(1)}kg synced from Apple Health`,
+        data: { type: "weight_logged", weightKg } as NotificationData,
         sound: true,
       },
       trigger: null,

@@ -828,6 +828,42 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         log("👟 Steps sync skipped: " + (error instanceof Error ? error.message : 'Unknown error'));
       }
 
+      // Sync weight data — logged, not goal-based day-to-day (weightGoal is an
+      // overall challenge target, not something to hit every single day)
+      if ((challenge as any).trackWeight) {
+        try {
+          log("⚖️ Fetching weight data...");
+          const { healthSyncService } = await import("@/lib/healthSync");
+          const weightKg = await healthSyncService.getWeightForDate(date);
+          if (weightKg && weightKg > 0) {
+            log(`⚖️ Weight: ${weightKg.toFixed(1)}kg`);
+            updates.currentWeight = weightKg;
+            updates.weightLogged = true;
+          } else {
+            log("⚖️ No weight data found");
+          }
+        } catch (error) {
+          log("⚖️ Weight sync skipped: " + (error instanceof Error ? error.message : 'Unknown error'));
+        }
+      }
+
+      // Sync mood data — logged only, no goal concept for mood
+      if ((challenge as any).trackMood) {
+        try {
+          log("🙂 Fetching mood data...");
+          const { healthSyncService } = await import("@/lib/healthSync");
+          const moodData = await healthSyncService.getMoodForDate(date);
+          if (moodData) {
+            log(`🙂 Mood: ${moodData.score}`);
+            updates.moodScore = moodData.score;
+          } else {
+            log("🙂 No mood data found");
+          }
+        } catch (error) {
+          log("🙂 Mood sync skipped: " + (error instanceof Error ? error.message : 'Unknown error'));
+        }
+      }
+
       // Only update if there are changes
       if (Object.keys(updates).length > 0) {
         log(`💾 Updating daily log...`);

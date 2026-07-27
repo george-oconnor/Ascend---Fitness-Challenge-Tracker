@@ -64,7 +64,7 @@
         {
           "NSHealthShareUsageDescription": "This app needs access to your health data to track your cycle, water intake, weight, calories, sleep, and mood for the 75 Hard challenge.",
           "NSHealthUpdateUsageDescription": "This app needs access to update your health data to log your cycle tracking, water intake, weight, calories, sleep, and mood.",
-          "background": false
+          "background": true
         }
       ]
     ],
