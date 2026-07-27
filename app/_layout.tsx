@@ -1,5 +1,6 @@
 import { BadgeCelebration } from "@/components/BadgeCelebration";
 import { ICloudGate } from "@/components/ICloudGate";
+import { registerBackgroundNotificationTask } from "@/lib/backgroundNotificationTask";
 import { setNotificationsEnabledCheck } from "@/lib/notifications";
 import { getHasSeenOnboarding } from "@/lib/onboarding";
 import { initSentry, logger } from "@/lib/sentry";
@@ -22,12 +23,7 @@ initSentry();
 // user having to open the app and tap "Sync Now".
 function handleStravaPushData(data: Record<string, any> | undefined) {
   if (data?.type !== "strava-activity") return;
-  import("@/store/useChallengeStore").then(({ useChallengeStore }) => {
-    const { challenge, todayLog, resyncHealthDataForDate } = useChallengeStore.getState();
-    if (challenge?.$id && todayLog?.$id) {
-      resyncHealthDataForDate(new Date(), todayLog.$id);
-    }
-  });
+  import("@/lib/resyncAndNotify").then(({ resyncTodayAndNotify }) => resyncTodayAndNotify());
 }
 
 // App startup events disabled to reduce Sentry noise
@@ -64,7 +60,8 @@ export default function RootLayout() {
   // Initialize notifications
   useEffect(() => {
     initNotifications();
-    
+    registerBackgroundNotificationTask();
+
     // Set up the notifications enabled check for the notification service
     setNotificationsEnabledCheck(() => notificationsEnabled);
 

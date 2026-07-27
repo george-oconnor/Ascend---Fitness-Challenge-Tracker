@@ -51,6 +51,7 @@
         }
       ],
       "expo-notifications",
+      "expo-task-manager",
       "@react-native-community/datetimepicker",
       [
         "react-native-health",
