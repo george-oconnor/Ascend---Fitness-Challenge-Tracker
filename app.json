@@ -29,13 +29,15 @@
         "NSCameraUsageDescription": "Camera access may be used for future features.",
         "NSPhotoLibraryUsageDescription": "Photo library access may be used for future features.",
         "NSHealthShareUsageDescription": "This app needs access to your health data to track your steps and workouts for the 75 Hard challenge.",
-        "NSHealthUpdateUsageDescription": "This app needs access to update your health data to log workouts for the 75 Hard challenge."
+        "NSHealthUpdateUsageDescription": "This app needs access to update your health data to log workouts for the 75 Hard challenge.",
+        "UIBackgroundModes": ["remote-notification"]
       }
     },
     "plugins": [
       "expo-router",
       "expo-secure-store",
       "expo-apple-authentication",
+      "expo-web-browser",
       [
         "expo-splash-screen",
         {

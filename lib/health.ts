@@ -18,6 +18,7 @@ export type WorkoutData = {
   startDate: string;
   endDate: string;
   isOutdoor: boolean;
+  sourceName?: string; // the app HealthKit attributes this sample to, e.g. "Strava"
 };
 
 // Map Apple's workout activity types to readable names
@@ -430,6 +431,7 @@ class HealthService {
               startDate: startDate.toISOString(),
               endDate: endDate.toISOString(),
               isOutdoor: workoutInfo.isOutdoor,
+              sourceName: workout.sourceName || undefined,
             };
           });
 

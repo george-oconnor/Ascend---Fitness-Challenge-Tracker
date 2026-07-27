@@ -17,6 +17,19 @@ import './globals.css';
 // Initialize Sentry before app renders
 initSentry();
 
+// A Strava webhook push (delivered via /server/api/strava/webhook) means a
+// new activity is available — resync today's log so it appears without the
+// user having to open the app and tap "Sync Now".
+function handleStravaPushData(data: Record<string, any> | undefined) {
+  if (data?.type !== "strava-activity") return;
+  import("@/store/useChallengeStore").then(({ useChallengeStore }) => {
+    const { challenge, todayLog, resyncHealthDataForDate } = useChallengeStore.getState();
+    if (challenge?.$id && todayLog?.$id) {
+      resyncHealthDataForDate(new Date(), todayLog.$id);
+    }
+  });
+}
+
 // App startup events disabled to reduce Sentry noise
 // if (!__DEV__) {
 //   captureMessage("App started successfully", "info");
@@ -58,18 +71,21 @@ export default function RootLayout() {
     // Listen for notifications received while app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
       console.log("📬 Notification received:", notification.request.content.title);
+      handleStravaPushData(notification.request.content.data);
     });
 
     // Listen for notification taps
     responseListener.current = Notifications.addNotificationResponseReceivedListener(response => {
       const data = response.notification.request.content.data;
       console.log("📬 Notification tapped:", data);
-      
+
       // Navigate based on notification type
       if (data?.type === "badge_earned") {
         router.push("/(tabs)/analytics");
       } else if (data?.type === "reminder" || data?.type === "task_complete") {
         router.push("/(tabs)");
+      } else {
+        handleStravaPushData(data);
       }
     });
 

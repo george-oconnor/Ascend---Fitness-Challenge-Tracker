@@ -117,6 +117,8 @@ DEFINE SCHEMA
         createdAt TIMESTAMP QUERYABLE SORTABLE,
         date TIMESTAMP QUERYABLE,
         description STRING,
+        externalId STRING QUERYABLE,
+        source STRING,
         title STRING,
         type STRING QUERYABLE,
         unit STRING,

@@ -202,6 +202,8 @@ export type ActivityLog = {
   value?: number; // Numeric value if applicable (steps, minutes, liters, etc.)
   unit?: string; // Unit for the value (steps, min, L, kg, etc.)
   date: string; // The date this activity is for (YYYY-MM-DD)
+  source?: "manual" | "healthkit" | "strava"; // Where this log originated, for sync dedup
+  externalId?: string; // Id from the source system (e.g. Strava activity id), for dedup lookups
 };
 
 // User Badge Types

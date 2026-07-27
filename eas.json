@@ -34,7 +34,9 @@
           "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728",
           "EXPO_PUBLIC_SENTRY_DSN": "https://427b038e9826c76a4003063a3ff7d179@o4509054949195776.ingest.de.sentry.io/4510664307441744",
           "EXPO_PUBLIC_BUILD_PROFILE": "production",
-          "CLOUDKIT_ENV": "Production"
+          "CLOUDKIT_ENV": "Production",
+          "EXPO_PUBLIC_STRAVA_CLIENT_ID": "268020",
+          "EXPO_PUBLIC_STRAVA_TOKEN_SERVER_URL": "https://server-iota-five-15.vercel.app"
         }
       }
     },
@@ -47,7 +49,9 @@
           "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728",
           "EXPO_PUBLIC_SENTRY_DSN": "https://427b038e9826c76a4003063a3ff7d179@o4509054949195776.ingest.de.sentry.io/4510664307441744",
           "EXPO_PUBLIC_BUILD_PROFILE": "testflight",
-          "CLOUDKIT_ENV": "Production"
+          "CLOUDKIT_ENV": "Production",
+          "EXPO_PUBLIC_STRAVA_CLIENT_ID": "268020",
+          "EXPO_PUBLIC_STRAVA_TOKEN_SERVER_URL": "https://server-iota-five-15.vercel.app"
         }
       }
     }

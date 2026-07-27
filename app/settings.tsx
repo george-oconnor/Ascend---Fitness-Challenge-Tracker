@@ -1,8 +1,10 @@
+import { StravaLogo } from "@/components/StravaLogo";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
+import { useStravaStore } from "@/store/useStravaStore";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
     ActivityIndicator,
     Alert,
@@ -18,8 +20,13 @@ import { SafeAreaView } from "react-native-safe-area-context";
 export default function SettingsScreen() {
   const { user, logout, deleteAccount } = useSessionStore();
   const { notificationsEnabled, setNotificationsEnabled } = useNotificationStore();
+  const { isConnected: stravaConnected, checkConnection: checkStravaConnection } = useStravaStore();
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  useEffect(() => {
+    checkStravaConnection();
+  }, [checkStravaConnection]);
 
   const handleLogout = async () => {
     setLoading(true);
@@ -66,25 +73,32 @@ export default function SettingsScreen() {
     await setNotificationsEnabled(value);
   };
 
-  const MenuItem = ({ 
-    icon, 
-    label, 
+  const MenuItem = ({
+    icon,
+    label,
     onPress,
     showChevron = true,
-    danger = false
-  }: { 
+    danger = false,
+    iconBg = "#F3F4F6",
+    iconColor = "#6B7280",
+  }: {
     icon: keyof typeof Feather.glyphMap;
     label: string;
     onPress?: () => void;
     showChevron?: boolean;
     danger?: boolean;
+    iconBg?: string;
+    iconColor?: string;
   }) => (
-    <Pressable 
+    <Pressable
       onPress={onPress}
       className="flex-row items-center bg-white px-4 py-3.5 border-b border-gray-100"
     >
-      <View className={`h-8 w-8 items-center justify-center rounded-full mr-3 ${danger ? "bg-red-100" : "bg-gray-100"}`}>
-        <Feather name={icon} size={18} color={danger ? "#EF4444" : "#6B7280"} />
+      <View
+        className="h-8 w-8 items-center justify-center rounded-lg mr-3"
+        style={{ backgroundColor: danger ? "#FEE2E2" : iconBg }}
+      >
+        <Feather name={icon} size={17} color={danger ? "#EF4444" : iconColor} />
       </View>
       <Text className={`flex-1 text-base ${danger ? "text-red-500" : "text-gray-900"}`}>{label}</Text>
       {showChevron && <Feather name="chevron-right" size={20} color="#9CA3AF" />}
@@ -109,14 +123,18 @@ export default function SettingsScreen() {
         <View className="mt-4">
           <Text className="text-xs font-semibold text-gray-400 uppercase px-5 mb-2">Challenge</Text>
           <View className="bg-white rounded-xl overflow-hidden mx-4">
-            <MenuItem 
-              icon="settings" 
-              label="Challenge Settings" 
+            <MenuItem
+              icon="settings"
+              label="Challenge Settings"
+              iconBg="#E5E7EB"
+              iconColor="#4B5563"
               onPress={() => router.push("/challenge-setup")}
             />
-            <MenuItem 
-              icon="calendar" 
-              label="Daily Log" 
+            <MenuItem
+              icon="calendar"
+              label="Daily Log"
+              iconBg="#DBEAFE"
+              iconColor="#3B82F6"
               onPress={() => router.push("/daily-log")}
             />
           </View>
@@ -126,14 +144,16 @@ export default function SettingsScreen() {
         <View className="mt-6">
           <Text className="text-xs font-semibold text-gray-400 uppercase px-5 mb-2">Account</Text>
           <View className="bg-white rounded-xl overflow-hidden mx-4">
-            <MenuItem 
-              icon="user" 
-              label="Edit Profile" 
+            <MenuItem
+              icon="user"
+              label="Edit Profile"
+              iconBg="#EDE9FE"
+              iconColor="#8B5CF6"
               onPress={() => router.push("/edit-profile")}
             />
             <Pressable className="flex-row items-center bg-white px-4 py-3.5 border-b border-gray-100">
-              <View className="h-8 w-8 items-center justify-center rounded-full mr-3 bg-gray-100">
-                <Feather name="bell" size={18} color="#6B7280" />
+              <View className="h-8 w-8 items-center justify-center rounded-lg mr-3" style={{ backgroundColor: "#FEE2E2" }}>
+                <Feather name="bell" size={17} color="#EF4444" />
               </View>
               <Text className="flex-1 text-base text-gray-900">Notifications</Text>
               <Switch
@@ -146,18 +166,41 @@ export default function SettingsScreen() {
           </View>
         </View>
 
+        {/* Connections Section */}
+        <View className="mt-6">
+          <Text className="text-xs font-semibold text-gray-400 uppercase px-5 mb-2">Connections</Text>
+          <View className="bg-white rounded-xl overflow-hidden mx-4">
+            <Pressable
+              onPress={() => router.push("/strava-settings")}
+              className="flex-row items-center bg-white px-4 py-3.5"
+            >
+              <StravaLogo height={22} />
+              <View className="flex-1 ml-3">
+                <Text className="text-xs text-gray-400">
+                  {stravaConnected ? "Connected" : "Not connected"}
+                </Text>
+              </View>
+              <Feather name="chevron-right" size={20} color="#9CA3AF" />
+            </Pressable>
+          </View>
+        </View>
+
         {/* Support Section */}
         <View className="mt-6">
           <Text className="text-xs font-semibold text-gray-400 uppercase px-5 mb-2">Support</Text>
           <View className="bg-white rounded-xl overflow-hidden mx-4">
-            <MenuItem 
-              icon="message-circle" 
-              label="Contact Us" 
+            <MenuItem
+              icon="message-circle"
+              label="Contact Us"
+              iconBg="#D1FAE5"
+              iconColor="#10B981"
               onPress={() => Linking.openURL('mailto:george@georgeoc.com')}
             />
-            <MenuItem 
-              icon="shield" 
-              label="Privacy Policy" 
+            <MenuItem
+              icon="shield"
+              label="Privacy Policy"
+              iconBg="#E5E7EB"
+              iconColor="#4B5563"
               onPress={() => Linking.openURL('https://george-oconnor.github.io/Ascend---Fitness-Challenge-Tracker/privacy')}
             />
           </View>

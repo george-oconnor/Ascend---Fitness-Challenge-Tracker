@@ -241,6 +241,8 @@ const ACTIVITY_LOG_FIELDS: FieldTypes = {
   unit: 'string',
   date: 'date',
   createdAt: 'date',
+  source: 'string',
+  externalId: 'string',
 };
 
 const USER_BADGE_FIELDS: FieldTypes = {
@@ -642,6 +644,28 @@ export async function getActivityLogsForDate(
   } catch (err) {
     console.error('getActivityLogsForDate error:', err);
     return [];
+  }
+}
+
+/** Look up a previously-imported log by its source system id (e.g. a Strava activity id), for sync dedup. */
+export async function getActivityLogByExternalId(
+  challengeId: string,
+  externalId: string
+): Promise<ActivityLog | null> {
+  if (!challengeId || !externalId) return null;
+  try {
+    const page = await queryPage('ActivityLog', ACTIVITY_LOG_FIELDS, {
+      filters: [
+        { field: 'challengeId', op: 'eq', value: filterValue('string', challengeId) },
+        { field: 'externalId', op: 'eq', value: filterValue('string', externalId) },
+      ],
+      limit: 1,
+    });
+    const docs = page.docs as unknown as ActivityLog[];
+    return docs[0] ?? null;
+  } catch (err) {
+    console.error('getActivityLogByExternalId error:', err);
+    return null;
   }
 }
 
