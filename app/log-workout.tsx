@@ -77,6 +77,7 @@ type WorkoutEntryData = {
   type: string;
   notes: string;
   syncedFromHealth: boolean;
+  syncedFromStrava?: boolean;
   syncedToHealth?: boolean;
   activityName?: string;
   calories?: number;
@@ -272,16 +273,32 @@ export default function LogWorkoutScreen() {
         // Update today's log using the store method
         await updateProgress(updates);
 
-        // Log activity to feed
-        const { logActivity } = useChallengeStore.getState();
+        // Create or update activity log (avoid inserting a duplicate row on repeat edits)
+        const dateStr = format(targetDate, 'yyyy-MM-dd');
+        const activityType: ActivityType = isWorkout1 ? 'workout1' : 'workout2';
+        const existingLogs = await getActivityLogsForDate(challenge.$id!, dateStr, activityType);
         const workoutType = WORKOUT_TYPES.find(t => t.id === selectedType);
-        await logActivity({
-          type: isWorkout1 ? "workout1" : "workout2",
+
+        const activityData = {
+          userId: challenge.userId,
+          challengeId: challenge.$id!,
+          type: activityType,
           title: `${isWorkout1 ? "Workout 1" : "Workout 2"} Complete`,
           description: `${workoutType?.label || "Workout"} - ${totalMinutes} minutes${notes ? ` - ${notes}` : ""}`,
           value: totalMinutes,
           unit: "minutes",
-        });
+          date: dateStr,
+        };
+
+        if (existingLogs.length > 0) {
+          await updateActivityLog(existingLogs[0].$id!, activityData);
+        } else {
+          await createActivityLog(activityData);
+        }
+
+        // Refresh the activity feed
+        const { fetchActivityLogs } = useChallengeStore.getState();
+        await fetchActivityLogs(challenge.$id!);
       }
 
       router.back();
