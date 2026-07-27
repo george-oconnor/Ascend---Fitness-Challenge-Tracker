@@ -1,0 +1,13 @@
+{
+  "name": "ascend-strava-server",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Minimal serverless proxy that holds the Strava client_secret so it never ships inside the Ascend app binary. Deploy this directory as its own Vercel project.",
+  "scripts": {
+    "dev": "vercel dev"
+  },
+  "devDependencies": {
+    "@vercel/node": "^3.2.24",
+    "typescript": "~5.9.3"
+  }
+}

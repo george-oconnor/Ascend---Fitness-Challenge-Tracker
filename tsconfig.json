@@ -15,5 +15,9 @@
     "expo-env.d.ts",
     "nativewind-env.d.ts",
     "types/type.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "server"
   ]
 }

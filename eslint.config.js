@@ -5,6 +5,7 @@ const expoConfig = require('eslint-config-expo/flat');
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ['dist/*'],
+    // server/ is a separate Vercel project (plain Node, not Expo).
+    ignores: ['dist/*', 'server/**'],
   },
 ]);
