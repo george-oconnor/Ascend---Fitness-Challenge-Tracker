@@ -342,7 +342,7 @@ export default function LogWorkoutScreen() {
           fetchActivityLogs(challenge.$id!)
         ]);
       } else {
-        // Reset today's workout data in Appwrite
+        // Reset today's workout data
         await updateProgress(updates);
       }
 

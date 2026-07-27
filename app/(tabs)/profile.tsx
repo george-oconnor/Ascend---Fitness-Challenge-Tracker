@@ -19,7 +19,7 @@ export default function ProfileScreen() {
   const { challenge, allLogs } = useChallengeStore();
   const [savedBadgeIds, setSavedBadgeIds] = useState<BadgeId[]>([]);
   
-  // Load saved badges from Appwrite
+  // Load saved badges
   useEffect(() => {
     const loadBadges = async () => {
       if (!user?.id) return;

@@ -729,7 +729,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       if (Object.keys(updates).length > 0) {
         log(`💾 Updating daily log...`);
         
-        // Persist to Appwrite
+        // Persist
         const updated = await updateDailyLog(logId, updates);
         
         // Update local state if this is today's log
@@ -936,11 +936,11 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         // Update local state optimistically
         set({ todayLog: { ...todayLog, ...updates } });
 
-        // Persist to Appwrite
+        // Persist
         const updated = await updateDailyLog(todayLog.$id, updates);
         set({ todayLog: updated });
         
-        console.log("syncHealthData: Successfully synced health data to Appwrite");
+        console.log("syncHealthData: Successfully synced health data");
         
         // Note: Activity log creation for workouts is handled by resyncHealthData
         // to avoid duplicate logs. The background sync only updates the daily log metrics.

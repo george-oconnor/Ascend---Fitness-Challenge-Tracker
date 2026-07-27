@@ -1,10 +1,6 @@
 import * as Crypto from 'expo-crypto';
 
-/**
- * Backend-agnostic unique ID generation. Drop-in replacement for Appwrite's
- * `ID.unique()` — UUIDs are valid Appwrite document IDs (36 chars, [a-z0-9-])
- * and valid CloudKit recordNames.
- */
+/** Unique ID generation — UUIDs are valid CloudKit recordNames. */
 export const ID = {
   unique(): string {
     return Crypto.randomUUID();

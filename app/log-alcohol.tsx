@@ -243,7 +243,7 @@ export default function LogAlcoholScreen() {
         console.log("Updating past day log:", logIdParam, "to sober");
         await updateDailyLog(logIdParam, {
           noAlcoholCompleted: true,
-          alcoholDetails: "", // Use empty string to clear the field in Appwrite
+          alcoholDetails: "", // Use empty string to clear the field
         });
         
         console.log("Successfully updated past day log");

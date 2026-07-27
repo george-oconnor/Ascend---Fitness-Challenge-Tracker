@@ -363,7 +363,7 @@ export default function AnalyticsScreen() {
     return items;
   };
 
-  // Load saved badges from Appwrite
+  // Load saved badges
   const loadBadges = useCallback(async () => {
     if (!user?.id) return;
     setBadgesLoading(true);
@@ -594,7 +594,7 @@ export default function AnalyticsScreen() {
     return Array.from(combined) as BadgeId[];
   }, [savedBadgeIds, earnedBadges]);
 
-  // Save any newly earned badges to Appwrite
+  // Save any newly earned badges
   const { queueBadgeCelebration } = useNotificationStore();
   
   useEffect(() => {

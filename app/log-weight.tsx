@@ -279,7 +279,7 @@ export default function LogWeightScreen() {
     setSaving(true);
     try {
       // Note: HealthKit doesn't allow third-party apps to delete data
-      // We can only clear the data saved by our app in Appwrite
+      // We can only clear the data saved by our app
       await updateProgress({
         currentWeight: 0,
         weightLogged: false,

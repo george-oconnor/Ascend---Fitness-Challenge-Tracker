@@ -193,7 +193,7 @@ export type ActivityType =
 
 export type ActivityLog = {
   $id?: string;
-  $createdAt?: string; // Appwrite's built-in timestamp
+  $createdAt?: string;
   userId: string;
   challengeId: string;
   type: ActivityType;
@@ -207,7 +207,7 @@ export type ActivityLog = {
 // User Badge Types
 export type UserBadge = {
   $id?: string;
-  $createdAt?: string; // When the badge was earned (Appwrite built-in)
+  $createdAt?: string; // When the badge was earned
   userId: string;
   badgeId: BadgeId;
   challengeId?: string; // Which challenge they earned it in (optional for account-wide badges)
