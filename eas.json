@@ -59,13 +59,13 @@
   "submit": {
     "production": {
       "ios": {
-        "ascAppId": "6756985580",
+        "ascAppId": "6757496594",
         "groups": ["External Testers"]
       }
     },
     "testflight": {
       "ios": {
-        "ascAppId": "6756985580"
+        "ascAppId": "6757496594"
       }
     }
   }

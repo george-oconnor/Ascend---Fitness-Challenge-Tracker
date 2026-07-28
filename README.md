@@ -1,6 +1,6 @@
-# 75 Hard Challenge Tracker
+# Ascend - Challenge Tracker
 
-A mobile app built with React Native and Expo for tracking the 75 Hard fitness challenge. Track daily tasks, monitor progress, sync with Apple Health, and stay accountable throughout the 75-day journey.
+A mobile app built with React Native and Expo for tracking daily fitness challenges. Track daily tasks, monitor progress, sync with Apple Health, and stay accountable throughout your challenge.
 
 ## Features
 
@@ -123,7 +123,6 @@ This means even if collection-level permissions were more permissive, the docume
 - [Expo documentation](https://docs.expo.dev/)
 - [Appwrite documentation](https://appwrite.io/docs)
 - [Appwrite Permissions](https://appwrite.io/docs/products/databases/permissions)
-- [75 Hard Challenge](https://andyfrisella.com/pages/75hard-info)
 
 ## Contributing
 

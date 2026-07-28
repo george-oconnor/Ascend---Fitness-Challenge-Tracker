@@ -3,21 +3,28 @@
 Draft copy for App Store Connect's listing fields. Character limits noted
 where Apple enforces them; trim/adjust to taste before pasting in.
 
+**Locale: `en-GB`** (English (U.K.)) — this is the app's actual primary
+locale in App Store Connect, not `en-US`. `store.config.json` uses the
+`en-GB` key to match.
+
+**Do not use the phrase "75 Hard"** anywhere in listing copy — it's a
+protected/trademarked term. "75-day" (as a plain duration) is fine.
+
 ---
 
 ## App Name (30 char max)
 
 ```
-Ascend: 75 Hard Tracker
+Ascend - Challenge Tracker
 ```
-(23 characters)
+(26 characters)
 
 ## Subtitle (30 char max)
 
 ```
-Daily habit & challenge log
+Transform Through Daily Habits
 ```
-(27 characters)
+(30 characters)
 
 ## Promotional Text (170 char max — editable without a new build)
 
@@ -30,9 +37,8 @@ across your devices. Connect Strava for accurate workout types. No ads.
 ## Description (4000 char max)
 
 ```
-Ascend is your daily companion for the 75 Hard challenge — build discipline
-one day at a time by tracking the habits that matter, and watch your streak
-grow.
+Ascend is your daily companion for building discipline — track the habits
+that matter one day at a time, and watch your streak grow.
 
 WHAT YOU CAN TRACK
 • Daily workouts (two-a-day support)
@@ -49,8 +55,8 @@ WHAT YOU CAN TRACK
 
 BUILT AROUND YOUR CHALLENGE
 Set up your own challenge — choose which rules to track, set your goals, and
-pick your duration. Not doing the strict 75-day version? Customize it to fit
-whatever challenge you're running.
+pick your duration. Running the standard 75-day format, or something custom?
+Ascend adapts to whatever challenge you're running.
 
 APPLE HEALTH INTEGRATION
 Connect Apple Health once and Ascend automatically pulls in your steps,
@@ -73,12 +79,22 @@ Ascend is ad-free, doesn't sell your data, and doesn't track you across other
 apps or websites.
 ```
 
+## What's New / Release Notes (current version: 2.1.0)
+
+```
+2.1.0 adds background health syncing — Ascend now checks in periodically and
+notifies you when you hit a new milestone, even when the app is closed. Also
+fixed: duplicate entries no longer appear in your activity feed when editing
+a workout, and background notifications for Strava and Apple Health are more
+reliable.
+```
+
 ## Keywords (100 char max, comma-separated, no spaces after commas)
 
 ```
-75hard,habit tracker,challenge,discipline,fitness,workout log,streak,strava,water intake,goals
+habit tracker,challenge,discipline,fitness,workout log,streak,strava,water intake,goals,consistency
 ```
-(96 characters)
+(99 characters)
 
 ## Support URL
 
@@ -120,3 +136,15 @@ https://george-oconnor.github.io/Ascend---Fitness-Challenge-Tracker/privacy.html
   Store Connect, not this listing copy) — see `docs/app-review-notes.md` for
   what to select there. EAS Metadata does not cover this field; it must still
   be set manually in App Store Connect's web UI.
+- **`eas.json`'s `ascAppId` was wrong** (fixed 2026-07-28): it pointed at a
+  different app entirely (`6756985580`, "Loaded - Personal Budgeting"). The
+  correct Ascend app ID is `6757496594`. Double check this before any
+  `eas submit` or `eas metadata:push`.
+- **`eas metadata:push` has a bug** (tested on eas-cli 21.3.0 and 21.4.0,
+  2026-07-28): it fails with "missing required attribute 'versionString'"
+  when creating a version-level localization (Description, Keywords, Promo
+  Text, What's New, Support/Marketing URL) for a locale that doesn't already
+  have one on the current App Store version. It succeeds for app-level
+  fields (Name, Subtitle, categories). Only Name/Subtitle actually update via
+  the CLI right now — the version-level fields need to be pasted in by hand
+  on the version's page in App Store Connect until this is fixed upstream.
