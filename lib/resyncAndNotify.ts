@@ -26,7 +26,11 @@ export async function resyncTodayAndNotify(): Promise<void> {
     const logId = before?.$id;
     if (!logId) return;
 
-    await useChallengeStore.getState().resyncHealthDataForDate(new Date(), logId);
+    // Something changed at the source (a HealthKit sample landed, or Strava
+    // pushed a webhook), so bypass the Strava activity cache.
+    await useChallengeStore
+      .getState()
+      .resyncHealthDataForDate(new Date(), logId, undefined, { forceStravaFetch: true });
     const after = useChallengeStore.getState().todayLog;
     if (!after) return;
 

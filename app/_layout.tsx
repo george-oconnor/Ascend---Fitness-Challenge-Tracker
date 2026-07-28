@@ -7,6 +7,7 @@ import { initSentry, logger } from "@/lib/sentry";
 import { useHealthStore } from "@/store/useHealthStore";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
+import { useStravaStore } from "@/store/useStravaStore";
 import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { SplashScreen, Stack, useRouter, useSegments } from "expo-router";
@@ -18,9 +19,10 @@ import './globals.css';
 // Initialize Sentry before app renders
 initSentry();
 
-// A Strava webhook push (delivered via /server/api/strava/webhook) means a
-// new activity is available — resync today's log so it appears without the
-// user having to open the app and tap "Sync Now".
+// A Strava webhook push (delivered via /server/api/strava/webhook) means the
+// athlete's activity list changed — an activity created, updated or deleted.
+// Resync today's log so it catches up without the user having to open the app
+// and tap "Sync Now".
 function handleStravaPushData(data: Record<string, any> | undefined) {
   if (data?.type !== "strava-activity") return;
   import("@/lib/resyncAndNotify").then(({ resyncTodayAndNotify }) => resyncTodayAndNotify());
@@ -49,6 +51,7 @@ export default function RootLayout() {
   const { checkSession, status } = useSessionStore();
   const { initialize: initNotifications, celebratingBadge, dismissBadgeCelebration, notificationsEnabled } = useNotificationStore();
   const { initialize: initHealth, isNativeModuleAvailable, isAuthorized, error: healthError, enableHealthBackgroundSync } = useHealthStore();
+  const { checkConnection: checkStravaConnection } = useStravaStore();
   const router = useRouter();
   const segments = useSegments();
   const navigationAttempted = useRef(false);
@@ -118,6 +121,13 @@ export default function RootLayout() {
       });
     }
   }, []);
+
+  // Resolve the Strava connection up front — the home screen uses it to decide
+  // whether to sync at all, so a Strava-only user shouldn't have to visit
+  // Strava settings first for their workouts to appear.
+  useEffect(() => {
+    checkStravaConnection();
+  }, [checkStravaConnection]);
 
   useEffect(() => {
     if (error) throw error;

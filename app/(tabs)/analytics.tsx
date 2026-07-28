@@ -125,7 +125,7 @@ export default function AnalyticsScreen() {
         }
         
         addLog('🔄 Starting health data resync...');
-        await resyncHealthDataForDate(selectedDate, logId!, addLog);
+        await resyncHealthDataForDate(selectedDate, logId!, addLog, { forceStravaFetch: true });
         addLog('✅ Resync complete!');
         
         // Refresh to show updated data

@@ -33,7 +33,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const event = req.body as StravaWebhookEvent;
 
-  if (event?.object_type !== "activity" || event.aspect_type === "delete") {
+  // Deletes matter as much as creates: the app's resync recomputes the day
+  // from Strava's current activity list, so a deleted activity has to wake it
+  // to drop back out of the daily log.
+  if (event?.object_type !== "activity") {
     res.status(200).json({ ok: true });
     return;
   }

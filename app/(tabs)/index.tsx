@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
 import { useSessionStore } from "@/store/useSessionStore";
+import { useStravaStore } from "@/store/useStravaStore";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -200,6 +201,7 @@ export default function HomeScreen() {
   const { user } = useSessionStore();
   const { challenge, todayLog, fetchChallenge, fetchAllLogs, syncHealthData } = useChallengeStore();
   const { isAuthorized, fetchTodayData, steps, workouts } = useHealthStore();
+  const { isConnected: stravaConnected } = useStravaStore();
   const [refreshing, setRefreshing] = useState(false);
   const [showConfetti, setShowConfetti] = useState(false);
   const wasCompleteRef = useRef(false);
@@ -233,23 +235,25 @@ export default function HomeScreen() {
       
       // Sync health data to daily log after challenge is refreshed
       // Get fresh values from store instead of using closure variables
-      if (Platform.OS === "ios" && isAuthorized) {
+      if (Platform.OS === "ios" && (isAuthorized || stravaConnected)) {
         const { challenge: freshChallenge, todayLog: freshTodayLog } = useChallengeStore.getState();
         if (freshChallenge?.$id && freshTodayLog?.$id) {
-          await syncHealthData();
+          // Pulling to refresh is an explicit "show me what's changed", so go
+          // straight to Strava rather than reusing a cached activity list.
+          await syncHealthData({ forceStravaFetch: true });
         }
       }
     } finally {
       setRefreshing(false);
     }
-  }, [user?.id, isAuthorized, fetchChallenge, fetchTodayData, syncHealthData]);
+  }, [user?.id, isAuthorized, stravaConnected, fetchChallenge, fetchTodayData, syncHealthData]);
 
   // Auto-sync health data when it changes
   useEffect(() => {
-    if (Platform.OS === "ios" && isAuthorized && challenge?.$id && todayLog?.$id) {
+    if (Platform.OS === "ios" && (isAuthorized || stravaConnected) && challenge?.$id && todayLog?.$id) {
       syncHealthData();
     }
-  }, [steps, workouts, isAuthorized, challenge?.$id, todayLog?.$id]);
+  }, [steps, workouts, isAuthorized, stravaConnected, challenge?.$id, todayLog?.$id]);
 
   // Check for all tasks complete and trigger confetti
   useEffect(() => {

@@ -74,6 +74,8 @@ export const useStravaStore = create<StravaState>()(
       disconnect: async () => {
         try {
           await disconnectStrava();
+          const { clearStravaWorkoutCache } = await import("@/lib/mergedWorkouts");
+          clearStravaWorkoutCache();
           set({ isConnected: false, error: null });
         } catch (err) {
           captureException(err instanceof Error ? err : new Error("Strava disconnect failed"));
@@ -99,9 +101,11 @@ export const useStravaStore = create<StravaState>()(
           }
 
           // Strava activities are merged into the same slot-assignment pass as
-          // HealthKit workouts (see the sourceName filter in resyncHealthDataForDate)
-          // so the two sources never race over the same workout1/workout2 slot.
-          await useChallengeStore.getState().resyncHealthDataForDate(new Date(), logId);
+          // HealthKit workouts (see lib/mergedWorkouts) so the two sources
+          // never race over the same workout1/workout2 slot.
+          await useChallengeStore
+            .getState()
+            .resyncHealthDataForDate(new Date(), logId, undefined, { forceStravaFetch: true });
           set({ isSyncing: false });
         } catch (err) {
           const errorMsg = err instanceof Error ? err.message : "Strava sync failed";

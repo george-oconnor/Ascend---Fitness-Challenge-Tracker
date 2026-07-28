@@ -13,7 +13,7 @@ import {
     updateDailyLog
 } from "@/lib/cloudkit";
 import { isDayComplete } from "@/lib/dayCompletion";
-import type { WorkoutData } from "@/lib/health";
+import type { MergedWorkout } from "@/lib/mergedWorkouts";
 import { NotificationService } from "@/lib/notifications";
 import { captureException, logger } from "@/lib/sentry";
 import { useNotificationStore } from "@/store/useNotificationStore";
@@ -22,30 +22,25 @@ import { format } from "date-fns";
 import { Platform } from "react-native";
 import { create } from "zustand";
 
-// A workout from either HealthKit or a direct Strava sync, normalized to a
-// common shape so both sources can go through the same chronological
-// workout1/workout2 slot assignment below. A workout must appear in exactly
-// one of the two lists that feed this — see the sourceName filter where
-// HealthKit workouts are fetched, which excludes anything HealthKit itself
-// attributes to Strava (it'll arrive via the direct Strava path instead).
-type MergedWorkout = {
-  typeId: string; // matches an id in app/log-workout.tsx's WORKOUT_TYPES
-  activityName: string;
-  duration: number; // minutes
-  calories?: number;
-  distance?: number; // meters
-  isOutdoor: boolean;
-  startDate: string;
-  endDate: string;
-  source: "healthkit" | "strava";
-  externalId?: string;
-};
+/**
+ * Set forceStravaFetch for user- or event-triggered syncs (a refresh tap,
+ * "Sync Now", a Strava webhook push) so they bypass the Strava activity cache
+ * in lib/mergedWorkouts and see changes — including deletions — immediately.
+ */
+type SyncOptions = { forceStravaFetch?: boolean };
 
 type ChallengeState = {
   challenge: Challenge | null;
   todayLog: DailyLog | null;
   allLogs: DailyLog[];
   activityLogs: ActivityLog[];
+  /**
+   * The reconciled HealthKit + Strava workout list behind today's workout
+   * slots, as of the last resync. Null until a resync has run. The daily log
+   * renders this rather than raw HealthKit data so a workout deleted in
+   * Strava disappears from the list, not just from the progress numbers.
+   */
+  todayWorkouts: MergedWorkout[] | null;
   isLoading: boolean;
   error: string | null;
 
@@ -67,8 +62,13 @@ type ChallengeState = {
     /** Defaults to today if omitted — pass this when logging/editing a past day. */
     date?: string;
   }) => Promise<void>;
-  syncHealthData: () => Promise<void>;
-  resyncHealthDataForDate: (date: Date, logId: string, logCallback?: (message: string) => void) => Promise<void>;
+  syncHealthData: (options?: SyncOptions) => Promise<void>;
+  resyncHealthDataForDate: (
+    date: Date,
+    logId: string,
+    logCallback?: (message: string) => void,
+    options?: SyncOptions
+  ) => Promise<void>;
   deleteActivityLogById: (logId: string) => Promise<void>;
   clearChallenge: () => void;
   // Helper for photo completion checking
@@ -85,6 +85,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   todayLog: null,
   allLogs: [],
   activityLogs: [],
+  todayWorkouts: null,
   isLoading: false,
   error: null,
 
@@ -310,7 +311,12 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     }
   },
 
-  resyncHealthDataForDate: async (date: Date, logId: string, logCallback?: (message: string) => void) => {
+  resyncHealthDataForDate: async (
+    date: Date,
+    logId: string,
+    logCallback?: (message: string) => void,
+    options?: SyncOptions
+  ) => {
     const { challenge } = get();
     const log = (msg: string) => {
       console.log(msg);
@@ -332,64 +338,21 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
 
     try {
       const { healthService } = await import("@/lib/health");
+      const { getMergedWorkoutsForDate } = await import("@/lib/mergedWorkouts");
 
       log(`📅 Fetching health data for ${format(date, 'MMM dd, yyyy')}...`);
 
-      // Fetch workouts for the specific date. Workouts HealthKit attributes to
-      // Strava are excluded here — they're picked up more accurately via the
-      // direct Strava fetch below, and including both would double-count.
-      // Also exclude anything this app itself wrote back to HealthKit (see
-      // syncStravaToHealthKit below) — otherwise a Strava workout we wrote to
-      // HealthKit would loop back in as a second, separate "healthkit"-sourced
-      // entry the next time this runs.
-      const healthWorkouts = await healthService.getWorkoutsForDate(date);
-      let mergedWorkouts: MergedWorkout[] = healthWorkouts
-        .filter((w: WorkoutData) => w.sourceName !== "Strava" && w.sourceName !== "Ascend")
-        .map((w: WorkoutData) => ({
-          typeId: w.activityName.toLowerCase().replace(/\s+/g, '-'),
-          activityName: w.activityName,
-          duration: w.duration,
-          calories: w.calories,
-          distance: w.distance,
-          isOutdoor: w.isOutdoor,
-          startDate: w.startDate,
-          endDate: w.endDate,
-          source: "healthkit" as const,
-        }));
+      // Sorted chronologically, HealthKit and Strava already de-duplicated.
+      const mergedWorkouts = await getMergedWorkoutsForDate(date, {
+        log,
+        forceStravaFetch: options?.forceStravaFetch,
+      });
 
-      try {
-        const { isStravaConnected, getActivities, mapStravaActivity } = await import("@/lib/strava");
-        if (await isStravaConnected()) {
-          const dayStart = new Date(date);
-          dayStart.setHours(0, 0, 0, 0);
-          const dayEnd = new Date(date);
-          dayEnd.setHours(23, 59, 59, 999);
-
-          const stravaActivities = await getActivities(dayStart, dayEnd);
-          const stravaWorkouts: MergedWorkout[] = stravaActivities.map(mapStravaActivity).map((w) => ({
-            typeId: w.workoutTypeId,
-            activityName: w.activityName,
-            duration: w.duration,
-            calories: w.calories,
-            distance: w.distance,
-            isOutdoor: w.isOutdoor,
-            startDate: w.startDate,
-            endDate: w.endDate,
-            source: "strava" as const,
-            externalId: w.externalId,
-          }));
-          log(`🟠 Found ${stravaWorkouts.length} Strava activity(ies)`);
-          mergedWorkouts = [...mergedWorkouts, ...stravaWorkouts];
-        }
-      } catch (stravaErr) {
-        log(`⚠️ Strava sync skipped: ${stravaErr instanceof Error ? stravaErr.message : 'Unknown error'}`);
-      }
-
-      log(`🏋️ Found ${mergedWorkouts.length} workout(s)`);
-      if (mergedWorkouts.length > 0) {
-        mergedWorkouts.forEach((w, idx) => {
-          log(`  ${idx + 1}. ${w.activityName} (${w.source}): ${w.duration} min, ${w.isOutdoor ? 'outdoor' : 'indoor'}`);
-        });
+      // Publish the list the daily log renders, so a workout deleted in Strava
+      // disappears from "Today's Workouts" at the same moment its minutes drop
+      // out of the workout slots below.
+      if (format(date, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')) {
+        set({ todayWorkouts: mergedWorkouts });
       }
 
       // If the user has opted in (Strava settings), also write Strava-sourced
@@ -929,7 +892,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     }
   },
 
-  syncHealthData: async () => {
+  syncHealthData: async (options?: SyncOptions) => {
     const { todayLog, challenge } = get();
 
     if (!todayLog?.$id || !challenge) {
@@ -947,8 +910,45 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       const { useHealthStore } = await import("@/store/useHealthStore");
       const healthState = useHealthStore.getState();
 
+      // Strava is a source in its own right — a user who connected Strava but
+      // declined Apple Health still has workouts to sync.
+      const { isStravaConnected } = await import("@/lib/strava");
+      const stravaConnected = await isStravaConnected();
+
+      if (!healthState.isAuthorized && !stravaConnected) {
+        console.log("syncHealthData: No health source connected");
+        return;
+      }
+
+      // Workouts are reconciled across HealthKit and Strava, so hand the whole
+      // job to resyncHealthDataForDate rather than duplicating that logic here
+      // — it covers steps/water/sleep too, and creates the activity logs
+      // without duplication. Done up front so the HealthKit-only work below
+      // isn't computed and then thrown away by the early return.
+      const hasWorkoutTracking = challenge.trackWorkout1 || challenge.trackWorkout2;
+      console.log("🏋️ syncHealthData: Checking workout sync", {
+        trackWorkout1: challenge.trackWorkout1,
+        trackWorkout2: challenge.trackWorkout2,
+        workoutsCount: healthState.workouts.length,
+        stravaConnected,
+      });
+
+      // Strava can hold workouts HealthKit knows nothing about, so being
+      // connected is reason enough to resync — waiting for a HealthKit workout
+      // to show up would strand a Strava-only user with an empty log.
+      if (hasWorkoutTracking && (healthState.workouts.length > 0 || stravaConnected) && challenge.$id) {
+        try {
+          console.log("🏋️ syncHealthData: Delegating to resyncHealthDataForDate for workout sync");
+          await get().resyncHealthDataForDate(new Date(), todayLog.$id, () => {}, options);
+          return; // resyncHealthDataForDate handled everything
+        } catch (error) {
+          console.error("Failed to resync workout data:", error);
+          // Fall through to regular sync if resync fails
+        }
+      }
+
       if (!healthState.isAuthorized) {
-        console.log("syncHealthData: Apple Health not authorized");
+        // Nothing below this point has a source without Apple Health.
         return;
       }
 
@@ -1038,33 +1038,6 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
           }
         } catch (error) {
           console.log("Sleep sync skipped:", error);
-        }
-      }
-
-      // Sync workout data if tracking is enabled
-      // Note: Instead of duplicating the workout sync logic here, we call resyncHealthData
-      // for today's date when workouts are detected. This ensures activity logs are created
-      // properly without duplication.
-      console.log("🏋️ syncHealthData: Checking workout sync", {
-        trackWorkout1: challenge.trackWorkout1,
-        trackWorkout2: challenge.trackWorkout2,
-        workoutsCount: healthState.workouts.length,
-        workouts: healthState.workouts.map(w => ({ name: w.activityName, duration: w.duration })),
-      });
-      
-      const hasWorkoutTracking = challenge.trackWorkout1 || challenge.trackWorkout2;
-      const hasWorkouts = healthState.workouts.length > 0;
-      
-      // If workouts changed, use resyncHealthData to properly handle activity logs
-      if (hasWorkoutTracking && hasWorkouts && challenge.$id) {
-        try {
-          console.log("🏋️ syncHealthData: Delegating to resyncHealthDataForDate for workout sync");
-          await get().resyncHealthDataForDate(new Date(), todayLog.$id, () => {});
-          // resyncHealthDataForDate handles both the daily log update and activity log creation
-          return; // Exit early since resyncHealthDataForDate handled everything
-        } catch (error) {
-          console.error("Failed to resync workout data:", error);
-          // Fall through to regular sync if resync fails
         }
       }
 
@@ -1192,6 +1165,6 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
   },
 
   clearChallenge: () => {
-    set({ challenge: null, todayLog: null, allLogs: [], activityLogs: [], error: null });
+    set({ challenge: null, todayLog: null, allLogs: [], activityLogs: [], todayWorkouts: null, error: null });
   },
 }));

@@ -1,6 +1,7 @@
 import { useTodayCycleLog } from "@/hooks/useCycleLog";
 import { useChallengeStore } from "@/store/useChallengeStore";
 import { useHealthStore } from "@/store/useHealthStore";
+import { useStravaStore } from "@/store/useStravaStore";
 import type { DailyLog } from "@/types/type";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
@@ -16,6 +17,9 @@ type TaskItem = {
   description: string;
   icon: keyof typeof Feather.glyphMap;
   isHealthTracked?: boolean; // True for tasks that sync from Apple Health on iOS
+  // Workouts can auto-track from Strava alone, with Apple Health declined —
+  // label the chip for the source that's actually feeding the task.
+  syncedFromStrava?: boolean;
   route?: string; // Route to navigate to when tapped
   healthData?: {
     current: number;
@@ -28,20 +32,21 @@ type TaskItem = {
 
 export default function DailyLogScreen() {
   const [connectingHealth, setConnectingHealth] = useState(false);
-  const lastSyncedRef = useRef<{ steps: number; outdoorMinutes: number; totalMinutes: number } | null>(null);
-  const { challenge, todayLog, toggleTask, updateProgress } = useChallengeStore();
+  const [refreshing, setRefreshing] = useState(false);
+  const lastSyncedStepsRef = useRef<number | null>(null);
+  const { challenge, todayLog, todayWorkouts, toggleTask, updateProgress, resyncHealthDataForDate } =
+    useChallengeStore();
   const { hasLoggedToday: cycleLoggedToday } = useTodayCycleLog();
-  const { 
-    steps, 
-    workouts, 
+  const { isConnected: stravaConnected } = useStravaStore();
+  const {
+    steps,
+    workouts,
     isAuthorized,
     isNativeModuleAvailable,
     error: healthError,
     isLoading: healthLoading,
     initialize: initHealth,
     fetchTodayData,
-    getOutdoorWorkoutMinutes,
-    getTotalWorkoutMinutes,
   } = useHealthStore();
 
   // Initialize health and fetch data (only if native module is available)
@@ -61,54 +66,28 @@ export default function DailyLogScreen() {
     }
   }, [isAuthorized]);
 
-  // Sync health data to daily log when it changes
+  // Sync steps to the daily log when they change. Workout minutes are
+  // deliberately *not* written here: resyncHealthDataForDate owns the workout
+  // slots, because it reconciles HealthKit against Strava. Summing the raw
+  // HealthKit list here would double-count Strava activities that Strava's own
+  // Health sync mirrors into HealthKit, and would resurrect the minutes of an
+  // activity deleted in Strava (HealthKit keeps its copy).
   useEffect(() => {
-    if (isAuthorized && todayLog && challenge && getOutdoorWorkoutMinutes && getTotalWorkoutMinutes) {
-      const outdoorMinutes = getOutdoorWorkoutMinutes();
-      const totalMinutes = getTotalWorkoutMinutes();
-
-      // Check if values have actually changed since last sync
-      if (lastSyncedRef.current &&
-          lastSyncedRef.current.steps === steps &&
-          lastSyncedRef.current.outdoorMinutes === outdoorMinutes &&
-          lastSyncedRef.current.totalMinutes === totalMinutes) {
-        return; // No changes, skip update
+    if (isAuthorized && todayLog && challenge) {
+      if (lastSyncedStepsRef.current === steps) {
+        return; // No change, skip update
       }
+      lastSyncedStepsRef.current = steps;
 
-      const progressUpdate: Partial<DailyLog> = {};
-
-      // Update steps
       if (challenge.trackSteps && steps !== todayLog.stepsCount) {
-        progressUpdate.stepsCount = steps;
-        progressUpdate.stepsCompleted = steps >= challenge.stepsGoal;
-      }
-
-      // Update workout 1 (outdoor)
-      if (challenge.trackWorkout1 && outdoorMinutes !== todayLog.workout1Minutes) {
-        progressUpdate.workout1Minutes = outdoorMinutes;
-        progressUpdate.workout1Completed = outdoorMinutes >= challenge.workoutMinutes;
-      }
-
-      // Update workout 2 (total - outdoor)
-      if (challenge.trackWorkout2) {
-        const secondWorkoutMinutes = Math.max(0, totalMinutes - challenge.workoutMinutes);
-        if (secondWorkoutMinutes !== todayLog.workout2Minutes) {
-          progressUpdate.workout2Minutes = secondWorkoutMinutes;
-          progressUpdate.workout2Completed = totalMinutes >= challenge.workoutMinutes * 2;
-        }
-      }
-
-      // Only update if there are changes
-      if (Object.keys(progressUpdate).length > 0) {
-        // Update ref before calling updateProgress to prevent re-triggering
-        lastSyncedRef.current = { steps, outdoorMinutes, totalMinutes };
+        const progressUpdate: Partial<DailyLog> = {
+          stepsCount: steps,
+          stepsCompleted: steps >= challenge.stepsGoal,
+        };
         updateProgress(progressUpdate);
-      } else {
-        // Still update ref even if no progress update to prevent checking again
-        lastSyncedRef.current = { steps, outdoorMinutes, totalMinutes };
       }
     }
-  }, [steps, isAuthorized, todayLog?.$id, challenge?.$id, getOutdoorWorkoutMinutes, getTotalWorkoutMinutes, updateProgress]);
+  }, [steps, isAuthorized, todayLog?.$id, challenge?.$id, updateProgress]);
 
   if (!challenge || !todayLog) {
     return (
@@ -135,6 +114,11 @@ export default function DailyLogScreen() {
   // Build task list based on challenge settings
   const tasks: TaskItem[] = [];
 
+  // Workout minutes come from the reconciled HealthKit + Strava sync, so
+  // either source on its own is enough to auto-track them.
+  const workoutsAutoTracked = isAuthorized || stravaConnected;
+  const workoutsFromStravaOnly = !isAuthorized && stravaConnected;
+
   if (challenge.trackWorkout1) {
     const currentMinutes = todayLog.workout1Minutes ?? 0;
     const meetsGoal = currentMinutes >= challenge.workoutMinutes;
@@ -145,7 +129,8 @@ export default function DailyLogScreen() {
       icon: "sun",
       route: "/log-workout?workout=1",
       isHealthTracked: Platform.OS === "ios",
-      healthData: isAuthorized ? {
+      syncedFromStrava: workoutsFromStravaOnly,
+      healthData: workoutsAutoTracked ? {
         current: currentMinutes,
         goal: challenge.workoutMinutes,
         unit: "min",
@@ -154,7 +139,7 @@ export default function DailyLogScreen() {
       } : undefined,
     });
   }
-  
+
   if (challenge.trackWorkout2) {
     // Workout 2
     const currentMinutes = todayLog.workout2Minutes ?? 0;
@@ -166,7 +151,8 @@ export default function DailyLogScreen() {
       icon: "activity",
       route: "/log-workout?workout=2",
       isHealthTracked: Platform.OS === "ios",
-      healthData: isAuthorized ? {
+      syncedFromStrava: workoutsFromStravaOnly,
+      healthData: workoutsAutoTracked ? {
         current: currentMinutes,
         goal: challenge.workoutMinutes,
         unit: "min",
@@ -384,6 +370,39 @@ export default function DailyLogScreen() {
     }
   };
 
+  // Prefer the reconciled HealthKit + Strava list the last resync produced, so
+  // the list matches the workout slots above it. Falls back to the raw
+  // HealthKit list only before the first resync of the session has landed —
+  // and only when Apple Health is actually connected, since a Strava-only user
+  // has nothing in that list.
+  const displayedWorkouts = (todayWorkouts ?? (isAuthorized ? workouts : [])).map((w) => ({
+    id: w.id,
+    activityName: w.activityName,
+    duration: w.duration,
+    calories: w.calories ?? 0,
+    distance: w.distance,
+    isOutdoor: w.isOutdoor,
+  }));
+
+  // Full resync, not just a HealthKit read — that's what picks up Strava
+  // changes (including deletions) and reconciles them into the workout slots.
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      if (isAuthorized) {
+        await fetchTodayData();
+      }
+      if (Platform.OS === "ios" && todayLog.$id) {
+        await resyncHealthDataForDate(new Date(), todayLog.$id, undefined, { forceStravaFetch: true });
+      }
+    } catch {
+      // resyncHealthDataForDate reports its own errors to Sentry
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleConnectHealth = async () => {
     try {
       setConnectingHealth(true);
@@ -407,8 +426,12 @@ export default function DailyLogScreen() {
           <Text className="text-xs text-blue-600">Day {currentDay} of {challenge.totalDays}</Text>
           <Text className="text-lg font-bold text-gray-900">Today's Log</Text>
         </View>
-        <Pressable onPress={fetchTodayData} className="p-2 -mr-2 bg-blue-100 rounded-full">
-          <Feather name="refresh-cw" size={20} color="#3B82F6" />
+        <Pressable onPress={handleRefresh} disabled={refreshing} className="p-2 -mr-2 bg-blue-100 rounded-full">
+          {refreshing ? (
+            <ActivityIndicator size="small" color="#3B82F6" />
+          ) : (
+            <Feather name="refresh-cw" size={20} color="#3B82F6" />
+          )}
         </Pressable>
       </View>
 
@@ -547,9 +570,23 @@ export default function DailyLogScreen() {
                         {task.label}
                       </Text>
                       {isHealthSynced && (
-                        <View className="ml-2 bg-purple-100 px-2 py-0.5 rounded flex-row items-center">
-                          <Feather name="heart" size={10} color="#8B5CF6" />
-                          <Text className="text-xs text-purple-600 font-medium ml-1">Health</Text>
+                        <View
+                          className={`ml-2 px-2 py-0.5 rounded flex-row items-center ${
+                            task.syncedFromStrava ? "bg-orange-100" : "bg-purple-100"
+                          }`}
+                        >
+                          <Feather
+                            name={task.syncedFromStrava ? "activity" : "heart"}
+                            size={10}
+                            color={task.syncedFromStrava ? "#FC4C02" : "#8B5CF6"}
+                          />
+                          <Text
+                            className={`text-xs font-medium ml-1 ${
+                              task.syncedFromStrava ? "text-orange-600" : "text-purple-600"
+                            }`}
+                          >
+                            {task.syncedFromStrava ? "Strava" : "Health"}
+                          </Text>
                         </View>
                       )}
                     </View>
@@ -601,15 +638,15 @@ export default function DailyLogScreen() {
           </View>
 
           {/* Workouts List */}
-          {isAuthorized && workouts.length > 0 && (
+          {displayedWorkouts.length > 0 && (
             <View className="mt-4">
               <Text className="text-sm font-semibold text-gray-700 mb-2 px-1">Today's Workouts</Text>
               <View className="bg-white rounded-2xl shadow-sm overflow-hidden">
-                {workouts.map((workout, index) => (
+                {displayedWorkouts.map((workout, index) => (
                   <View
                     key={workout.id}
                     className={`flex-row items-center p-4 ${
-                      index < workouts.length - 1 ? "border-b border-gray-100" : ""
+                      index < displayedWorkouts.length - 1 ? "border-b border-gray-100" : ""
                     }`}
                   >
                     <View className={`h-10 w-10 items-center justify-center rounded-full ${workout.isOutdoor ? "bg-orange-100" : "bg-blue-100"}`}>
