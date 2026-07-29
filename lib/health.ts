@@ -103,6 +103,39 @@ const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
   3000: { name: "Other", isOutdoor: false },
 };
 
+/**
+ * At cold/background launch, HealthKit's store is protected by the same
+ * `NSFileProtectionCompleteUntilFirstUserAuthentication` class as the keychain,
+ * so queries can fail for a window before the device's first unlock even
+ * though HealthKit reports the app as authorized. lib/auth.ts hit the
+ * identical race with SecureStore (Sentry 75-HARD-APP-1R); retry these
+ * callback-style HealthKit queries with the same exponential backoff.
+ */
+function isProtectedHealthDataError(error: any): boolean {
+  const message = error?.message || String(error);
+  return message.includes("Protected health data is inaccessible") || message.includes("AppleHealthKit error 0");
+}
+
+function queryHealthKitWithRetry<T>(
+  runQuery: (callback: (error: any, results: T) => void) => void,
+  attempts = 7,
+  baseDelayMs = 150
+): Promise<{ error: any; results?: T }> {
+  return new Promise((resolve) => {
+    const attempt = (attemptNumber: number) => {
+      runQuery((error, results) => {
+        if (error && isProtectedHealthDataError(error) && attemptNumber < attempts) {
+          const delayMs = Math.min(baseDelayMs * 2 ** (attemptNumber - 1), 1500);
+          setTimeout(() => attempt(attemptNumber + 1), delayMs);
+          return;
+        }
+        resolve({ error, results });
+      });
+    };
+    attempt(1);
+  });
+}
+
 function getWorkoutInfo(activityType: number): { name: string; isOutdoor: boolean; isUnknown?: boolean } {
   const info = WORKOUT_TYPE_MAP[activityType];
   if (info) {
@@ -298,21 +331,19 @@ class HealthService {
       date: date.toISOString(),
     };
 
-    return new Promise((resolve) => {
-      try {
-        this.HealthKit.getStepCount(options, (error: any, results: any) => {
-          if (error) {
-            console.error("Error getting steps:", error);
-            resolve(0);
-            return;
-          }
-          resolve(results?.value || 0);
-        });
-      } catch (error) {
-        console.error("Exception getting steps:", error);
-        resolve(0);
+    try {
+      const { error, results } = await queryHealthKitWithRetry<any>((callback) =>
+        this.HealthKit.getStepCount(options, callback)
+      );
+      if (error) {
+        console.error("Error getting steps:", error);
+        return 0;
       }
-    });
+      return results?.value || 0;
+    } catch (error) {
+      console.error("Exception getting steps:", error);
+      return 0;
+    }
   }
 
   /**
@@ -352,101 +383,99 @@ class HealthService {
     };
 
     logger.info("HealthKit getSamples request", { options });
-    
-    return new Promise((resolve) => {
-      try {
-        this.HealthKit.getSamples(options, (error: any, results: any) => {
-          if (error) {
-            logger.error("HealthKit getSamples error", {
-              error: error?.message || String(error),
-              errorType: typeof error,
-              options,
-            });
-            resolve([]);
-            return;
-          }
 
-          logger.info("HealthKit getSamples response", {
-            resultsCount: results?.length || 0,
-            resultsType: typeof results,
-            isArray: Array.isArray(results),
-            firstResult: results?.[0] ? JSON.stringify(results[0]).slice(0, 200) : null,
-          });
-          
-          if (results?.length > 0) {
-            console.log("🏋️ First workout raw data (ALL PROPERTIES):", JSON.stringify(results[0], null, 2));
-            console.log("🏋️ Available keys:", Object.keys(results[0]));
-          }
+    try {
+      const { error, results } = await queryHealthKitWithRetry<any>((callback) =>
+        this.HealthKit.getSamples(options, callback)
+      );
 
-          if (!results || results.length === 0) {
-            console.log("🏋️ getWorkoutsForDate: No workouts found for today");
-            logger.debug("HealthKit returned no workouts", {
-              dateRange: { start: options.startDate, end: options.endDate },
-            });
-            resolve([]);
-            return;
-          }
-
-          const workouts: WorkoutData[] = results.map((workout: any) => {
-            const activityType = workout.activityId || workout.activityType || 0;
-            const workoutInfo = getWorkoutInfo(activityType);
-            
-            // react-native-health may return the activity name directly from Apple Health
-            // Use it if available, otherwise fall back to our mapping
-            const appleActivityName = workout.activityName || workout.type || workout.workoutActivityType;
-
-            const startDate = new Date(workout.start || workout.startDate);
-            const endDate = new Date(workout.end || workout.endDate);
-            const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
-
-            console.log(`🏋️ Processing workout:`, {
-              ourMappedName: workoutInfo.name,
-              appleActivityName,
-              activityId: activityType,
-              duration: Math.round(duration),
-              allWorkoutKeys: Object.keys(workout),
-            });
-            
-            // Prefer Apple's activity name if it exists and differs from our mapping
-            // This handles cases where Apple returns a name we haven't mapped
-            const finalActivityName = appleActivityName || workoutInfo.name;
-            
-            // Log to Sentry if there's a mismatch between Apple's name and our mapping
-            if (appleActivityName && appleActivityName.toLowerCase() !== workoutInfo.name.toLowerCase()) {
-              logger.warn("Workout type mismatch - Apple name differs from our mapping", {
-                appleActivityName,
-                ourMappedName: workoutInfo.name,
-                activityId: activityType,
-                rawWorkoutData: JSON.stringify(workout).slice(0, 500),
-              });
-            }
-
-            return {
-              id: workout.id || `${startDate.getTime()}`,
-              activityType: String(activityType),
-              activityName: finalActivityName,
-              duration: Math.round(duration),
-              calories: workout.calories || 0,
-              distance: workout.distance || undefined,
-              startDate: startDate.toISOString(),
-              endDate: endDate.toISOString(),
-              isOutdoor: workoutInfo.isOutdoor,
-              sourceName: workout.sourceName || undefined,
-            };
-          });
-
-          console.log(`🏋️ getWorkoutsForDate: Returning ${workouts.length} workouts`);
-          resolve(workouts);
-        });
-      } catch (error: any) {
-        console.error("Exception getting workouts:", error);
-        logger.error("HealthKit workout fetch exception", {
+      if (error) {
+        logger.error("HealthKit getSamples error", {
           error: error?.message || String(error),
+          errorType: typeof error,
+          options,
+        });
+        return [];
+      }
+
+      logger.info("HealthKit getSamples response", {
+        resultsCount: results?.length || 0,
+        resultsType: typeof results,
+        isArray: Array.isArray(results),
+        firstResult: results?.[0] ? JSON.stringify(results[0]).slice(0, 200) : null,
+      });
+
+      if (results?.length > 0) {
+        console.log("🏋️ First workout raw data (ALL PROPERTIES):", JSON.stringify(results[0], null, 2));
+        console.log("🏋️ Available keys:", Object.keys(results[0]));
+      }
+
+      if (!results || results.length === 0) {
+        console.log("🏋️ getWorkoutsForDate: No workouts found for today");
+        logger.debug("HealthKit returned no workouts", {
           dateRange: { start: options.startDate, end: options.endDate },
         });
-        resolve([]);
+        return [];
       }
-    });
+
+      const workouts: WorkoutData[] = results.map((workout: any) => {
+        const activityType = workout.activityId || workout.activityType || 0;
+        const workoutInfo = getWorkoutInfo(activityType);
+
+        // react-native-health may return the activity name directly from Apple Health
+        // Use it if available, otherwise fall back to our mapping
+        const appleActivityName = workout.activityName || workout.type || workout.workoutActivityType;
+
+        const startDate = new Date(workout.start || workout.startDate);
+        const endDate = new Date(workout.end || workout.endDate);
+        const duration = (endDate.getTime() - startDate.getTime()) / (1000 * 60);
+
+        console.log(`🏋️ Processing workout:`, {
+          ourMappedName: workoutInfo.name,
+          appleActivityName,
+          activityId: activityType,
+          duration: Math.round(duration),
+          allWorkoutKeys: Object.keys(workout),
+        });
+
+        // Prefer Apple's activity name if it exists and differs from our mapping
+        // This handles cases where Apple returns a name we haven't mapped
+        const finalActivityName = appleActivityName || workoutInfo.name;
+
+        // Log to Sentry if there's a mismatch between Apple's name and our mapping
+        if (appleActivityName && appleActivityName.toLowerCase() !== workoutInfo.name.toLowerCase()) {
+          logger.warn("Workout type mismatch - Apple name differs from our mapping", {
+            appleActivityName,
+            ourMappedName: workoutInfo.name,
+            activityId: activityType,
+            rawWorkoutData: JSON.stringify(workout).slice(0, 500),
+          });
+        }
+
+        return {
+          id: workout.id || `${startDate.getTime()}`,
+          activityType: String(activityType),
+          activityName: finalActivityName,
+          duration: Math.round(duration),
+          calories: workout.calories || 0,
+          distance: workout.distance || undefined,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+          isOutdoor: workoutInfo.isOutdoor,
+          sourceName: workout.sourceName || undefined,
+        };
+      });
+
+      console.log(`🏋️ getWorkoutsForDate: Returning ${workouts.length} workouts`);
+      return workouts;
+    } catch (error: any) {
+      console.error("Exception getting workouts:", error);
+      logger.error("HealthKit workout fetch exception", {
+        error: error?.message || String(error),
+        dateRange: { start: options.startDate, end: options.endDate },
+      });
+      return [];
+    }
   }
 
   /**
