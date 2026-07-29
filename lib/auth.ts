@@ -20,6 +20,29 @@ const SIWA_USER_KEY = 'siwa_user_id';
 const SIWA_EMAIL_KEY = 'siwa_email';
 const SIWA_NAME_KEY = 'siwa_name';
 
+/**
+ * At cold launch, SecureStore reads can hit iOS's `errSecInteractionNotAllowed`
+ * for a window before `UIApplicationProtectedDataDidBecomeAvailable` fires —
+ * even though the device is unlocked. On some devices/launch paths (e.g. right
+ * after a reboot's first unlock) that window has been observed to run past a
+ * second, so back off with growing delays rather than a few quick retries.
+ * `checkSession` keeps status "loading" (no redirect to the sign-in screen)
+ * for as long as this is in flight, so it's safe to keep trying here.
+ */
+async function getItemWithRetry(key: string, attempts = 7, baseDelayMs = 150): Promise<string | null> {
+  for (let attempt = 1; attempt <= attempts; attempt++) {
+    try {
+      return await SecureStore.getItemAsync(key);
+    } catch (err) {
+      const isInteractionError = String(err).includes('User interaction is not allowed');
+      if (!isInteractionError || attempt === attempts) throw err;
+      const delayMs = Math.min(baseDelayMs * 2 ** (attempt - 1), 1500);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return null;
+}
+
 export type AppleIdentity = {
   appleUserId: string;
   email?: string;
@@ -59,8 +82,8 @@ export async function signInWithApple(): Promise<AppleIdentity> {
     ? [credential.fullName.givenName, credential.fullName.familyName].filter(Boolean).join(' ').trim()
     : '';
 
-  const email = credential.email ?? (await SecureStore.getItemAsync(SIWA_EMAIL_KEY)) ?? undefined;
-  const fullName = nameFromCredential || (await SecureStore.getItemAsync(SIWA_NAME_KEY)) || undefined;
+  const email = credential.email ?? (await getItemWithRetry(SIWA_EMAIL_KEY)) ?? undefined;
+  const fullName = nameFromCredential || (await getItemWithRetry(SIWA_NAME_KEY)) || undefined;
 
   await SecureStore.setItemAsync(SIWA_USER_KEY, appleUserId);
   if (email) await SecureStore.setItemAsync(SIWA_EMAIL_KEY, email);
@@ -70,10 +93,10 @@ export async function signInWithApple(): Promise<AppleIdentity> {
 }
 
 export async function getStoredIdentity(): Promise<AppleIdentity | null> {
-  const appleUserId = await SecureStore.getItemAsync(SIWA_USER_KEY);
+  const appleUserId = await getItemWithRetry(SIWA_USER_KEY);
   if (!appleUserId) return null;
-  const email = (await SecureStore.getItemAsync(SIWA_EMAIL_KEY)) ?? undefined;
-  const fullName = (await SecureStore.getItemAsync(SIWA_NAME_KEY)) ?? undefined;
+  const email = (await getItemWithRetry(SIWA_EMAIL_KEY)) ?? undefined;
+  const fullName = (await getItemWithRetry(SIWA_NAME_KEY)) ?? undefined;
   return { appleUserId, email, fullName };
 }
 
