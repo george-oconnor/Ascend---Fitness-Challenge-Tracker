@@ -18,9 +18,20 @@ import { NotificationService } from "@/lib/notifications";
 import { captureException, logger } from "@/lib/sentry";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import type { ActivityLog, ActivityType, Challenge, DailyLog } from "@/types/type";
-import { format } from "date-fns";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { format, subDays } from "date-fns";
 import { Platform } from "react-native";
 import { create } from "zustand";
+
+const LAST_HEALTH_FINALIZE_DATE_KEY = "lastHealthFinalizeDate";
+
+// Keyed by `${challengeId}:${dateStr}`. resyncHealthDataForDate reads
+// "existing activity logs" up front and only creates-vs-updates once its slow
+// HealthKit/Strava fetches finish, so concurrent triggers for the same day
+// (a Strava webhook retry, HealthKit background delivery, and a manual "Sync
+// Now" landing close together) would each see no existing log yet and each
+// create their own — see resyncHealthDataForDate below.
+const resyncInFlight = new Map<string, Promise<void>>();
 
 /**
  * Set forceStravaFetch for user- or event-triggered syncs (a refresh tap,
@@ -141,6 +152,12 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
 
       // If no log exists for today, create one
       if (!log) {
+        // The day just rolled over (or this is the very first launch) — take
+        // one last pass at yesterday's log before moving on, since background
+        // HealthKit delivery for steps is sparse and whatever count landed
+        // last would otherwise be frozen as the permanent historical record.
+        finalizePreviousDayHealthDataIfNeeded(challengeId);
+
         const { challenge } = get();
         if (challenge) {
           log = await createDailyLog({
@@ -336,6 +353,17 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       return;
     }
 
+    // Coalesce concurrent calls for the same challenge+date into one run
+    // instead of racing (see resyncInFlight comment above).
+    const dateStr = format(date, 'yyyy-MM-dd');
+    const lockKey = `${challengeId}:${dateStr}`;
+    const existingRun = resyncInFlight.get(lockKey);
+    if (existingRun) {
+      log(`⏳ Resync already running for ${dateStr}, waiting on it instead of racing`);
+      return existingRun;
+    }
+
+    const run = (async () => {
     try {
       const { healthService } = await import("@/lib/health");
       const { getMergedWorkoutsForDate } = await import("@/lib/mergedWorkouts");
@@ -379,8 +407,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       const activityLogsToCreate: Omit<ActivityLog, "$id">[] = [];
       const activityLogsToUpdate: { id: string; data: Partial<ActivityLog> }[] = [];
       const activityLogsToDelete: string[] = [];
-      const dateStr = format(date, 'yyyy-MM-dd');
-      
+
       // Fetch existing workout activity logs for this date
       const existingWorkout1Logs = await getActivityLogsForDate(challengeId, dateStr, 'workout1');
       const existingWorkout2Logs = await getActivityLogsForDate(challengeId, dateStr, 'workout2');
@@ -878,7 +905,7 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
 
       if (hasActivityLogChanges) {
         // Refresh activity logs to reflect the changes
-        const refreshedActivityLogs = await getActivityLogsForChallenge(challenge.$id);
+        const refreshedActivityLogs = await getActivityLogsForChallenge(challengeId);
         set({ activityLogs: refreshedActivityLogs });
         log(`🔄 Activity logs refreshed`);
       } else {
@@ -889,6 +916,14 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
       captureException(err instanceof Error ? err : new Error(errorMsg));
       log(`❌ Error: ${errorMsg}`);
       throw err;
+    }
+    })();
+
+    resyncInFlight.set(lockKey, run);
+    try {
+      await run;
+    } finally {
+      resyncInFlight.delete(lockKey);
     }
   },
 
@@ -1168,3 +1203,30 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
     set({ challenge: null, todayLog: null, allLogs: [], activityLogs: [], todayWorkouts: null, error: null });
   },
 }));
+
+/**
+ * Fired once, the moment fetchTodayLog notices a new day's log needs
+ * creating. Background HealthKit delivery for steps is sparse (see
+ * useHealthStore.enableHealthBackgroundSync), so whatever count landed last
+ * during the previous day would otherwise sit frozen as its permanent
+ * historical record. Guarded by AsyncStorage so it only runs once per
+ * calendar day even though fetchTodayLog can be called many times a day.
+ */
+async function finalizePreviousDayHealthDataIfNeeded(challengeId: string) {
+  try {
+    const yesterday = subDays(new Date(), 1);
+    const yesterdayStr = format(yesterday, "yyyy-MM-dd");
+
+    const lastFinalized = await AsyncStorage.getItem(LAST_HEALTH_FINALIZE_DATE_KEY);
+    if (lastFinalized === yesterdayStr) return;
+
+    const log = await getDailyLog(challengeId, yesterdayStr);
+    if (log?.$id) {
+      await useChallengeStore.getState().resyncHealthDataForDate(yesterday, log.$id);
+    }
+
+    await AsyncStorage.setItem(LAST_HEALTH_FINALIZE_DATE_KEY, yesterdayStr);
+  } catch (err) {
+    captureException(err instanceof Error ? err : new Error("Failed to finalize previous day's health data"));
+  }
+}

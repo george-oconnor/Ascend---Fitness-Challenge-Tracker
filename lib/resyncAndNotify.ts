@@ -40,10 +40,14 @@ export async function resyncTodayAndNotify(): Promise<void> {
     const notificationStore = useNotificationStore.getState();
     const today = new Date().toISOString().split("T")[0];
 
-    // Workouts: notify on any minutes growth in a slot (a workout was detected)
+    // Workouts: notify on any minutes growth in a slot (a workout was detected),
+    // guarded the same way water/sleep/weight/steps below are — dedup by day
+    // so concurrent resync triggers (e.g. a Strava webhook retry) can't each
+    // fire their own notification for the same growth.
     for (const slot of ["workout1", "workout2"] as const) {
       const grew = (after[`${slot}Minutes`] ?? 0) > (before?.[`${slot}Minutes`] ?? 0);
-      if (!grew) continue;
+      if (!grew || notificationStore.hasNotifiedWorkout(today, slot)) continue;
+      notificationStore.markWorkoutNotified(today, slot);
       try {
         const details = after.workoutDetails ? JSON.parse(after.workoutDetails) : {};
         await NotificationService.notifyWorkoutDetected(

@@ -139,8 +139,9 @@ export const useHealthStore = create<HealthState>((set, get) => ({
    * Enables HealthKit background delivery for workouts, water, sleep,
    * weight, mood, and steps, so data logged elsewhere (e.g. an Apple Watch,
    * or the Health app directly) while this app is closed gets pulled in.
-   * Steps use 'hourly' delivery (not 'immediate') since it's a
-   * high-frequency type — Apple discourages waking the app on every step.
+   * All types use 'immediate' delivery — 'hourly' for steps left the daily
+   * total looking stale for most of the day since it's only a best-effort
+   * ceiling, not a guarantee, for a continuously-accumulating type.
    *
    * Every wake-up triggers a resync, but only fires a notification for
    * genuinely new "obvious points": a workout appearing, a goal being
@@ -163,10 +164,7 @@ export const useHealthStore = create<HealthState>((set, get) => ({
       const types = Object.values(HealthKitBackgroundTypes);
       const results = await Promise.all(
         types.map((typeIdentifier) =>
-          healthSyncService.enableBackgroundDeliveryFor(
-            typeIdentifier,
-            typeIdentifier === HealthKitBackgroundTypes.Steps ? "hourly" : "immediate"
-          )
+          healthSyncService.enableBackgroundDeliveryFor(typeIdentifier, "immediate")
         )
       );
 
