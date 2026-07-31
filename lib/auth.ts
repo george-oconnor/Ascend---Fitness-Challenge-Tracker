@@ -65,6 +65,16 @@ export function isAppleCancel(err: unknown): boolean {
 }
 
 /**
+ * Apple's own generic wording for ASAuthorizationError.unknown (code 1000) —
+ * a native-side failure (stale iCloud session, Apple auth-server hiccup,
+ * missing entitlement) that the app can't diagnose or retry around, so the UI
+ * should show something more actionable than the raw message.
+ */
+export function isAppleUnknownError(err: unknown): boolean {
+  return (err as any)?.code === 'ERR_REQUEST_UNKNOWN';
+}
+
+/**
  * Runs the Apple sign-in sheet. Apple only returns name/email on the FIRST
  * authorization for a given Apple ID, so we persist them immediately and fall
  * back to the stored copy on subsequent sign-ins.

@@ -12,7 +12,7 @@ import { useFonts } from "expo-font";
 import * as Notifications from "expo-notifications";
 import { SplashScreen, Stack, useRouter, useSegments } from "expo-router";
 import { useEffect, useRef, useState } from "react";
-import { Platform } from "react-native";
+import { InteractionManager, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import './globals.css';
 
@@ -99,12 +99,20 @@ export default function RootLayout() {
     };
   }, [notificationsEnabled]);
 
-  // Initialize HealthKit early on iOS
+  // Initialize HealthKit early on iOS, but only once the session status (and
+  // therefore the initial onboarding/auth navigation) has resolved, and after
+  // any in-flight route transition finishes. Requesting HealthKit
+  // authorization while a navigation transition is still animating can make
+  // the native authorization sheet fail to present, so initHealthKit's
+  // callback errors out immediately instead of showing the permission prompt.
   useEffect(() => {
-    if (Platform.OS === "ios" && !healthInitAttempted.current) {
-      healthInitAttempted.current = true;
+    if (Platform.OS !== "ios" || healthInitAttempted.current) return;
+    if (status === "loading" || status === "idle") return;
+    healthInitAttempted.current = true;
+
+    InteractionManager.runAfterInteractions(() => {
       logger.info("Starting HealthKit initialization from _layout");
-      
+
       initHealth().then((authorized) => {
         logger.info("HealthKit initialization complete", {
           authorized,
@@ -119,8 +127,8 @@ export default function RootLayout() {
           error: err?.message || String(err),
         });
       });
-    }
-  }, []);
+    });
+  }, [status]);
 
   // Resolve the Strava connection up front — the home screen uses it to decide
   // whether to sync at all, so a Strava-only user shouldn't have to visit

@@ -5,6 +5,7 @@ import {
   getStoredIdentity,
   isAppleCancel,
   isAppleCredentialValid,
+  isAppleUnknownError,
   signInWithApple,
   type AppleIdentity,
 } from "@/lib/auth";
@@ -93,7 +94,9 @@ export const useSessionStore = create<SessionState>((set) => ({
         set({ status: "unauthenticated", error: null });
         return;
       }
-      const errorMsg = err instanceof Error ? err.message : "Sign in failed";
+      const errorMsg = isAppleUnknownError(err)
+        ? "Sign in with Apple couldn't complete. Check that this device is signed into iCloud, then try again."
+        : err instanceof Error ? err.message : "Sign in failed";
       captureException(err instanceof Error ? err : new Error(errorMsg), {
         operation: "sign_in_apple",
       });
