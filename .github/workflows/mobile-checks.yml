@@ -24,3 +24,7 @@ jobs:
         run: node scripts/ci/quality-ratchet.mjs
       - name: Profiles used for OTA promotion share the same public settings
         run: node scripts/ci/eas-profile-env.mjs internal --same-public-env-as production testflight
+      # Bundles the app the way "Mobile OTA update" does, so a bundling error
+      # (e.g. a missing Babel preset) fails the PR rather than the publish.
+      - name: JavaScript bundle builds
+        run: CI=1 npx expo export --platform ios --output-dir /tmp/bundle-check
