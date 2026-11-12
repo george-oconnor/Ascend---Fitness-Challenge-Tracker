@@ -1,4 +1,5 @@
 import { StravaLogo } from "@/components/StravaLogo";
+import { formatAppVersion, getAppVersion } from "@/lib/appVersion";
 import { useNotificationStore } from "@/store/useNotificationStore";
 import { useSessionStore } from "@/store/useSessionStore";
 import { useStravaStore } from "@/store/useStravaStore";
@@ -19,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function SettingsScreen() {
   const { user, logout, deleteAccount } = useSessionStore();
+  const version = getAppVersion();
   const { notificationsEnabled, setNotificationsEnabled } = useNotificationStore();
   const { isConnected: stravaConnected, checkConnection: checkStravaConnection } = useStravaStore();
   const [loading, setLoading] = useState(false);
@@ -246,9 +248,17 @@ export default function SettingsScreen() {
           <Text className="text-xs text-gray-400">
             Account ID: {user?.id ? user.id.slice(0, 8) + "..." : "N/A"}
           </Text>
-          <Text className="text-xs text-gray-400 mt-1">
-            Version 1.0.0
+          {/* Which version is running, so you can tell if you have the latest update. */}
+          <Text className="text-xs text-gray-400 mt-1" selectable>
+            {formatAppVersion(version)}
           </Text>
+          {version.publishedAt ? (
+            <Text className="text-xs text-gray-400 mt-1">
+              Update published{" "}
+              {version.publishedAt.toLocaleString("en-IE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}
+              {version.channel ? ` · ${version.channel}` : ""}
+            </Text>
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>

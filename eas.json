@@ -1,16 +1,27 @@
 {
   "cli": {
     "version": ">= 5.9.1",
-      "appVersionSource": "local"
+    "appVersionSource": "remote"
   },
   "build": {
+    "_base": {
+      "env": {
+        "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
+        "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728",
+        "EXPO_PUBLIC_SENTRY_DSN": "https://427b038e9826c76a4003063a3ff7d179@o4509054949195776.ingest.de.sentry.io/4510664307441744",
+        "EXPO_PUBLIC_STRAVA_CLIENT_ID": "268020",
+        "EXPO_PUBLIC_STRAVA_TOKEN_SERVER_URL": "https://server-iota-five-15.vercel.app"
+      }
+    },
     "preview": {
       "ios": {
         "simulator": true
-      }
+      },
+      "channel": "preview"
     },
     "preview3": {
-      "developmentClient": true
+      "developmentClient": true,
+      "channel": "preview3"
     },
     "development": {
       "ios": {
@@ -24,36 +35,41 @@
           "EXPO_PUBLIC_BUILD_PROFILE": "development",
           "CLOUDKIT_ENV": "Development"
         }
-      }
+      },
+      "channel": "development"
+    },
+    "internal": {
+      "extends": "_base",
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "medium"
+      },
+      "env": {
+        "CLOUDKIT_ENV": "Production"
+      },
+      "channel": "internal"
     },
     "production": {
+      "extends": "_base",
       "ios": {
-        "resourceClass": "medium",
-        "env": {
-          "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
-          "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728",
-          "EXPO_PUBLIC_SENTRY_DSN": "https://427b038e9826c76a4003063a3ff7d179@o4509054949195776.ingest.de.sentry.io/4510664307441744",
-          "EXPO_PUBLIC_BUILD_PROFILE": "production",
-          "CLOUDKIT_ENV": "Production",
-          "EXPO_PUBLIC_STRAVA_CLIENT_ID": "268020",
-          "EXPO_PUBLIC_STRAVA_TOKEN_SERVER_URL": "https://server-iota-five-15.vercel.app"
-        }
-      }
+        "resourceClass": "medium"
+      },
+      "env": {
+        "CLOUDKIT_ENV": "Production"
+      },
+      "channel": "production",
+      "autoIncrement": true
     },
     "testflight": {
+      "extends": "_base",
       "ios": {
-        "resourceClass": "medium",
-        "developmentClient": false,
-        "env": {
-          "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
-          "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728",
-          "EXPO_PUBLIC_SENTRY_DSN": "https://427b038e9826c76a4003063a3ff7d179@o4509054949195776.ingest.de.sentry.io/4510664307441744",
-          "EXPO_PUBLIC_BUILD_PROFILE": "testflight",
-          "CLOUDKIT_ENV": "Production",
-          "EXPO_PUBLIC_STRAVA_CLIENT_ID": "268020",
-          "EXPO_PUBLIC_STRAVA_TOKEN_SERVER_URL": "https://server-iota-five-15.vercel.app"
-        }
-      }
+        "resourceClass": "medium"
+      },
+      "env": {
+        "CLOUDKIT_ENV": "Production"
+      },
+      "channel": "testflight",
+      "autoIncrement": true
     }
   },
   "submit": {

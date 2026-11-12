@@ -1,0 +1,100 @@
+name: Mobile OTA update
+
+# Publishes JavaScript-only changes as an EAS Update to the "internal" channel:
+# only internal-profile builds (your own test devices) receive it, never App
+# Store users. When you're happy, run "Mobile promote update" to send that
+# exact update to the App Store channels.
+#
+# Updates only reach builds with the same app version (runtimeVersion policy
+# "appVersion"). Pushes that touch native code/config are skipped: those need
+# a new build ("Mobile build iOS").
+on:
+  push:
+    branches: [main]
+    paths-ignore: ["server/**", "docs/**", "**/*.md", ".github/**", "scripts/ci/**", "scripts/setup-*", ".vscode/**", "cloudkit/**"]
+  workflow_dispatch:
+    inputs:
+      message:
+        description: "Update message (defaults to the commit message)"
+        required: false
+
+concurrency:
+  group: mobile-update
+  cancel-in-progress: false
+
+env:
+  CHANNEL: internal
+  PROFILE: internal          # its eas.json env is what the bundle is built with
+  EAS_CLI: eas-cli@27.2.0
+
+jobs:
+  checks:
+    uses: ./.github/workflows/mobile-checks.yml
+
+  publish:
+    needs: checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Skip if EXPO_TOKEN isn't set
+        id: token
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "::notice::EXPO_TOKEN secret not set; skipping OTA publish."
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip if this push changes native code or config
+        id: native
+        if: steps.token.outputs.ok == 'true' && github.event_name == 'push'
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          if [ -z "$BEFORE" ] || [ "$BEFORE" = "0000000000000000000000000000000000000000" ]; then
+            BEFORE="HEAD~1"
+          fi
+          changed="$(git diff --name-only "$BEFORE" HEAD || true)"
+          native="$(printf '%s\n' "$changed" | grep -E '^(package\.json|app\.json|app\.config\.js|eas\.json|modules/|patches/|ios/|android/|plugins/)' || true)"
+          if [ -n "$native" ]; then
+            echo "::warning::Native-affecting files changed, so no OTA update was published. Build a new version with 'Mobile build iOS'. Files: $(echo $native)"
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/setup-node@v4
+        if: steps.token.outputs.ok == 'true' && steps.native.outputs.skip != 'true'
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package.json
+
+      - name: Publish update to the internal channel
+        if: steps.token.outputs.ok == 'true' && steps.native.outputs.skip != 'true'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          MESSAGE: ${{ inputs.message }}
+        run: |
+          npm install --no-audit --no-fund
+          # Bake in exactly the EXPO_PUBLIC_* settings the internal profile's builds use.
+          while IFS= read -r line; do export "$line"; done < <(node scripts/ci/eas-profile-env.mjs "$PROFILE")
+          echo "Using EXPO_PUBLIC_APPWRITE_PROJECT_ID=$EXPO_PUBLIC_APPWRITE_PROJECT_ID"
+          # Shown at the bottom of the app's Settings screen (lib/appVersion.ts) so you can tell
+          # which update you're running. Promotion copies the update, so the
+          # App Store channel shows the same number.
+          export EXPO_PUBLIC_UPDATE_NUMBER="${{ github.run_number }}"
+          export EXPO_PUBLIC_GIT_SHA="${{ github.sha }}"
+          MSG="${MESSAGE:-$(git log -1 --pretty=%s)}"
+          npx -y "$EAS_CLI" update --channel "$CHANNEL" --platform ios --environment production \
+            --message "$MSG" --non-interactive
+          echo "### Published update ${{ github.run_number }} to \`$CHANNEL\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "The bottom of the app's Settings screen shows: **update ${{ github.run_number }} · ${GITHUB_SHA::7}**" >> "$GITHUB_STEP_SUMMARY"
+          echo "Test it on an internal build, then run **Mobile promote update** to ship it to App Store users." >> "$GITHUB_STEP_SUMMARY"

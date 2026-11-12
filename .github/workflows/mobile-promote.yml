@@ -1,0 +1,60 @@
+name: Mobile promote update
+
+# Sends a tested OTA update from the internal channel to App Store users.
+# It republishes the same update group (no rebuild) to both channels an App
+# Store build could be listening on, "production" and "testflight", so it
+# works whichever profile the live build was made with.
+on:
+  workflow_dispatch:
+    inputs:
+      group:
+        description: "Update group ID to promote (leave empty for the latest on the internal channel)"
+        required: false
+      channels:
+        description: "Destination channels (comma-separated)"
+        required: false
+        default: "production,testflight"
+
+concurrency:
+  group: mobile-promote
+  cancel-in-progress: false
+
+env:
+  EAS_CLI: eas-cli@27.2.0
+
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: app-store   # optional: add required reviewers in Settings > Environments
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check the bundle's settings are valid for the App Store channels
+        run: node scripts/ci/eas-profile-env.mjs internal --same-public-env-as production testflight
+
+      - name: Republish
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          GROUP: ${{ inputs.group }}
+          CHANNELS: ${{ inputs.channels }}
+        run: |
+          [ -n "$EXPO_TOKEN" ] || { echo "::error::Add the EXPO_TOKEN secret first"; exit 1; }
+          source_args="--channel internal"
+          if [ -n "$GROUP" ]; then
+            printf '%s' "$GROUP" | grep -Eq '^[0-9a-fA-F-]{36}$' || { echo "::error::group must be an update group UUID"; exit 1; }
+            source_args="--group $GROUP"
+          fi
+          IFS=',' read -ra dests <<< "$CHANNELS"
+          for dest in "${dests[@]}"; do
+            dest="$(echo "$dest" | tr -d '[:space:]')"
+            printf '%s' "$dest" | grep -Eq '^[a-z0-9_-]+$' || { echo "::error::bad channel name '$dest'"; exit 1; }
+            echo "==> Promoting to $dest"
+            npx -y "$EAS_CLI" update:republish $source_args --destination-channel "$dest" --platform ios \
+              --message "Promoted from internal by ${{ github.actor }}" --non-interactive
+            echo "- promoted to \`$dest\`" >> "$GITHUB_STEP_SUMMARY"
+          done
