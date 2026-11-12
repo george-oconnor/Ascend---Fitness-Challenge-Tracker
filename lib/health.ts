@@ -333,10 +333,19 @@ class HealthService {
       try {
         this.HealthKit.initHealthKit(permissions, (error: any) => {
           if (error) {
-            logger.error("HealthKit initHealthKit callback error", { 
-              error: error?.message || String(error),
-              errorType: typeof error,
-            });
+            const message = error?.message || String(error);
+            // iOS tore down the permission sheet before it finished (the app
+            // was backgrounded or the view service was killed). Nothing is
+            // wrong with the app, and the next HealthKit read asks again.
+            const interrupted = /_UIViewServiceHostSessionErrorDomain|service connection .* halted/i.test(message);
+            if (interrupted) {
+              logger.info("HealthKit permission sheet interrupted", { error: message });
+            } else {
+              logger.error("HealthKit initHealthKit callback error", {
+                error: message,
+                errorType: typeof error,
+              });
+            }
             this.isInitialized = false;
             this.isAuthorized = false;
             resolve(false);

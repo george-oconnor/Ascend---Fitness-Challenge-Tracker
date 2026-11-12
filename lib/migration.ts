@@ -223,7 +223,7 @@ export async function runMigration(
     logger.info('Migration completed', counts);
     return { success: true, counts };
   } catch (err) {
-    const errorMsg = err instanceof Error ? err.message : 'Migration failed';
+    const errorMsg = describeMigrationError(err);
     const activeStep = steps.find((s) => s.status === 'active');
     if (activeStep) {
       activeStep.status = 'error';
@@ -234,6 +234,24 @@ export async function runMigration(
     });
     return { success: false, error: errorMsg, counts };
   }
+}
+
+/**
+ * A message for the migration screen. Appwrite's own messages are written for
+ * the project's developer (e.g. "Project is paused due to inactivity. Please
+ * restore it from the console"), so the server-side ones are replaced.
+ */
+function describeMigrationError(err: unknown): string {
+  if (!(err instanceof Error)) return 'Migration failed';
+  const type = (err as { type?: unknown }).type;
+  const code = (err as { code?: unknown }).code;
+  if (type === 'project_paused' || /project is paused/i.test(err.message)) {
+    return "Your old account's server is offline right now, so your data can't be copied yet. Please try again later.";
+  }
+  if (typeof code === 'number' && code >= 500) {
+    return "Your old account's server isn't responding. Please try again later.";
+  }
+  return err.message;
 }
 
 /**

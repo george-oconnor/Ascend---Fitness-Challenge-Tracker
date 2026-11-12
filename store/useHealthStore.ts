@@ -72,7 +72,9 @@ export const useHealthStore = create<HealthState>((set, get) => ({
         // Fetch today's data after initialization
         await get().fetchTodayData();
       } else {
-        logger.warn("HealthKit authorization denied");
+        // The user's choice (or an interrupted permission sheet), not a fault:
+        // a breadcrumb only, so it doesn't open a Sentry issue.
+        logger.info("HealthKit authorization denied");
       }
       
       return authorized;
