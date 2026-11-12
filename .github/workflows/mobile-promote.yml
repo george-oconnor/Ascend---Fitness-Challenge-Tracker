@@ -34,6 +34,10 @@ jobs:
         with:
           node-version: 22
 
+      # eas-cli reads app.config.js, whose plugins (expo-router etc.) must resolve
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
       - name: Check the bundle's settings are valid for the App Store channels
         run: node scripts/ci/eas-profile-env.mjs internal --same-public-env-as production testflight
 
@@ -44,11 +48,14 @@ jobs:
           CHANNELS: ${{ inputs.channels }}
         run: |
           [ -n "$EXPO_TOKEN" ] || { echo "::error::Add the EXPO_TOKEN secret first"; exit 1; }
-          source_args="--channel internal"
-          if [ -n "$GROUP" ]; then
-            printf '%s' "$GROUP" | grep -Eq '^[0-9a-fA-F-]{36}$' || { echo "::error::group must be an update group UUID"; exit 1; }
-            source_args="--group $GROUP"
+          # eas-cli only accepts --group with --non-interactive, so look up
+          # the latest group on the internal branch when none was given.
+          if [ -z "$GROUP" ]; then
+            GROUP="$(npx -y "$EAS_CLI" update:list --branch internal --limit 1 --json --non-interactive 2>/dev/null | jq -r '.currentPage[0].group // empty')"
+            echo "Latest update group on internal: ${GROUP:-none}"
           fi
+          printf '%s' "$GROUP" | grep -Eq '^[0-9a-fA-F-]{36}$' || { echo "::error::group must be an update group UUID"; exit 1; }
+          source_args="--group $GROUP"
           IFS=',' read -ra dests <<< "$CHANNELS"
           for dest in "${dests[@]}"; do
             dest="$(echo "$dest" | tr -d '[:space:]')"
