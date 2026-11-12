@@ -5,6 +5,7 @@
   },
   "build": {
     "_base": {
+      "node": "22.23.4",
       "env": {
         "EXPO_PUBLIC_APPWRITE_ENDPOINT": "https://fra.cloud.appwrite.io/v1",
         "EXPO_PUBLIC_APPWRITE_PROJECT_ID": "695d3166000489e7b728",
