@@ -23,7 +23,7 @@ The `server/` folder (the Strava token proxy) is a separate Vercel project and i
 
 **Which version am I on?** The bottom of the Settings screen shows e.g. **Ascend 2.1.1 (3) · update 12 · 4670153**: the app version and build, then the update number (the "Mobile OTA update" run that published it, also shown in that run's summary) and its commit. Promoting keeps the same number, so the App Store build shows it too. "built-in" means the app hasn't downloaded an update yet; close and reopen it (an update downloads on one launch and applies on the next). Sentry events carry the same details as tags (`update.number`, `update.commit`, `update.channel`, `update.id`), so you can filter errors by update, e.g. `update.number:12`.
 
-OTA updates only reach builds with the **same app version** (`runtimeVersion` policy `appVersion`, currently 2.1.1). After bumping `version` in `app.json`, ship a build first. Builds made before this setup (2.1.1 build 2 and earlier) don't include `expo-updates`, so they never receive updates.
+OTA updates only reach builds with the **same app version** (`runtimeVersion` policy `appVersion`, currently 2.1.2). After bumping `version` in `app.json`, ship a build first, and rebuild your `internal` test phone too: a phone on the old version stops receiving updates. The `version` must also be higher than the one live on the App Store, or Apple rejects the upload. Builds made before this setup (2.1.1 build 2 and earlier) don't include `expo-updates`, so they never receive updates.
 
 ## Where builds run
 
