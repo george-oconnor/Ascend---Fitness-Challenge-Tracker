@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/react-native";
 import Constants from "expo-constants";
+import * as Updates from "expo-updates";
 
 const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
 
@@ -24,7 +25,19 @@ function getEnvironment(): string {
     return "development";
   }
 
-  // Use the build profile environment variable set in eas.json
+  // The build's EAS Update channel (set per profile in eas.json). The same
+  // JavaScript bundle is promoted from "internal" to "testflight" and
+  // "production", so this has to be read at runtime, not baked in.
+  const channel = Updates.channel;
+  if (channel === "production") {
+    return "production";
+  }
+  if (channel === "testflight" || channel === "internal") {
+    return "staging";
+  }
+
+  // Builds without a channel (older builds, dev clients) fall back to the
+  // build profile variable set in eas.json
   const buildProfile = process.env.EXPO_PUBLIC_BUILD_PROFILE;
   
   if (buildProfile === "development" || buildProfile === "preview") {

@@ -1,0 +1,26 @@
+name: Mobile checks
+
+# Type-check and lint the iOS app on every PR. Existing errors are tracked in
+# .github/quality-baseline.json; the check fails only if a change adds more.
+on:
+  pull_request:
+    paths-ignore: ["server/**", "docs/**", "**/*.md"]
+  workflow_call:   # reused by "Mobile OTA update" before publishing
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: package.json
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+      - name: Type-check and lint (ratchet)
+        run: node scripts/ci/quality-ratchet.mjs
+      - name: Profiles used for OTA promotion share the same public settings
+        run: node scripts/ci/eas-profile-env.mjs internal --same-public-env-as production testflight

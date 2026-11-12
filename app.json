@@ -10,7 +10,7 @@
     "newArchEnabled": true,
     "description": "Ascend - Transform your life through daily fitness challenges and habit tracking",
     "ios": {
-        "buildNumber": "2",
+      "buildNumber": "2",
       "supportsTablet": true,
       "bundleIdentifier": "com.georgeoc.75hardapp",
       "entitlements": {
@@ -30,7 +30,9 @@
         "NSPhotoLibraryUsageDescription": "Photo library access may be used for future features.",
         "NSHealthShareUsageDescription": "This app needs access to your health data to track your steps and workouts.",
         "NSHealthUpdateUsageDescription": "This app needs access to update your health data to log your workouts.",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "plugins": [
@@ -78,6 +80,12 @@
       "eas": {
         "projectId": "952f241a-2d00-4951-8b7a-b073ec850257"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/952f241a-2d00-4951-8b7a-b073ec850257"
     }
   }
 }

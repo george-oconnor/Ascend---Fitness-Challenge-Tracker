@@ -1,0 +1,118 @@
+name: Mobile build iOS
+
+# Builds the iOS app and (optionally) submits it to TestFlight. Pick where it builds:
+#   eas-cloud     EAS build servers (uses your Expo plan's build quota; fastest to set up)
+#   github-macos  GitHub's macOS runner running `eas build --local` (uses private-repo
+#                 Actions minutes at 10x: roughly 8-10 builds/month on the free tier)
+#   my-mac        your own Mac registered as a self-hosted runner (free; Mac must be on)
+# Build numbers are managed by EAS (appVersionSource: remote, autoIncrement).
+on:
+  workflow_dispatch:
+    inputs:
+      where:
+        description: "Where to build"
+        type: choice
+        options: [eas-cloud, github-macos, my-mac]
+        default: eas-cloud
+      profile:
+        description: "EAS build profile"
+        type: choice
+        options: [production, testflight, internal]
+        default: production
+      submit:
+        description: "Submit to TestFlight when done (production/testflight only)"
+        type: boolean
+        default: true
+
+concurrency:
+  group: mobile-build-${{ inputs.profile }}
+  cancel-in-progress: false
+
+env:
+  EAS_CLI: eas-cli@27.2.0
+  PROFILE: ${{ inputs.profile }}
+
+jobs:
+  checks:
+    uses: ./.github/workflows/mobile-checks.yml
+
+  cloud:
+    needs: checks
+    if: inputs.where == 'eas-cloud'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Start EAS build
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+          SUBMIT: ${{ inputs.submit }}
+        run: |
+          [ -n "$EXPO_TOKEN" ] || { echo "::error::Add the EXPO_TOKEN secret first"; exit 1; }
+          npm install --no-audit --no-fund
+          submit_args=""
+          if [ "$SUBMIT" = "true" ] && [ "$PROFILE" != "internal" ]; then
+            submit_args="--auto-submit-with-profile=$PROFILE"
+          fi
+          # --no-wait: the build runs on EAS; this job ends straight away so it doesn't
+          # spend Actions minutes waiting. Follow progress on expo.dev.
+          npx -y "$EAS_CLI" build --platform ios --profile "$PROFILE" $submit_args --non-interactive --no-wait
+          echo "Build queued on EAS ($PROFILE). Track it at https://expo.dev under Builds." >> "$GITHUB_STEP_SUMMARY"
+
+  local:
+    needs: checks
+    if: inputs.where != 'eas-cloud'
+    runs-on: ${{ fromJSON(inputs.where == 'my-mac' && '["self-hosted","macOS"]' || '"macos-latest"') }}
+    timeout-minutes: 90
+    env:
+      LANG: en_US.UTF-8
+      LC_ALL: en_US.UTF-8
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Use the latest stable Xcode (GitHub runner only)
+        if: inputs.where == 'github-macos'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Prepare signing prerequisites (Apple WWDR certificates, tooling check)
+        if: inputs.where == 'github-macos'
+        run: bash scripts/setup-local-ios-build.sh
+
+      - name: Build locally with EAS
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          [ -n "$EXPO_TOKEN" ] || { echo "::error::Add the EXPO_TOKEN secret first"; exit 1; }
+          npm install --no-audit --no-fund
+          mkdir -p build
+          npx -y "$EAS_CLI" build --platform ios --profile "$PROFILE" --local --non-interactive \
+            --output "build/ascend-$PROFILE-${{ github.run_number }}.ipa"
+
+      - name: Submit to TestFlight
+        if: inputs.submit && inputs.profile != 'internal'
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          npx -y "$EAS_CLI" submit --platform ios --profile "$PROFILE" \
+            --path "build/ascend-$PROFILE-${{ github.run_number }}.ipa" --non-interactive
+          echo "Submitted to TestFlight ($PROFILE)." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Keep the .ipa for a week
+        uses: actions/upload-artifact@v4
+        with:
+          name: ascend-${{ inputs.profile }}-${{ github.run_number }}
+          path: build/*.ipa
+          retention-days: 7
+
+      - name: Clean up (self-hosted runner)
+        if: always() && inputs.where == 'my-mac'
+        run: rm -rf build node_modules
