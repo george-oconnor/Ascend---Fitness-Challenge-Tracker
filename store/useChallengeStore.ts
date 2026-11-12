@@ -912,6 +912,13 @@ export const useChallengeStore = create<ChallengeState>((set, get) => ({
         log(`ℹ️ No activity logs to create, update, or delete`);
       }
     } catch (err) {
+      // Phone locked (background launch): skip this sync rather than writing
+      // zero workout minutes over the day's log. The next sync after unlock
+      // picks everything up.
+      if ((err as any)?.name === "HealthDataLockedError") {
+        log("🔒 Apple Health is locked, skipping this resync");
+        return;
+      }
       const errorMsg = err instanceof Error ? err.message : "Failed to re-sync health data";
       captureException(err instanceof Error ? err : new Error(errorMsg));
       log(`❌ Error: ${errorMsg}`);

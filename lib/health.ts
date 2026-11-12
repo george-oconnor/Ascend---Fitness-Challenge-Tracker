@@ -21,26 +21,12 @@ export type WorkoutData = {
   sourceName?: string; // the app HealthKit attributes this sample to, e.g. "Strava"
 };
 
-// Map Apple's workout activity types to readable names
+// Apple's HKWorkoutActivityType raw values (the `activityId` react-native-health
+// returns) mapped to readable names. Names follow Apple's, so they match the
+// `activityName` react-native-health sends once spaces are ignored. isOutdoor is
+// the default for the activity; a workout's own HKIndoorWorkout / swimming
+// location metadata overrides it (see isOutdoorWorkout).
 const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
-  // Outdoor activities
-  37: { name: "Running", isOutdoor: true },
-  52: { name: "Walking", isOutdoor: true },
-  13: { name: "Cycling", isOutdoor: true },
-  24: { name: "Hiking", isOutdoor: true },
-  46: { name: "Swimming (Open Water)", isOutdoor: true },
-  56: { name: "Rowing (Outdoor)", isOutdoor: true },
-  // Indoor activities
-  20: { name: "Functional Training", isOutdoor: false },
-  50: { name: "Traditional Strength Training", isOutdoor: false },
-  25: { name: "High Intensity Interval Training", isOutdoor: false },
-  35: { name: "Pilates", isOutdoor: false },
-  63: { name: "Yoga", isOutdoor: false },
-  45: { name: "Swimming (Pool)", isOutdoor: false },
-  19: { name: "Elliptical", isOutdoor: false },
-  83: { name: "Indoor Running", isOutdoor: false },
-  57: { name: "Rowing", isOutdoor: false },
-  // Other common types
   1: { name: "American Football", isOutdoor: true },
   2: { name: "Archery", isOutdoor: true },
   3: { name: "Australian Football", isOutdoor: true },
@@ -53,55 +39,101 @@ const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
   10: { name: "Cricket", isOutdoor: true },
   11: { name: "Cross Training", isOutdoor: false },
   12: { name: "Curling", isOutdoor: false },
+  13: { name: "Cycling", isOutdoor: true },
   14: { name: "Dance", isOutdoor: false },
-  16: { name: "Fencing", isOutdoor: false },
-  17: { name: "Fishing", isOutdoor: true },
+  15: { name: "Dance Inspired Training", isOutdoor: false },
+  16: { name: "Elliptical", isOutdoor: false },
+  17: { name: "Equestrian Sports", isOutdoor: true },
+  18: { name: "Fencing", isOutdoor: false },
+  19: { name: "Fishing", isOutdoor: true },
+  20: { name: "Functional Strength Training", isOutdoor: false },
   21: { name: "Golf", isOutdoor: true },
   22: { name: "Gymnastics", isOutdoor: false },
   23: { name: "Handball", isOutdoor: true },
-  26: { name: "Hockey", isOutdoor: true },
-  27: { name: "Hunting", isOutdoor: true },
-  28: { name: "Lacrosse", isOutdoor: true },
-  29: { name: "Martial Arts", isOutdoor: false },
-  30: { name: "Mind and Body", isOutdoor: false },
-  32: { name: "Paddle Sports", isOutdoor: true },
-  33: { name: "Play", isOutdoor: true },
-  36: { name: "Racquetball", isOutdoor: false },
-  38: { name: "Rugby", isOutdoor: true },
-  39: { name: "Sailing", isOutdoor: true },
-  40: { name: "Skating", isOutdoor: true },
-  41: { name: "Snow Sports", isOutdoor: true },
-  42: { name: "Soccer", isOutdoor: true },
-  43: { name: "Softball", isOutdoor: true },
-  44: { name: "Squash", isOutdoor: false },
-  47: { name: "Surfing", isOutdoor: true },
-  48: { name: "Table Tennis", isOutdoor: false },
-  49: { name: "Tennis", isOutdoor: true },
-  51: { name: "Track and Field", isOutdoor: true },
-  53: { name: "Volleyball", isOutdoor: true },
-  54: { name: "Water Fitness", isOutdoor: false },
-  55: { name: "Water Polo", isOutdoor: true },
-  58: { name: "Water Sports", isOutdoor: true },
-  59: { name: "Wrestling", isOutdoor: false },
-  60: { name: "Core Training", isOutdoor: false },
+  24: { name: "Hiking", isOutdoor: true },
+  25: { name: "Hockey", isOutdoor: true },
+  26: { name: "Hunting", isOutdoor: true },
+  27: { name: "Lacrosse", isOutdoor: true },
+  28: { name: "Martial Arts", isOutdoor: false },
+  29: { name: "Mind And Body", isOutdoor: false },
+  30: { name: "Mixed Metabolic Cardio Training", isOutdoor: false },
+  31: { name: "Paddle Sports", isOutdoor: true },
+  32: { name: "Play", isOutdoor: true },
+  33: { name: "Preparation And Recovery", isOutdoor: false },
+  34: { name: "Racquetball", isOutdoor: false },
+  35: { name: "Rowing", isOutdoor: true },
+  36: { name: "Rugby", isOutdoor: true },
+  37: { name: "Running", isOutdoor: true },
+  38: { name: "Sailing", isOutdoor: true },
+  39: { name: "Skating Sports", isOutdoor: true },
+  40: { name: "Snow Sports", isOutdoor: true },
+  41: { name: "Soccer", isOutdoor: true },
+  42: { name: "Softball", isOutdoor: true },
+  43: { name: "Squash", isOutdoor: false },
+  44: { name: "Stair Climbing", isOutdoor: false },
+  45: { name: "Surfing Sports", isOutdoor: true },
+  46: { name: "Swimming", isOutdoor: false },
+  47: { name: "Table Tennis", isOutdoor: false },
+  48: { name: "Tennis", isOutdoor: true },
+  49: { name: "Track And Field", isOutdoor: true },
+  50: { name: "Traditional Strength Training", isOutdoor: false },
+  51: { name: "Volleyball", isOutdoor: true },
+  52: { name: "Walking", isOutdoor: true },
+  53: { name: "Water Fitness", isOutdoor: false },
+  54: { name: "Water Polo", isOutdoor: true },
+  55: { name: "Water Sports", isOutdoor: true },
+  56: { name: "Wrestling", isOutdoor: false },
+  57: { name: "Yoga", isOutdoor: false },
+  58: { name: "Barre", isOutdoor: false },
+  59: { name: "Core Training", isOutdoor: false },
+  60: { name: "Cross Country Skiing", isOutdoor: true },
+  61: { name: "Downhill Skiing", isOutdoor: true },
   62: { name: "Flexibility", isOutdoor: false },
-  64: { name: "Kickboxing", isOutdoor: false },
-  65: { name: "Stairs", isOutdoor: false },
+  63: { name: "High Intensity Interval Training", isOutdoor: false },
+  64: { name: "Jump Rope", isOutdoor: false },
+  65: { name: "Kickboxing", isOutdoor: false },
   66: { name: "Pilates", isOutdoor: false },
-  67: { name: "Jump Rope", isOutdoor: false },
-  70: { name: "Barre", isOutdoor: false },
-  71: { name: "Cooldown", isOutdoor: false },
-  73: { name: "Hand Cycling", isOutdoor: true },
-  74: { name: "Mixed Cardio", isOutdoor: false },
-  76: { name: "Tai Chi", isOutdoor: false },
-  77: { name: "Indoor Walk", isOutdoor: false },
-  79: { name: "Indoor Cycling", isOutdoor: false },
-  80: { name: "Pickleball", isOutdoor: true },
-  82: { name: "Cardio", isOutdoor: false },
+  67: { name: "Snowboarding", isOutdoor: true },
+  68: { name: "Stairs", isOutdoor: false },
+  69: { name: "Step Training", isOutdoor: false },
+  70: { name: "Wheelchair Walk Pace", isOutdoor: true },
+  71: { name: "Wheelchair Run Pace", isOutdoor: true },
+  72: { name: "Tai Chi", isOutdoor: false },
+  73: { name: "Mixed Cardio", isOutdoor: false },
+  74: { name: "Hand Cycling", isOutdoor: true },
+  75: { name: "Disc Sports", isOutdoor: true },
+  76: { name: "Fitness Gaming", isOutdoor: false },
+  77: { name: "Cardio Dance", isOutdoor: false },
+  78: { name: "Social Dance", isOutdoor: false },
+  79: { name: "Pickleball", isOutdoor: true },
+  80: { name: "Cooldown", isOutdoor: false },
+  82: { name: "Swim Bike Run", isOutdoor: true },
+  83: { name: "Transition", isOutdoor: false },
+  84: { name: "Underwater Diving", isOutdoor: true },
   // Default
   0: { name: "Other Workout", isOutdoor: false },
   3000: { name: "Other", isOutdoor: false },
 };
+
+/** "HighIntensityIntervalTraining" and "High Intensity Interval Training" compare equal. */
+function normalizeWorkoutName(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Whether a HealthKit workout happened outdoors: the activity's default,
+ * overridden by what the recording device said (an indoor run on a treadmill
+ * has HKIndoorWorkout = 1; a swim has HKSwimmingLocationType 1 = pool,
+ * 2 = open water).
+ */
+function isOutdoorWorkout(defaultIsOutdoor: boolean, metadata: any): boolean {
+  const indoor = metadata?.HKIndoorWorkout;
+  if (indoor === 1 || indoor === true) return false;
+  const swimLocation = metadata?.HKSwimmingLocationType;
+  if (swimLocation === 1) return false;
+  if (swimLocation === 2) return true;
+  return defaultIsOutdoor;
+}
 
 /**
  * At cold/background launch, HealthKit's store is protected by the same
@@ -114,6 +146,19 @@ const WORKOUT_TYPE_MAP: Record<number, { name: string; isOutdoor: boolean }> = {
 function isProtectedHealthDataError(error: any): boolean {
   const message = error?.message || String(error);
   return message.includes("Protected health data is inaccessible") || message.includes("AppleHealthKit error 0");
+}
+
+/**
+ * Thrown (only when asked for, see getWorkoutsForDate) when HealthKit is still
+ * locked after the retries above: typically a background launch while the
+ * phone is locked. Callers that would otherwise treat "no workouts" as real
+ * data, like the daily log resync, catch this and skip the sync instead.
+ */
+export class HealthDataLockedError extends Error {
+  constructor() {
+    super("Apple Health data is locked until the phone is unlocked");
+    this.name = "HealthDataLockedError";
+  }
 }
 
 function queryHealthKitWithRetry<T>(
@@ -349,7 +394,10 @@ class HealthService {
   /**
    * Get workouts for a specific date
    */
-  async getWorkoutsForDate(date: Date): Promise<WorkoutData[]> {
+  async getWorkoutsForDate(
+    date: Date,
+    { throwIfLocked = false }: { throwIfLocked?: boolean } = {}
+  ): Promise<WorkoutData[]> {
     logger.info("HealthKit getWorkoutsForDate called", { 
       date: date.toISOString(),
       isModuleLinked: this.isNativeModuleLinked(),
@@ -388,6 +436,14 @@ class HealthService {
       const { error, results } = await queryHealthKitWithRetry<any>((callback) =>
         this.HealthKit.getSamples(options, callback)
       );
+
+      if (error && isProtectedHealthDataError(error)) {
+        // Expected while the phone is locked (background launches), so only a
+        // breadcrumb rather than an error event.
+        logger.info("HealthKit workouts unavailable: phone locked", { options });
+        if (throwIfLocked) throw new HealthDataLockedError();
+        return [];
+      }
 
       if (error) {
         logger.error("HealthKit getSamples error", {
@@ -443,7 +499,7 @@ class HealthService {
         const finalActivityName = appleActivityName || workoutInfo.name;
 
         // Log to Sentry if there's a mismatch between Apple's name and our mapping
-        if (appleActivityName && appleActivityName.toLowerCase() !== workoutInfo.name.toLowerCase()) {
+        if (appleActivityName && normalizeWorkoutName(appleActivityName) !== normalizeWorkoutName(workoutInfo.name)) {
           logger.warn("Workout type mismatch - Apple name differs from our mapping", {
             appleActivityName,
             ourMappedName: workoutInfo.name,
@@ -461,7 +517,7 @@ class HealthService {
           distance: workout.distance || undefined,
           startDate: startDate.toISOString(),
           endDate: endDate.toISOString(),
-          isOutdoor: workoutInfo.isOutdoor,
+          isOutdoor: isOutdoorWorkout(workoutInfo.isOutdoor, workout.metadata),
           sourceName: workout.sourceName || undefined,
         };
       });
@@ -469,6 +525,7 @@ class HealthService {
       console.log(`🏋️ getWorkoutsForDate: Returning ${workouts.length} workouts`);
       return workouts;
     } catch (error: any) {
+      if (error instanceof HealthDataLockedError) throw error;
       console.error("Exception getting workouts:", error);
       logger.error("HealthKit workout fetch exception", {
         error: error?.message || String(error),

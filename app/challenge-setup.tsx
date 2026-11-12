@@ -268,6 +268,15 @@ export default function ChallengeSetupScreen() {
       }
       router.back();
     } catch (err) {
+      // CloudKit's quotaExceeded: the user's own iCloud storage is full, so
+      // retrying can't help until they free some space.
+      if ((err as any)?.code === "QUOTA_EXCEEDED") {
+        Alert.alert(
+          "iCloud storage is full",
+          "Ascend saves your challenge to your iCloud, which has no space left. Free up space in Settings → your name → iCloud, then try again."
+        );
+        return;
+      }
       Alert.alert("Error", "Failed to save challenge. Please try again.");
     }
   };

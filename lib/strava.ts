@@ -1,7 +1,7 @@
 import * as AuthSession from "expo-auth-session";
-import * as SecureStore from "expo-secure-store";
 import * as WebBrowser from "expo-web-browser";
 import { getExpoPushTokenAsync } from "./notifications";
+import { deleteSecureItem, getSecureItem, setSecureItem } from "./secureStorage";
 import { logger } from "./sentry";
 
 WebBrowser.maybeCompleteAuthSession();
@@ -119,20 +119,20 @@ function requireTokenServerUrl(): string {
 }
 
 async function storeTokens(tokens: StravaTokenResponse): Promise<void> {
-  await SecureStore.setItemAsync(ACCESS_TOKEN_KEY, tokens.access_token);
-  await SecureStore.setItemAsync(REFRESH_TOKEN_KEY, tokens.refresh_token);
-  await SecureStore.setItemAsync(EXPIRES_AT_KEY, String(tokens.expires_at));
+  await setSecureItem(ACCESS_TOKEN_KEY, tokens.access_token);
+  await setSecureItem(REFRESH_TOKEN_KEY, tokens.refresh_token);
+  await setSecureItem(EXPIRES_AT_KEY, String(tokens.expires_at));
   if (tokens.athlete?.id) {
-    await SecureStore.setItemAsync(ATHLETE_ID_KEY, String(tokens.athlete.id));
+    await setSecureItem(ATHLETE_ID_KEY, String(tokens.athlete.id));
   }
 }
 
 export async function isStravaConnected(): Promise<boolean> {
-  return (await SecureStore.getItemAsync(REFRESH_TOKEN_KEY)) !== null;
+  return (await getSecureItem(REFRESH_TOKEN_KEY)) !== null;
 }
 
 export async function getStoredAthleteId(): Promise<string | null> {
-  return SecureStore.getItemAsync(ATHLETE_ID_KEY);
+  return getSecureItem(ATHLETE_ID_KEY);
 }
 
 /**
@@ -211,12 +211,12 @@ export class StravaAuthCancelledError extends Error {
 }
 
 export async function disconnectStrava(): Promise<void> {
-  const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
+  const accessToken = await getSecureItem(ACCESS_TOKEN_KEY);
   await Promise.all([
-    SecureStore.deleteItemAsync(ACCESS_TOKEN_KEY),
-    SecureStore.deleteItemAsync(REFRESH_TOKEN_KEY),
-    SecureStore.deleteItemAsync(EXPIRES_AT_KEY),
-    SecureStore.deleteItemAsync(ATHLETE_ID_KEY),
+    deleteSecureItem(ACCESS_TOKEN_KEY),
+    deleteSecureItem(REFRESH_TOKEN_KEY),
+    deleteSecureItem(EXPIRES_AT_KEY),
+    deleteSecureItem(ATHLETE_ID_KEY),
   ]);
 
   if (accessToken) {
@@ -233,11 +233,11 @@ export async function disconnectStrava(): Promise<void> {
  * when it's expired or close to it. Returns null if Strava isn't connected.
  */
 export async function getValidAccessToken(): Promise<string | null> {
-  const refreshToken = await SecureStore.getItemAsync(REFRESH_TOKEN_KEY);
+  const refreshToken = await getSecureItem(REFRESH_TOKEN_KEY);
   if (!refreshToken) return null;
 
-  const accessToken = await SecureStore.getItemAsync(ACCESS_TOKEN_KEY);
-  const expiresAt = Number((await SecureStore.getItemAsync(EXPIRES_AT_KEY)) ?? 0);
+  const accessToken = await getSecureItem(ACCESS_TOKEN_KEY);
+  const expiresAt = Number((await getSecureItem(EXPIRES_AT_KEY)) ?? 0);
   const nowSeconds = Date.now() / 1000;
 
   if (accessToken && expiresAt - nowSeconds > REFRESH_MARGIN_SECONDS) {

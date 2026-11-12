@@ -245,7 +245,11 @@ class HealthSyncService {
    * @param date Date of the measurement (defaults to now)
    */
   async saveWeight(kilograms: number, date: Date = new Date()): Promise<boolean> {
-    if (!await this.ensureAuthorized()) return false;
+    if (!await this.ensureAuthorized()) {
+      // Breadcrumb, so the "returned false" warning in log-weight says why.
+      logger.info("Apple Health weight save skipped: not authorized");
+      return false;
+    }
 
     try {
       const { saveQuantitySample } = this.HealthKit;
@@ -261,6 +265,7 @@ class HealthSyncService {
       return true;
     } catch (error: any) {
       console.error("❌ HealthSync: Failed to save weight:", error);
+      logger.info("Apple Health weight save failed", { error: error?.message || String(error) });
       return false;
     }
   }
