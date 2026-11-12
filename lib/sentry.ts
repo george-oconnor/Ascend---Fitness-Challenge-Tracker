@@ -1,6 +1,7 @@
 import * as Sentry from "@sentry/react-native";
 import Constants from "expo-constants";
 import * as Updates from "expo-updates";
+import { getAppVersion } from "./appVersion";
 
 const dsn = process.env.EXPO_PUBLIC_SENTRY_DSN;
 
@@ -89,6 +90,17 @@ export function initSentry() {
   //     level: "info",
   //   });
   // }
+
+  // Which JavaScript is running, so an error can be traced to the OTA update
+  // that shipped it. The release (app version + build) only names the
+  // installed binary, which stays the same across updates.
+  const version = getAppVersion();
+  Sentry.setTags({
+    "update.number": version.updateNumber ?? (version.isBuiltIn ? "built-in" : "unknown"),
+    "update.commit": version.commit ?? "unknown",
+    "update.channel": version.channel ?? "none",
+    "update.id": Updates.updateId ?? "built-in",
+  });
 
   console.log(`✅ Sentry initialized (${environment})`);
 }
