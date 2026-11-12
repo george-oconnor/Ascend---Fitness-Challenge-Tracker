@@ -21,7 +21,7 @@ Four GitHub Actions workflows handle checks, over-the-air (OTA) updates and buil
 
 The `server/` folder (the Strava token proxy) is a separate Vercel project and isn't touched by these workflows.
 
-**Which version am I on?** The bottom of the Settings screen shows e.g. **Ascend 2.1.1 (3) · update 12 · 4670153**: the app version and build, then the update number (the "Mobile OTA update" run that published it, also shown in that run's summary) and its commit. Promoting keeps the same number, so the App Store build shows it too. "built-in" means the app hasn't downloaded an update yet; close and reopen it (an update downloads on one launch and applies on the next).
+**Which version am I on?** The bottom of the Settings screen shows e.g. **Ascend 2.1.1 (3) · update 12 · 4670153**: the app version and build, then the update number (the "Mobile OTA update" run that published it, also shown in that run's summary) and its commit. Promoting keeps the same number, so the App Store build shows it too. "built-in" means the app hasn't downloaded an update yet; close and reopen it (an update downloads on one launch and applies on the next). Sentry events carry the same details as tags (`update.number`, `update.commit`, `update.channel`, `update.id`), so you can filter errors by update, e.g. `update.number:12`.
 
 OTA updates only reach builds with the **same app version** (`runtimeVersion` policy `appVersion`, currently 2.1.1). After bumping `version` in `app.json`, ship a build first. Builds made before this setup (2.1.1 build 2 and earlier) don't include `expo-updates`, so they never receive updates.
 
