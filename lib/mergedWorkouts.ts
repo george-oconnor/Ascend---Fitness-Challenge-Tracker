@@ -77,7 +77,9 @@ export async function getMergedWorkoutsForDate(
   date: Date,
   { log = () => {}, forceStravaFetch = false }: MergedWorkoutOptions = {}
 ): Promise<MergedWorkout[]> {
-  const healthWorkouts = await healthService.getWorkoutsForDate(date);
+  // Throws HealthDataLockedError rather than returning [] when the phone is
+  // locked, so callers don't mistake "can't read" for "no workouts".
+  const healthWorkouts = await healthService.getWorkoutsForDate(date, { throwIfLocked: true });
 
   let stravaWorkouts: MergedWorkout[] | null = null;
   try {

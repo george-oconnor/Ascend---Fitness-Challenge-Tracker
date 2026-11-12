@@ -7,7 +7,6 @@
  * into iCloud — a separate condition checked with getCloudKitAccountStatus.
  */
 import * as AppleAuthentication from 'expo-apple-authentication';
-import * as SecureStore from 'expo-secure-store';
 import {
   createUserProfile,
   ensureUserZone,
@@ -15,33 +14,11 @@ import {
   getCloudKitUserRecordName,
   getUserProfile,
 } from './cloudkit';
+import { deleteSecureItem, getSecureItem, migrateSecureItems, setSecureItem } from './secureStorage';
 
 const SIWA_USER_KEY = 'siwa_user_id';
 const SIWA_EMAIL_KEY = 'siwa_email';
 const SIWA_NAME_KEY = 'siwa_name';
-
-/**
- * At cold launch, SecureStore reads can hit iOS's `errSecInteractionNotAllowed`
- * for a window before `UIApplicationProtectedDataDidBecomeAvailable` fires —
- * even though the device is unlocked. On some devices/launch paths (e.g. right
- * after a reboot's first unlock) that window has been observed to run past a
- * second, so back off with growing delays rather than a few quick retries.
- * `checkSession` keeps status "loading" (no redirect to the sign-in screen)
- * for as long as this is in flight, so it's safe to keep trying here.
- */
-async function getItemWithRetry(key: string, attempts = 7, baseDelayMs = 150): Promise<string | null> {
-  for (let attempt = 1; attempt <= attempts; attempt++) {
-    try {
-      return await SecureStore.getItemAsync(key);
-    } catch (err) {
-      const isInteractionError = String(err).includes('User interaction is not allowed');
-      if (!isInteractionError || attempt === attempts) throw err;
-      const delayMs = Math.min(baseDelayMs * 2 ** (attempt - 1), 1500);
-      await new Promise((resolve) => setTimeout(resolve, delayMs));
-    }
-  }
-  return null;
-}
 
 export type AppleIdentity = {
   appleUserId: string;
@@ -92,28 +69,31 @@ export async function signInWithApple(): Promise<AppleIdentity> {
     ? [credential.fullName.givenName, credential.fullName.familyName].filter(Boolean).join(' ').trim()
     : '';
 
-  const email = credential.email ?? (await getItemWithRetry(SIWA_EMAIL_KEY)) ?? undefined;
-  const fullName = nameFromCredential || (await getItemWithRetry(SIWA_NAME_KEY)) || undefined;
+  const email = credential.email ?? (await getSecureItem(SIWA_EMAIL_KEY)) ?? undefined;
+  const fullName = nameFromCredential || (await getSecureItem(SIWA_NAME_KEY)) || undefined;
 
-  await SecureStore.setItemAsync(SIWA_USER_KEY, appleUserId);
-  if (email) await SecureStore.setItemAsync(SIWA_EMAIL_KEY, email);
-  if (fullName) await SecureStore.setItemAsync(SIWA_NAME_KEY, fullName);
+  await setSecureItem(SIWA_USER_KEY, appleUserId);
+  if (email) await setSecureItem(SIWA_EMAIL_KEY, email);
+  if (fullName) await setSecureItem(SIWA_NAME_KEY, fullName);
 
   return { appleUserId, email, fullName };
 }
 
 export async function getStoredIdentity(): Promise<AppleIdentity | null> {
-  const appleUserId = await getItemWithRetry(SIWA_USER_KEY);
+  // Older versions stored these readable only while unlocked; move them to
+  // after-first-unlock so background launches can read them (foreground only).
+  await migrateSecureItems();
+  const appleUserId = await getSecureItem(SIWA_USER_KEY);
   if (!appleUserId) return null;
-  const email = (await getItemWithRetry(SIWA_EMAIL_KEY)) ?? undefined;
-  const fullName = (await getItemWithRetry(SIWA_NAME_KEY)) ?? undefined;
+  const email = (await getSecureItem(SIWA_EMAIL_KEY)) ?? undefined;
+  const fullName = (await getSecureItem(SIWA_NAME_KEY)) ?? undefined;
   return { appleUserId, email, fullName };
 }
 
 export async function clearStoredIdentity(): Promise<void> {
-  await SecureStore.deleteItemAsync(SIWA_USER_KEY);
-  await SecureStore.deleteItemAsync(SIWA_EMAIL_KEY);
-  await SecureStore.deleteItemAsync(SIWA_NAME_KEY);
+  await deleteSecureItem(SIWA_USER_KEY);
+  await deleteSecureItem(SIWA_EMAIL_KEY);
+  await deleteSecureItem(SIWA_NAME_KEY);
 }
 
 /** AUTHORIZED means the Apple ID still trusts this app. REVOKED/NOT_FOUND require re-auth. */
